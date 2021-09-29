@@ -26,7 +26,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final Object lockObj = new Object();
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
-    public static final int THREAD_PARK_TIMEOUT = 3;
+    public static final int THREAD_PARK_TIMEOUT = 10;
     public static final int MERGE_MIN_THREAD_COUNT = 20;
     static {
         try {
@@ -54,7 +54,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static volatile ByteBuffer mergeBuffer = ByteBuffer.allocateDirect(18 * 1024 * 50);
     public static final AtomicLong mergeBufferPosition = new AtomicLong(((DirectBuffer) mergeBuffer).address());
 
-    public static final long TIMEOUT = 5*60;  // seconds
+    public static final long TIMEOUT = 3*60;  // seconds
     public static final int DATA_INFORMATION_LENGTH = 7;
 
     public static void killSelf(long timeout) {
