@@ -139,6 +139,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     if(pos > forcedDataPosition) {
                         dataWChannel.force(true);
                         forcedDataPosition = pos;
+                        for (Thread thread : threadSet) {
+                            unsafe.unpark(thread);
+                        }
                     }
                 }
             }

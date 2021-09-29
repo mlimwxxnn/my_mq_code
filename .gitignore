@@ -3,3 +3,5 @@
 *.jar
 *.iml
 target/
+*.txt
+essd/
