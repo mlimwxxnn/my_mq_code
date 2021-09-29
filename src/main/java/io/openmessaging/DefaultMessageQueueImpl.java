@@ -13,18 +13,20 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class DefaultMessageQueueImpl extends MessageQueue {
 
-    public static final File DISC_ROOT = new File("/essd");
-    public static final File PMEM_ROOT = new File("/pmem");
+    public static final File DISC_ROOT = new File("./essd");
+    public static final File PMEM_ROOT = new File("./pmem");
     public static final File dataFile = new File(DISC_ROOT, "data");
-    public static FileChannel dataWChannel;
-    public static FileChannel dataRChannel;
+    public static FileChannel dataWriteChannel;
+    public static FileChannel dataReadChannel;
     public static final Object lockObj = new Object();
+    public static final AtomicInteger appendCount = new AtomicInteger();
+    public static final AtomicInteger getRangeCount = new AtomicInteger();
     static {
         try {
             if (!dataFile.exists()) dataFile.createNewFile();
-            dataWChannel = FileChannel.open(dataFile.toPath(),
+            dataWriteChannel = FileChannel.open(dataFile.toPath(),
                     StandardOpenOption.APPEND, StandardOpenOption.WRITE);
-            dataRChannel = FileChannel.open(dataFile.toPath(), StandardOpenOption.READ);
+            dataReadChannel = FileChannel.open(dataFile.toPath(), StandardOpenOption.READ);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -39,7 +41,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static HashSet<Thread> threadSet = new HashSet<>(100);  // 存储调用过append方法的线程
     public static AtomicInteger blockedTheadCount = new AtomicInteger();
     public static long forcedDataPosition = 0;
-    public static final long TIMEOUT = 30*60;  // seconds
+    public static final long TIMEOUT = 5*60;  // seconds
 
     public static void killSelf(long timeout) {
         new Thread(()->{
@@ -62,7 +64,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         if ((dataFilesize = dataFile.length()) > 0) {
             try {
                 ByteBuffer readBuffer = ByteBuffer.allocate(7);
-                FileChannel channel = dataRChannel;
+                FileChannel channel = dataReadChannel;
                 byte topicId;
                 int queueId;
                 short dataLen = 0;
@@ -97,6 +99,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
+        int appendCountNow = appendCount.incrementAndGet();
+        if (appendCountNow % 10000 == 0){
+            System.out.println("appendCountNow: " + appendCountNow);
+        }
         try {
             long offset;
             long pos;
@@ -125,20 +131,22 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 
             synchronized (lockObj) {
-                dataWChannel.write(outBuffer);
-                dataWChannel.write(data);
-                pos = dataWChannel.position();
+                dataWriteChannel.write(outBuffer);
+                dataWriteChannel.write(data);
+                pos = dataWriteChannel.position();
             }
 
             if(blockedTheadCount.get() < 10) {
                 blockedTheadCount.getAndIncrement();
-                unsafe.park(true, 50);
+                unsafe.park(true, 10);
             }
             if(pos > forcedDataPosition) {
                 synchronized(lockObj){
                     if(pos > forcedDataPosition) {
-                        dataWChannel.force(true);
-                        forcedDataPosition = pos;
+                        dataWriteChannel.force(true);
+                        // 这里改了
+                        // forcedDataPosition = pos;
+                        forcedDataPosition = dataWriteChannel.position();
                         threadSet.forEach(unsafe::unpark);
                     }
                 }
@@ -192,12 +200,17 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 for (int i = (int) offset; i < (int) (offset + fetchNum) && i < queueInfo.size(); ++i) {
                     long[] p = queueInfo.get(i);
                     ByteBuffer buf = ByteBuffer.allocate((int) p[1]);
-                    dataRChannel.read(buf, p[0]);
+                    dataReadChannel.read(buf, p[0]);
                     buf.flip();
                     ret.put(i, buf);
                 }
             }
         }catch (Exception ignored){ }
+
+        int getRangeCountNow = getRangeCount.incrementAndGet();
+        if (getRangeCountNow % 10000 == 0){
+            System.out.println("getRangeCountNow: " + getRangeCountNow);
+        }
         return ret;
     }
 
