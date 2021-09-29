@@ -21,6 +21,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final Object lockObj = new Object();
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
+    public static final int THREAD_PARK_TIMEOUT = 3;
     static {
         try {
             if (!dataFile.exists()) dataFile.createNewFile();
@@ -38,7 +39,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     // topicId, queueId, dataPosition
     public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, ArrayList<long[]>>> metaInfo = new ConcurrentHashMap<>();
     public static final Unsafe unsafe = UnsafeUtil.unsafe;
-    public volatile static HashSet<Thread> threadSet = new HashSet<>(100);  // 存储调用过append方法的线程
+    public static volatile HashSet<Thread> threadSet = new HashSet<>(100);  // 存储调用过append方法的线程
     public static AtomicInteger blockedTheadCount = new AtomicInteger();
     public static long forcedDataPosition = 0;
     public static final long TIMEOUT = 5*60;  // seconds
@@ -136,9 +137,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 pos = dataWriteChannel.position();
             }
 
-            if(blockedTheadCount.get() < 10) {
+            if(blockedTheadCount.get() < 30) {
                 blockedTheadCount.getAndIncrement();
-                unsafe.park(true, 10);
+                unsafe.park(true, THREAD_PARK_TIMEOUT);
             }
             if(pos > forcedDataPosition) {
                 synchronized(lockObj){
@@ -193,7 +194,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
         Byte topicId = getTopicId(topic);
         ArrayList<long[]> queueInfo = metaInfo.get(topicId).get(queueId);
-        ByteBuffer readerBuffer = ByteBuffer.allocateDirect(17 * 1024);
+        // 这里改了
+        // ByteBuffer readerBuffer = ByteBuffer.allocateDirect(17 * 1024);
         HashMap<Integer, ByteBuffer> ret = new HashMap<>();
         try {
             synchronized (queueInfo) {
