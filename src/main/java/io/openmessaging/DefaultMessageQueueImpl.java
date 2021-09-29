@@ -168,10 +168,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //            readLock.unlock();
             long l4 = System.currentTimeMillis();
             dataToForceSet.put(data, data);
+            parkedThreadSet.put(Thread.currentThread(), Thread.currentThread());
             if(parkedThreadSet.size() < MERGE_MIN_THREAD_COUNT) {
                 // 登记需要刷盘的数据
                 // 登记需要被唤醒的数据
-                parkedThreadSet.put(Thread.currentThread(), Thread.currentThread());
                 long l5 = System.currentTimeMillis();
                 System.out.println("l4 - l5: " + (l5 - l4));
                 unsafe.park(true, THREAD_PARK_TIMEOUT);
