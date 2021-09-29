@@ -181,7 +181,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     Thread.sleep(1);
                 }
                 mergeBuffer.limit((int) (mergeBufferPosition.get() - initialAddress));
+
+                long start = System.currentTimeMillis();
                 dataWriteChannel.write(mergeBuffer);
+                dataWriteChannel.force(true);
+                long stop = System.currentTimeMillis();
+                System.out.println(String.format("mergeSize: %d kb, use time: %d", mergeBuffer.limit() / 1024, stop - start));
+
                 mergeBuffer.clear();
                 dataToForceSet.clear();
                 parkedThreadSet.clear();
