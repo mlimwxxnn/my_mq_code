@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class DefaultMessageQueueImpl extends MessageQueue {
 
+    public static final boolean DEBUG = true;
     public static final File DISC_ROOT = new File("/essd");
     public static final File PMEM_ROOT = new File("/pmem");
     public static final File dataFile = new File(DISC_ROOT, "data");
@@ -48,9 +49,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         new Thread(()->{
             try {
                 Thread.sleep(timeout * 1000);
-                System.out.println("kill myself");
+                long writtenSize = dataWriteChannel.position() / (1024 * 1024);  // M
+                System.out.println(String.format("kill myself(written: %d)", writtenSize));
                 System.exit(-1);
-            } catch (InterruptedException e) {
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }).start();
@@ -100,10 +102,20 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
-        int appendCountNow = appendCount.incrementAndGet();
-        if (appendCountNow % 10000 == 0){
-            System.out.println("appendCountNow: " + appendCountNow);
+        // 打印所有已经append的条数
+        if (DEBUG){
+            try {
+                int appendCountNow = appendCount.incrementAndGet();
+                long writtenSize = dataWriteChannel.position() / (1024 * 1024);  // M
+                if (appendCountNow % 10000 == 0){
+                    System.out.println(String.format("appendCountNow: %d, writtenSize: %d", appendCountNow, writtenSize));
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
         }
+
         try {
             long offset;
             long pos;
@@ -179,7 +191,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     fos.write(topicId);
                     fos.flush();
                     fos.close();
-
                 } else {
                     // 文件存在，topic不在内存，从文件恢复
                     FileInputStream fis = new FileInputStream(new File(DISC_ROOT, topic));
@@ -208,10 +219,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 }
             }
         }catch (Exception ignored){ }
-
-        int getRangeCountNow = getRangeCount.incrementAndGet();
-        if (getRangeCountNow % 10000 == 0){
-            System.out.println("getRangeCountNow: " + getRangeCountNow);
+        // 打印总体已经响应查询的次数
+        if (DEBUG){
+            int getRangeCountNow = getRangeCount.incrementAndGet();
+            if (getRangeCountNow % 10000 == 0){
+                System.out.println("getRangeCountNow: " + getRangeCountNow);
+            }
         }
         return ret;
     }
