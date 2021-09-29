@@ -1,64 +1,175 @@
 package io.openmessaging;
 
+import sun.misc.Unsafe;
+
+import java.io.*;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * 这是一个简单的基于内存的实现，以方便选手理解题意；
- * 实际提交时，请维持包名和类名不变，把方法实现修改为自己的内容；
- */
+
 public class DefaultMessageQueueImpl extends MessageQueue {
-    ConcurrentHashMap<String, Map<Integer, Long>> appendOffset = new ConcurrentHashMap<>();
-    ConcurrentHashMap<String, Map<Integer, Map<Long, ByteBuffer>>> appendData = new ConcurrentHashMap<>();
 
-    // getOrPutDefault 若指定key不存在，则插入defaultValue并返回
-    private <K, V> V getOrPutDefault(Map<K, V> map, K key, V defaultValue){
-        V retObj = map.get(key);
-        if(retObj != null){
-            return retObj;
+    public static final File DISC_ROOT = new File("/essd");
+    public static final File PMEM_ROOT = new File("/pmem");
+    public static final File dataFile = new File(DISC_ROOT, "data");
+    public static FileChannel dataChannel;
+
+    static {
+        try {
+            dataChannel = FileChannel.open(new File(DISC_ROOT, "dataFile").toPath(),
+                    StandardOpenOption.APPEND, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-        map.put(key, defaultValue);
-        return defaultValue;
+    }
+
+    public static AtomicInteger topicCount = new AtomicInteger();
+    ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
+    public ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
+    // topicId, queueId, dataPosition
+    ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, ArrayList<long[]>>> metaInfo = new ConcurrentHashMap<>();
+
+
+    public DefaultMessageQueueImpl() {
+        long dataFilesize;
+
+        // 如果数据文件里有东西就从文件恢复索引
+        if ((dataFilesize = dataFile.length()) > 0) {
+            try {
+                ByteBuffer readBuffer = ByteBuffer.allocate(8);
+                FileChannel channel = FileChannel.open(dataFile.toPath(), StandardOpenOption.READ);
+                channel.read(readBuffer);
+                readBuffer.flip();
+                byte topicId;
+                int queueId;
+                short dataLen = 0;
+                ConcurrentHashMap<Integer, ArrayList<long[]>> topicInfo;
+                ArrayList<long[]> queueInfo;
+                while (channel.position() < dataFilesize) {
+                    channel.position(channel.position() + dataLen); // 跳过数据部分只读取数据头部的索引信息
+                    channel.read(readBuffer);
+                    readBuffer.flip();
+                    topicId = readBuffer.get();
+                    queueId = readBuffer.getInt();
+                    dataLen = readBuffer.getShort();
+                    topicInfo = metaInfo.get(topicId);
+                    if (topicInfo == null) {
+                        topicInfo = new ConcurrentHashMap<>(5000);
+                        metaInfo.put(topicId, topicInfo);
+                    }
+                    queueInfo = topicInfo.get(queueId);
+                    if (queueInfo == null) {
+                        queueInfo = new ArrayList<>(64);
+                        topicInfo.put(queueId, queueInfo);
+                    }
+                    queueInfo.add(new long[]{channel.position(), dataLen});
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     @Override
-    public long append(String topic, int queueId, ByteBuffer data){
-        // 获取该 topic-queueId 下的最大位点 offset
-        Map<Integer, Long> topicOffset = getOrPutDefault(appendOffset, topic, new HashMap<>());
-        long offset = topicOffset.getOrDefault(queueId, 0L);
-        // 更新最大位点
-        topicOffset.put(queueId, offset+1);
+    public long append(String topic, int queueId, ByteBuffer data) {
+        long offset;
+        try {
+            File topicFolder = new File(DISC_ROOT, topic);
+            byte topicId = getTopicId(topic);
 
-        Map<Integer, Map<Long, ByteBuffer>> map1 = getOrPutDefault(appendData, topic, new HashMap<>());
-        Map<Long, ByteBuffer> map2 = getOrPutDefault(map1, queueId, new HashMap<>());
-        // 保存 data 中的数据
-        ByteBuffer buf = ByteBuffer.allocate(data.remaining());
-        buf.put(data);
-        map2.put(offset, buf);
-        return offset;
+            // 根据topicId获取topic下的队列信息
+            ConcurrentHashMap<Integer, ArrayList<long[]>> topicInfo = metaInfo.get(topicId);
+            if(topicInfo == null) {
+                topicInfo = new ConcurrentHashMap<Integer, ArrayList<long[]>>();
+                metaInfo.put(topicId, topicInfo);
+            }
+            // 根据queueId获取队列在文件中的位置信息
+            ArrayList<long[]> queueInfo = topicInfo.get(queueId);
+            if(queueInfo == null){
+                queueInfo = new ArrayList<>();
+                topicInfo.put(queueId, queueInfo);
+            }
+            offset = queueInfo.size();
+
+
+
+            return offset;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return 0L;
+        }
+    }
+
+    /**
+     * 创建或并返回topic对应的topicId
+     * @param topic 话题名
+     * @return
+     * @throws IOException
+     */
+    private Byte getTopicId(String topic) throws IOException {
+
+        Byte topicId = topicNameToTopicId.get(topic);
+        if (topicId == null) {
+            File topicIdFile = new File(DISC_ROOT, topic);
+            if (!topicIdFile.exists()) {
+                // 文件不存在，这是一个新的Topic，保存topic名称到topicId的映射，文件名为topic，内容为id
+                topicNameToTopicId.put(topic, topicId = (byte) topicCount.getAndDecrement());
+                FileOutputStream fos = new FileOutputStream(new File(DISC_ROOT, topic));
+                fos.write(topicId);
+                fos.flush();
+                fos.close();
+            } else {
+                // 文件存在，topic不在内存，从文件恢复
+                FileInputStream fis = new FileInputStream(new File(DISC_ROOT, topic));
+                topicId = (byte) fis.read();
+            }
+        }
+        return topicId;
     }
 
     @Override
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
-        Map<Integer, ByteBuffer> ret = new HashMap<>();
-        for(int i = 0; i < fetchNum; i++){
-            Map<Integer, Map<Long, ByteBuffer>> map1 = appendData.get(topic);
-            if(map1 == null){
-                break;
-            }
-            Map<Long, ByteBuffer> m2 = map1.get(queueId);
-            if(m2 == null){
-                break;
-            }
-            ByteBuffer buf = m2.get(offset+i);
-            if(buf != null){
-                // 返回前确保 ByteBuffer 的 remain 区域为完整答案
-                buf.position(0);
-                buf.limit(buf.capacity());
-                ret.put(i,buf);
+        ArrayList<long[]> position = metaInfo.get(topic).get(queueId);
+        ByteBuffer readerBuffer = ByteBuffer.allocateDirect(17 * 1024);
+        HashMap<Integer, ByteBuffer> ret = new HashMap<>();
+        synchronized (position) {
+            for (int i = (int) offset; i < (int) (offset + fetchNum) && i < position.size(); ++i) {
+                long[] p = position.get(i);
+                ByteBuffer buf = ByteBuffer.allocate((int) p[1]);
+
+                ret.put(i, buf);
             }
         }
         return ret;
     }
+
+    private <K, V> V getOrPutDefault(Map<K, V> map, K key, V defaultValue) {
+        V retObj = map.get(key);
+        if (retObj != null) {
+            return retObj;
+        }
+
+        map.put(key, defaultValue);
+        return defaultValue;
+    }
+
+    public static void main(String[] args) throws IOException {
+        FileChannel open = FileChannel.open(new File("aaa.txt").toPath(), StandardOpenOption.APPEND, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+        FileChannel channel = open;
+        ByteBuffer buf = ByteBuffer.allocate(128);
+        buf.put("hello world".getBytes());
+        buf.flip();
+        int write = channel.write(buf);
+        buf.position(0);
+        channel.write(buf);
+        channel.force(true);
+        System.out.println(channel.position());
+
+    }
+
+
 }
