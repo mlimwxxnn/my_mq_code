@@ -22,7 +22,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final Object lockObj = new Object();
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
-    public static final int THREAD_PARK_TIMEOUT = 3;
+    public static final int THREAD_PARK_TIMEOUT = 50;
     static {
         try {
             if (!dataFile.exists()) dataFile.createNewFile();
