@@ -36,9 +36,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
     public ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
     // topicId, queueId, dataPosition
-    public static ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, ArrayList<long[]>>> metaInfo = new ConcurrentHashMap<>();
+    public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, ArrayList<long[]>>> metaInfo = new ConcurrentHashMap<>();
     public static final Unsafe unsafe = UnsafeUtil.unsafe;
-    public static HashSet<Thread> threadSet = new HashSet<>(100);  // 存储调用过append方法的线程
+    public volatile static HashSet<Thread> threadSet = new HashSet<>(100);  // 存储调用过append方法的线程
     public static AtomicInteger blockedTheadCount = new AtomicInteger();
     public static long forcedDataPosition = 0;
     public static final long TIMEOUT = 5*60;  // seconds
