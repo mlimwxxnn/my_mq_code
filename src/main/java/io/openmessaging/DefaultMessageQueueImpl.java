@@ -1,6 +1,7 @@
 package io.openmessaging;
 
 import sun.misc.Unsafe;
+import sun.nio.ch.DirectBuffer;
 
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -9,6 +10,9 @@ import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 
 public class DefaultMessageQueueImpl extends MessageQueue {
@@ -22,7 +26,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final Object lockObj = new Object();
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
-    public static final int THREAD_PARK_TIMEOUT = 50;
+    public static final int THREAD_PARK_TIMEOUT = 3;
+    public static final int MERGE_MIN_THREAD_COUNT = 20;
     static {
         try {
             if (!dataFile.exists()) dataFile.createNewFile();
@@ -36,14 +41,21 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static AtomicInteger topicCount = new AtomicInteger();
     ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
-    public ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
     // topicId, queueId, dataPosition
     public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, ArrayList<long[]>>> metaInfo = new ConcurrentHashMap<>();
     public static final Unsafe unsafe = UnsafeUtil.unsafe;
-    public static volatile HashSet<Thread> threadSet = new HashSet<>(100);  // 存储调用过append方法的线程
-    public static AtomicInteger blockedTheadCount = new AtomicInteger();
-    public static long forcedDataPosition = 0;
+    // 用来控制不同轮次的数据不被干扰
+    public static final ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+    public static final Lock writeLock = readWriteLock.writeLock();
+    public static final Lock readLock = readWriteLock.readLock();
+    public static volatile Map<Thread, Thread> parkedThreadSet = new ConcurrentHashMap<>(100);  // 存储调用过append方法的线程 k: thread, v: self
+    public static volatile Map<ByteBuffer, ByteBuffer> dataToForceSet = new ConcurrentHashMap<>();  // 存储需要被force的data, k: byteBuffer, v: self
+
+    public static volatile ByteBuffer mergeBuffer = ByteBuffer.allocateDirect(18 * 1024 * 50);
+    public static final AtomicLong mergeBufferPosition = new AtomicLong(((DirectBuffer) mergeBuffer).address());
+
     public static final long TIMEOUT = 5*60;  // seconds
+    public static final int DATA_INFORMATION_LENGTH = 7;
 
     public static void killSelf(long timeout) {
         new Thread(()->{
@@ -66,7 +78,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         // 如果数据文件里有东西就从文件恢复索引
         if ((dataFilesize = dataFile.length()) > 0) {
             try {
-                ByteBuffer readBuffer = ByteBuffer.allocate(7);
+                ByteBuffer readBuffer = ByteBuffer.allocate(DATA_INFORMATION_LENGTH);
                 FileChannel channel = dataReadChannel;
                 byte topicId;
                 int queueId;
@@ -118,9 +130,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         try {
             long offset;
-            long pos;
-            threadSet.add(Thread.currentThread());
             byte topicId = getTopicId(topic);
+            int dataLength = data.remaining(); // 默认data的position是从 0 开始的
+            long channelPosition = dataWriteChannel.position();
 
             // 根据topicId获取topic下的全部队列的信息
             ConcurrentHashMap<Integer, ArrayList<long[]>> topicInfo = metaInfo.get(topicId);
@@ -135,37 +147,49 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 topicInfo.put(queueId, queueInfo);
             }
             offset = queueInfo.size();
+            long initialAddress = ((DirectBuffer) mergeBuffer).address();
+            readLock.lock();
+            // 登记需要刷盘的数据
+            dataToForceSet.put(data, data);
+            long writeAddress = mergeBufferPosition.getAndAdd(DATA_INFORMATION_LENGTH + dataLength);
+            int index = (int)(writeAddress - initialAddress);
+            mergeBuffer.put(index, topicId);
+            mergeBuffer.putInt(index + 1, queueId);
+            mergeBuffer.putShort(index + 5, (short) dataLength);
 
-            ByteBuffer outBuffer = ByteBuffer.allocate(8);
-            outBuffer.put(topicId);
-            outBuffer.putInt(queueId);
-            outBuffer.putShort((short)data.remaining());
-            outBuffer.flip();
+//            unsafe.putByte(writeAddress, topicId);
+//            writeAddress += 1;
+//            unsafe.putInt(writeAddress, queueId);
+//            writeAddress += 4;
+//            unsafe.putShort(writeAddress, (short) dataLength);
+//            writeAddress += 2;
 
+            unsafe.copyMemory(data.array(), 16 + data.position(), null, writeAddress + DATA_INFORMATION_LENGTH, dataLength);
+            readLock.unlock();
 
-            synchronized (lockObj) {
-                dataWriteChannel.write(outBuffer);
-                dataWriteChannel.write(data);
-                pos = dataWriteChannel.position();
-            }
-
-            if(blockedTheadCount.get() < 30) {
-                blockedTheadCount.getAndIncrement();
+            if(parkedThreadSet.size() < MERGE_MIN_THREAD_COUNT) {
+                // 登记需要被唤醒的数据
+                parkedThreadSet.put(Thread.currentThread(), Thread.currentThread());
                 unsafe.park(true, THREAD_PARK_TIMEOUT);
             }
-            if(pos > forcedDataPosition) {
-                synchronized(lockObj){
-                    if(pos > forcedDataPosition) {
-                        dataWriteChannel.force(true);
-                        // 这里改了
-                        // forcedDataPosition = pos;
-                        forcedDataPosition = dataWriteChannel.position();
-                        threadSet.forEach(unsafe::unpark);
-                    }
-                }
-            }
 
-            queueInfo.add(new long[]{pos - data.limit(), data.limit()}); // todo: 占用大小待优化
+            // 自己的 data 还没被 force
+            if (dataToForceSet.containsKey(data)){
+                writeLock.lock();
+                // 等待各个线程拷贝完毕
+                while (parkedThreadSet.size() != dataToForceSet.size()){
+                    Thread.sleep(1);
+                }
+                mergeBuffer.limit((int) (mergeBufferPosition.get() - initialAddress));
+                dataWriteChannel.write(mergeBuffer);
+                mergeBuffer.clear();
+                dataToForceSet.clear();
+                parkedThreadSet.clear();
+                mergeBufferPosition.set(initialAddress);
+                writeLock.unlock();
+            }
+            long pos = channelPosition + writeAddress - initialAddress + DATA_INFORMATION_LENGTH;
+            queueInfo.add(new long[]{pos, dataLength}); // todo: 占用大小待优化
             return offset;
         } catch (Exception ignored) { }
         return 0L;
