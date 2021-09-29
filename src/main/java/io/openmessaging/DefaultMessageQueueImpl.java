@@ -13,8 +13,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class DefaultMessageQueueImpl extends MessageQueue {
 
-    public static final File DISC_ROOT = new File("/essd");
-    public static final File PMEM_ROOT = new File("/pmem");
+    public static final File DISC_ROOT = new File("./essd");
+    public static final File PMEM_ROOT = new File("./pmem");
     public static final File dataFile = new File(DISC_ROOT, "data");
     public static FileChannel dataWChannel;
     public static FileChannel dataRChannel;
@@ -87,7 +87,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         queueInfo = new ArrayList<>(64);
                         topicInfo.put(queueId, queueInfo);
                     }
-                    queueInfo.add(new long[]{channel.position() - 7, dataLen + 7});
+                    queueInfo.add(new long[]{channel.position(), dataLen});
                 }
             } catch (IOException e) {
                 e.printStackTrace();
@@ -103,7 +103,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             threadSet.add(Thread.currentThread());
             byte topicId = getTopicId(topic);
 
-            // 根据topicId获取topic下的队列信息
+            // 根据topicId获取topic下的全部队列的信息
             ConcurrentHashMap<Integer, ArrayList<long[]>> topicInfo = metaInfo.get(topicId);
             if (topicInfo == null) {
                 topicInfo = new ConcurrentHashMap<>();
@@ -132,26 +132,22 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
             if(blockedTheadCount.get() < 10) {
                 blockedTheadCount.getAndIncrement();
-                unsafe.park(true, 500);
+                unsafe.park(true, 50);
             }
             if(pos > forcedDataPosition) {
                 synchronized(lockObj){
                     if(pos > forcedDataPosition) {
                         dataWChannel.force(true);
                         forcedDataPosition = pos;
-                        for (Thread thread : threadSet) {
-                            unsafe.unpark(thread);
-                        }
+                        threadSet.forEach(unsafe::unpark);
                     }
                 }
             }
 
-            queueInfo.add(new long[]{pos - data.limit() - 7, data.limit() + 7}); // todo: 占用大小待优化
+            queueInfo.add(new long[]{pos - data.limit(), data.limit()}); // todo: 占用大小待优化
             return offset;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return 0L;
-        }
+        } catch (Exception ignored) { }
+        return 0L;
     }
 
     /**
@@ -195,8 +191,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             synchronized (queueInfo) {
                 for (int i = (int) offset; i < (int) (offset + fetchNum) && i < queueInfo.size(); ++i) {
                     long[] p = queueInfo.get(i);
-                    ByteBuffer buf = ByteBuffer.allocate((int) p[1] - 7);
-                    dataRChannel.read(buf, p[0] + 7);
+                    ByteBuffer buf = ByteBuffer.allocate((int) p[1]);
+                    dataRChannel.read(buf, p[0]);
                     buf.flip();
                     ret.put(i, buf);
                 }
