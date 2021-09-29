@@ -148,7 +148,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
             offset = queueInfo.size();
             long initialAddress = ((DirectBuffer) mergeBuffer).address();
+
+            long l1 = System.currentTimeMillis();
             readLock.lock();
+            long l2 = System.currentTimeMillis();
             // 登记需要刷盘的数据
             dataToForceSet.put(data, data);
             long writeAddress = mergeBufferPosition.getAndAdd(DATA_INFORMATION_LENGTH + dataLength);
@@ -165,17 +168,26 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //            writeAddress += 2;
 
             unsafe.copyMemory(data.array(), 16 + data.position(), null, writeAddress + DATA_INFORMATION_LENGTH, dataLength);
+            long l3 = System.currentTimeMillis();
             readLock.unlock();
+            long l4 = System.currentTimeMillis();
 
             if(parkedThreadSet.size() < MERGE_MIN_THREAD_COUNT) {
                 // 登记需要被唤醒的数据
                 parkedThreadSet.put(Thread.currentThread(), Thread.currentThread());
+
+                long l5 = System.currentTimeMillis();
+                System.out.println("l4 - l5: " + (l5 - l4));
                 unsafe.park(true, THREAD_PARK_TIMEOUT);
             }
 
+            long l6 = System.currentTimeMillis();
             // 自己的 data 还没被 force
             if (dataToForceSet.containsKey(data)){
                 writeLock.lock();
+
+                long l7 = System.currentTimeMillis();
+
                 // 等待各个线程拷贝完毕
                 while (parkedThreadSet.size() != dataToForceSet.size()){
                     Thread.sleep(1);
@@ -192,6 +204,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 dataToForceSet.clear();
                 parkedThreadSet.clear();
                 mergeBufferPosition.set(initialAddress);
+
+                long l8 = System.currentTimeMillis();
+
+                System.out.println(String.format("l1 - l4: %d, l2 - l3: %d, l6 - l7: %d, l7 - l8: %d", l4 - l1, l3 - l2, l7 - l6, l8 - l7));
                 writeLock.unlock();
             }
             long pos = channelPosition + writeAddress - initialAddress + DATA_INFORMATION_LENGTH;
