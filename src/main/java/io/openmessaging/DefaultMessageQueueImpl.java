@@ -13,8 +13,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class DefaultMessageQueueImpl extends MessageQueue {
 
-    public static final File DISC_ROOT = new File("./essd");
-    public static final File PMEM_ROOT = new File("./pmem");
+    public static final File DISC_ROOT = new File("/essd");
+    public static final File PMEM_ROOT = new File("/pmem");
     public static final File dataFile = new File(DISC_ROOT, "data");
     public static FileChannel dataWriteChannel;
     public static FileChannel dataReadChannel;
