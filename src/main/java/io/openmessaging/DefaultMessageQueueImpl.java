@@ -35,7 +35,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int positionMask = (1 << 24) - 1;
     public static final int statusMask = 1 << 25;  // 这个位置为 0 不在force中，为 1 是正在force中
 
-    public static final long TIMEOUT = 3*60;  // seconds
+    public static final long TIMEOUT = 1 * 60;  // seconds
     public static final int DATA_INFORMATION_LENGTH = 7;
     public static volatile Map<Thread, Integer> groupIdMap = new ConcurrentHashMap<>();
     public static final AtomicInteger threadCountNow = new AtomicInteger();
@@ -181,8 +181,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             AtomicLong mergeBufferPosition = mergeBufferPositions[id];
             Map<ByteBuffer, Thread> dataToForceMap = dataToForceMaps[id];
 
-
-
             long offset;
             byte topicId = getTopicId(topic);
             int dataLength = data.remaining(); // 默认data的position是从 0 开始的
@@ -214,28 +212,37 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             // 登记需要刷盘的数据和对应的线程
             dataToForceMap.put(data, Thread.currentThread());
             mergeBufferLock.unlock();
+
             if(dataToForceMap.size() < MERGE_MIN_THREAD_COUNT) {
+                long start = System.currentTimeMillis();
                 unsafe.park(true, THREAD_PARK_TIMEOUT);
+                long stop = System.currentTimeMillis();
+                if (DEBUG){
+                    System.out.println(String.format("Thread: %s, id: %d, park for time : %d ms", Thread.currentThread().getName(), id, stop - start));
+                }
             }
             // 自己的 data 还没被 force
             if (dataToForceMap.containsKey(data)){
                 mergeBufferLock.lock();
                 if (dataToForceMap.containsKey(data)){
-                    mergeBuffer.limit((int) (mergeBufferPosition.get() - initialAddress));
+
                     long start = System.currentTimeMillis();
+                    mergeBuffer.limit((int) (mergeBufferPosition.get() - initialAddress));
                     dataWriteChannel.write(mergeBuffer);
                     dataWriteChannel.force(true);
                     long stop = System.currentTimeMillis();
+
+                    mergeBuffer.clear();
+                    mergeBufferPosition.set(initialAddress);
                     if (DEBUG){
                         System.out.println(String.format("mergeThreadCount: %d, mergeSize: %d kb, writeCostTime: %d", dataToForceMap.size(), mergeBuffer.limit() / 1024, stop - start));
                     }
-                    mergeBuffer.clear();
+
                     // 叫醒各个线程
                     for (Thread thread : dataToForceMap.values()) {
                         unsafe.unpark(thread);
                     }
                     dataToForceMap.clear();
-                    mergeBufferPosition.set(initialAddress);
                     mergeBufferLock.unlock();
                 }
             }
