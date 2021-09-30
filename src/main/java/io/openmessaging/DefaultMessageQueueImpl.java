@@ -262,8 +262,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         unsafe.unpark(thread);
                     }
                     parkedThreadMap.clear();
-                    mergeBufferLock.unlock();
                 }
+                mergeBufferLock.unlock();
             }
             long pos = channelPosition + writeAddress - initialAddress + DATA_INFORMATION_LENGTH;
             long groupAndDataLength = (((long) id) << 32) | dataLength;
