@@ -22,7 +22,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final File dataFile = new File(DISC_ROOT, "data");
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
-    public static final long THREAD_PARK_TIMEOUT = 3;  // ms
+    public static final long THREAD_PARK_TIMEOUT = 10;  // ms
     public static final int MERGE_MIN_THREAD_COUNT = 5;
 
 
@@ -215,7 +215,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
             if(dataToForceMap.size() < MERGE_MIN_THREAD_COUNT) {
                 long start = System.currentTimeMillis();
-                unsafe.park(false, THREAD_PARK_TIMEOUT * 1000000L);  // ns
+                unsafe.park(true, System.currentTimeMillis() + THREAD_PARK_TIMEOUT);  // ms
                 long stop = System.currentTimeMillis();
                 if (DEBUG){
                     System.out.println(String.format("Thread: %s, id: %d, park for time : %d ms", Thread.currentThread().getName(), id, stop - start));
@@ -232,11 +232,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     dataWriteChannel.force(true);
                     long stop = System.currentTimeMillis();
 
-                    mergeBuffer.clear();
-                    mergeBufferPosition.set(initialAddress);
                     if (DEBUG){
                         System.out.println(String.format("mergeThreadCount: %d, mergeSize: %d kb, writeCostTime: %d", dataToForceMap.size(), mergeBuffer.limit() / 1024, stop - start));
                     }
+
+                    mergeBuffer.clear();
+                    mergeBufferPosition.set(initialAddress);
 
                     // 叫醒各个线程
                     for (Thread thread : dataToForceMap.values()) {

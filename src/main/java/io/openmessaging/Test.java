@@ -12,7 +12,7 @@ public class Test {
                 try {
                     Thread.sleep(1000);
                     System.out.println("get in park");
-                    unsafe.park(false, 6000000000L);
+                    unsafe.park(true, System.currentTimeMillis() + 6000);
                     System.out.println("unparked");
                 } catch (InterruptedException e) {
                     e.printStackTrace();
@@ -26,8 +26,9 @@ public class Test {
         try {
             System.out.println("main get in sleep");
             Thread.sleep(10 * 1000);
-        } catch (InterruptedException e) {
             System.out.println("main finish sleep");
+        } catch (InterruptedException e) {
+
         }
     }
 }
