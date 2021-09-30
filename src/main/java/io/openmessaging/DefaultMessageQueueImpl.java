@@ -13,18 +13,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 
 public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static final boolean DEBUG = true;
-    public static final File DISC_ROOT = new File("/essd");
-    public static final File PMEM_ROOT = new File("/pmem");
+    public static final File DISC_ROOT = new File("./essd");
+    public static final File PMEM_ROOT = new File("./pmem");
     public static final File dataFile = new File(DISC_ROOT, "data");
     public static FileChannel dataWriteChannel;
     public static FileChannel dataReadChannel;
-    public static final Object lockObj = new Object();
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
     public static final int THREAD_PARK_TIMEOUT = 10;
@@ -53,8 +53,14 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static volatile Map<ByteBuffer, ByteBuffer> dataToForceSet = new ConcurrentHashMap<>();  // 存储需要被force的data, k: byteBuffer, v: self
 
     public static volatile ByteBuffer mergeBuffer = ByteBuffer.allocateDirect(18 * 1024 * 50);
+    public static final AtomicInteger mergePosition = new AtomicInteger();
+
+    public static final int positionMask = (1 << 24) - 1;
+    public static final int statusMask = 1 << 25;  // 这个位置为 0 不在force中，为 1 是正在force中
+
+    public static final ReentrantLock mergeBufferLock = new ReentrantLock();
     public static final AtomicLong mergeBufferPosition = new AtomicLong(((DirectBuffer) mergeBuffer).address());
-    public static final AtomicBoolean isForcing = new AtomicBoolean(false);
+//    public static final AtomicBoolean isForcing = new AtomicBoolean(false);
 
     public static final long TIMEOUT = 3*60;  // seconds
     public static final int DATA_INFORMATION_LENGTH = 7;
@@ -70,6 +76,14 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 e.printStackTrace();
             }
         }).start();
+    }
+
+    public static int getPosition(int mergePositionValue){
+        return mergePositionValue & positionMask;
+    }
+
+    public static boolean isForcing(int mergePositionValue){
+        return (mergePositionValue & statusMask) == statusMask;
     }
 
     public DefaultMessageQueueImpl() {
@@ -155,20 +169,29 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //            readLock.lock();
             long l2 = System.currentTimeMillis();
             // 如果正在刷盘中，就自旋等待
-            while (isForcing.get()){
-                Thread.sleep(1);
-            };
+
+//            int mergePositionValue = mergePosition.get();
+//            while (isForcing(mergePositionValue)){
+//                Thread.sleep(1);
+//                mergePositionValue = mergePosition.get();
+//            }
+
+            mergeBufferLock.lock();
             long writeAddress = mergeBufferPosition.getAndAdd(DATA_INFORMATION_LENGTH + dataLength);
             int index = (int)(writeAddress - initialAddress);
             mergeBuffer.put(index, topicId);
             mergeBuffer.putInt(index + 1, queueId);
             mergeBuffer.putShort(index + 5, (short) dataLength);
             unsafe.copyMemory(data.array(), 16 + data.position(), null, writeAddress + DATA_INFORMATION_LENGTH, dataLength);
+
             long l3 = System.currentTimeMillis();
 //            readLock.unlock();
             long l4 = System.currentTimeMillis();
             dataToForceSet.put(data, data);
             parkedThreadSet.put(Thread.currentThread(), Thread.currentThread());
+            mergeBufferLock.unlock();
+
+
             if(parkedThreadSet.size() < MERGE_MIN_THREAD_COUNT) {
                 // 登记需要刷盘的数据
                 // 登记需要被唤醒的数据
@@ -181,23 +204,22 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             // 自己的 data 还没被 force
             if (dataToForceSet.containsKey(data)){
 //                writeLock.lock();
-                isForcing.set(true);
 
+                mergeBufferLock.lock();
                 long l7 = System.currentTimeMillis();
-
-                // 等待各个线程拷贝完毕
-                while (parkedThreadSet.size() != dataToForceSet.size()){
-                    Thread.sleep(1);
-                }
+//
+//                // 等待各个线程拷贝完毕
+//                while (parkedThreadSet.size() != dataToForceSet.size()){
+//                    Thread.sleep(1);
+//                }
                 dataToForceSet.clear();
-                mergeBuffer.clear();
-
 
 
                 mergeBuffer.limit((int) (mergeBufferPosition.get() - initialAddress));
                 long start = System.currentTimeMillis();
                 dataWriteChannel.write(mergeBuffer);
                 dataWriteChannel.force(true);
+                mergeBuffer.clear();
                 long stop = System.currentTimeMillis();
                 System.out.println(String.format("mergeSize: %d kb, use time: %d", mergeBuffer.limit() / 1024, stop - start));
                 // 叫醒各个线程
@@ -206,11 +228,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 }
                 parkedThreadSet.clear();
                 mergeBufferPosition.set(initialAddress);
+
+                mergeBufferLock.unlock();
                 long l8 = System.currentTimeMillis();
 
                 System.out.println(String.format("l1 - l4: %d, l2 - l3: %d, l6 - l7: %d, l7 - l8: %d", l4 - l1, l3 - l2, l7 - l6, l8 - l7));
 //                writeLock.unlock();
-                isForcing.set(false);
             }
             long pos = channelPosition + writeAddress - initialAddress + DATA_INFORMATION_LENGTH;
             queueInfo.add(new long[]{pos, dataLength}); // todo: 占用大小待优化
@@ -280,6 +303,41 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static void main(String[] args) throws IOException, InterruptedException {
         DefaultMessageQueueImpl inst = new DefaultMessageQueueImpl();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    ByteBuffer[] buffers = new ByteBuffer[100];
+                    for (byte i = 0; i < buffers.length; i++) {
+                        buffers[i] = ByteBuffer.allocate(4);
+                        buffers[i].put(i);
+                        buffers[i].flip();
+                    }
+
+                    long offset;
+
+                    for (int i = 0; i < 1000000; i++) {
+                        ByteBuffer byteBuffer = ByteBuffer.allocate(8);
+                        byteBuffer.putLong(12345L);
+                        inst.append("abcmnp", 1000, byteBuffer);
+                        Thread.sleep(4);
+                    }
+
+                    offset = inst.append("abc", 1000, buffers[77]);
+                    Thread.sleep(100);
+                    offset = inst.append("abc", 1001, buffers[67]);
+                    Thread.sleep(100);
+                    offset = inst.append("abc", 1001, buffers[42]);
+                    offset = inst.append("abc", 1001, buffers[33]);
+                    Thread.sleep(100);
+                    offset = inst.append("abd", 1001, buffers[11]);
+                }catch (Exception e){}
+                Map<Integer, ByteBuffer> ret = inst.getRange("abc", 1001, 0, 100);
+                System.out.println(String.format("Keys: %d", ret.keySet().size()));
+            }
+        });
+
+
         ByteBuffer[] buffers = new ByteBuffer[100];
         for (byte i = 0; i < buffers.length; i++) {
             buffers[i] = ByteBuffer.allocate(4);
@@ -288,10 +346,21 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }
 
         long offset;
+
+//        for (int i = 0; i < 1000000; i++) {
+//            ByteBuffer byteBuffer = ByteBuffer.allocate(8);
+//            byteBuffer.putLong(12345L);
+//            inst.append("abcdef", 1000, byteBuffer);
+//            Thread.sleep(4);
+//        }
+
         offset = inst.append("abc", 1000, buffers[77]);
+        Thread.sleep(100);
         offset = inst.append("abc", 1001, buffers[67]);
+        Thread.sleep(100);
         offset = inst.append("abc", 1001, buffers[42]);
         offset = inst.append("abc", 1001, buffers[33]);
+        Thread.sleep(100);
         offset = inst.append("abd", 1001, buffers[11]);
 
         Map<Integer, ByteBuffer> ret = inst.getRange("abc", 1001, 0, 100);
