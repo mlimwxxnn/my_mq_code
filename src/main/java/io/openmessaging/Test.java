@@ -21,6 +21,7 @@ public class Test {
                 try {
                     Thread.sleep(1000);
                     System.out.println("get in park");
+                    unsafe.park(false, 1);
                     unsafe.park(true, System.currentTimeMillis() + 6000);
                     System.out.println("finish first park");
                     unsafe.park(true, System.currentTimeMillis() + 6000);
