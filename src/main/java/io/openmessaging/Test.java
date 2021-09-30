@@ -20,7 +20,7 @@ public class Test {
             }
         });
         thread.start();
-//        unsafe.unpark(thread);
+        unsafe.unpark(thread);
         System.out.println("do unpark in main");
 
         try {

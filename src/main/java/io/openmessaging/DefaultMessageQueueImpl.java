@@ -17,8 +17,8 @@ import java.util.concurrent.locks.ReentrantLock;
 public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static final boolean DEBUG = true;
-    public static final File DISC_ROOT = new File("/essd");
-    public static final File PMEM_ROOT = new File("/pmem");
+    public static final File DISC_ROOT = new File("./essd");
+    public static final File PMEM_ROOT = new File("./pmem");
     public static final File dataFile = new File(DISC_ROOT, "data");
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
@@ -42,10 +42,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final AtomicInteger threadCountNow = new AtomicInteger();
     public static final FileChannel[] dataWriteChannels = new FileChannel[groupCount];
     public static final FileChannel[] dataReadChannels = new FileChannel[groupCount];
-    public static final ByteBuffer[] mergeBuffers = new ByteBuffer[groupCount];
+    public static volatile ByteBuffer[] mergeBuffers = new ByteBuffer[groupCount];
     public static final ReentrantLock[] mergeBufferLocks = new ReentrantLock[groupCount];
     public static final AtomicLong[] mergeBufferPositions = new AtomicLong[groupCount];
-    public static final Map<ByteBuffer, Thread>[] dataToForceMaps = new Map[groupCount];
+    public static volatile Map<ByteBuffer, Thread>[] dataToForceMaps = new Map[groupCount];
 
     public static void init() throws IOException {
         for (int i = 0; i < groupCount; i++) {
@@ -156,8 +156,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         queueInfo.add(new long[]{channel.position(), groupIdAndDataLength});
                     }
                 }
-
-
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -244,6 +242,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         unsafe.unpark(thread);
                     }
                     dataToForceMap.clear();
+
+                    System.out.println("to force map cleared: " + dataToForceMap.size());
+
                     mergeBufferLock.unlock();
                 }
             }
