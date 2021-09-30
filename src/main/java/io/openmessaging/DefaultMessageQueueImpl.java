@@ -22,7 +22,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
     public static final long KILL_SELF_TIMEOUT = 1 * 60;  // seconds
-    public static final long THREAD_PARK_TIMEOUT = 10;  // ms
+    public static final long THREAD_PARK_TIMEOUT = 50;  // ms
     public static final int MERGE_MIN_THREAD_COUNT = 5;
     public static final int groupCount = 3;
 
@@ -248,7 +248,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         unsafe.unpark(thread);
                     }
                     parkedThreadMap.clear();
-
                     mergeBufferLock.unlock();
                 }
             }
