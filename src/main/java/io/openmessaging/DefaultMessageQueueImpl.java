@@ -22,7 +22,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final File dataFile = new File(DISC_ROOT, "data");
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
-    public static final int THREAD_PARK_TIMEOUT = 10;
+    public static final long THREAD_PARK_TIMEOUT = 3;  // ms
     public static final int MERGE_MIN_THREAD_COUNT = 5;
 
 
@@ -215,7 +215,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
             if(dataToForceMap.size() < MERGE_MIN_THREAD_COUNT) {
                 long start = System.currentTimeMillis();
-                unsafe.park(true, THREAD_PARK_TIMEOUT);
+                unsafe.park(false, THREAD_PARK_TIMEOUT * 1000000L);  // ns
                 long stop = System.currentTimeMillis();
                 if (DEBUG){
                     System.out.println(String.format("Thread: %s, id: %d, park for time : %d ms", Thread.currentThread().getName(), id, stop - start));
