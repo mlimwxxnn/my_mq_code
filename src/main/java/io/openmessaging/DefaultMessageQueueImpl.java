@@ -16,14 +16,14 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class DefaultMessageQueueImpl extends MessageQueue {
 
-    public static final boolean DEBUG = true;
+    public static final boolean DEBUG = false;
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
     public static final long KILL_SELF_TIMEOUT = 1 * 60;  // seconds
-    public static final long THREAD_PARK_TIMEOUT = 4;  // ms
-    public static int MERGE_MIN_THREAD_COUNT = 5;  // 只是起始
+    public static final long THREAD_PARK_TIMEOUT = 2;  // ms
+    public static AtomicInteger MERGE_MIN_THREAD_COUNT = new AtomicInteger(5);  // 只是起始
     public static final int groupCount = 3;
 
 
@@ -107,8 +107,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }
         id = threadCountNow.getAndIncrement() % groupCount;
         // threadCountNow.get() / groupCount - 5 为每个分组的线程数少 5 个为最小 merge 数
-        MERGE_MIN_THREAD_COUNT = Math.max(threadCountNow.get() / groupCount - 5, MERGE_MIN_THREAD_COUNT);
-
+        MERGE_MIN_THREAD_COUNT.set(Math.max(threadCountNow.get() / groupCount - 5, MERGE_MIN_THREAD_COUNT.get()));
         groupIdMap.put(thread, id);
         return id;
     }
@@ -228,7 +227,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             int parkedThreadCount = parkedThreadMap.size();
             mergeBufferLock.unlock();
 
-            if(parkedThreadCount < MERGE_MIN_THREAD_COUNT) {
+            if(parkedThreadCount < MERGE_MIN_THREAD_COUNT.get()) {
                 long start = System.currentTimeMillis();
                 unsafe.park(true, System.currentTimeMillis() + THREAD_PARK_TIMEOUT);  // ms
                 long stop = System.currentTimeMillis();
@@ -254,7 +253,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
                     mergeBuffer.clear();
                     mergeBufferPosition.set(initialAddress);
-
 //                    dataToForceMap.clear();
                     forceVersion.getAndIncrement();
                     // 叫醒各个线程
