@@ -9,9 +9,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -24,8 +22,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
     public static final long KILL_SELF_TIMEOUT = 1 * 60;  // seconds
-    public static final long THREAD_PARK_TIMEOUT = 10;  // ms
-    public static final int MERGE_MIN_THREAD_COUNT = 5;
+    public static final long THREAD_PARK_TIMEOUT = 4;  // ms
+    public static int MERGE_MIN_THREAD_COUNT = 5;  // 只是起始
     public static final int groupCount = 3;
 
 
@@ -108,6 +106,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             return id;
         }
         id = threadCountNow.getAndIncrement() % groupCount;
+        // threadCountNow.get() / groupCount - 5 为每个分组的线程数少 5 个为最小 merge 数
+        MERGE_MIN_THREAD_COUNT = Math.max(threadCountNow.get() / groupCount - 5, MERGE_MIN_THREAD_COUNT);
+
         groupIdMap.put(thread, id);
         return id;
     }
