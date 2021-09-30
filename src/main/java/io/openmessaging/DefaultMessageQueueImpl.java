@@ -17,8 +17,8 @@ import java.util.concurrent.locks.ReentrantLock;
 public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static final boolean DEBUG = true;
-    public static final File DISC_ROOT = new File("./essd");
-    public static final File PMEM_ROOT = new File("./pmem");
+    public static final File DISC_ROOT = new File("/essd");
+    public static final File PMEM_ROOT = new File("/pmem");
     public static final File dataFile = new File(DISC_ROOT, "data");
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
