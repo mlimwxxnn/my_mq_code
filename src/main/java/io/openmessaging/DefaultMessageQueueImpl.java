@@ -22,8 +22,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final File dataFile = new File(DISC_ROOT, "data");
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
+    public static final long KILL_SELF_TIMEOUT = 1 * 60;  // seconds
     public static final long THREAD_PARK_TIMEOUT = 10;  // ms
     public static final int MERGE_MIN_THREAD_COUNT = 5;
+    public static final int groupCount = 3;
 
 
     public static AtomicInteger topicCount = new AtomicInteger();
@@ -35,11 +37,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int positionMask = (1 << 24) - 1;
     public static final int statusMask = 1 << 25;  // 这个位置为 0 不在force中，为 1 是正在force中
 
-    public static final long TIMEOUT = 1 * 60;  // seconds
     public static final int DATA_INFORMATION_LENGTH = 7;
     public static volatile Map<Thread, Integer> groupIdMap = new ConcurrentHashMap<>();
     public static final AtomicInteger threadCountNow = new AtomicInteger();
-    public static final int groupCount = 5;
     public static final FileChannel[] dataWriteChannels = new FileChannel[groupCount];
     public static final FileChannel[] dataReadChannels = new FileChannel[groupCount];
     public static final ByteBuffer[] mergeBuffers = new ByteBuffer[groupCount];
@@ -119,7 +119,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             System.out.println("init failed");
         }
 
-        killSelf(TIMEOUT);
+        killSelf(KILL_SELF_TIMEOUT);
 
         // 如果数据文件里有东西就从文件恢复索引
         if (getTotalFileSize() > 0) {
