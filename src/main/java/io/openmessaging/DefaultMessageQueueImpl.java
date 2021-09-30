@@ -11,6 +11,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicIntegerArray;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -48,6 +49,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //    public static volatile Map<ByteBuffer, ByteBuffer>[] dataToForceMaps = new Map[groupCount];
     public static volatile Map<Thread, Thread>[] parkedThreadMaps = new Map[groupCount];
     public static final AtomicLong[] forceVersions = new AtomicLong[groupCount];
+    public static int maxThreadCountPerGroup = (50 + groupCount - 1) / groupCount;
+
+    public static Thread[][] threads = new Thread[groupCount][maxThreadCountPerGroup];
 
     public static void init() throws IOException {
         for (int i = 0; i < groupCount; i++) {
@@ -61,7 +65,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
             dataWriteChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.APPEND, StandardOpenOption.WRITE);
             dataReadChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.READ);
-            mergeBuffers[i] = ByteBuffer.allocateDirect(18 * 1024 * (50 + groupCount - 1) / groupCount);
+            mergeBuffers[i] = ByteBuffer.allocateDirect(18 * 1024 * maxThreadCountPerGroup);
             mergeBufferLocks[i] = new  ReentrantLock();
             mergeBufferPositions[i] = new AtomicLong(((DirectBuffer) mergeBuffers[i]).address());
 //            dataToForceMaps[i] = new ConcurrentHashMap<>();
@@ -219,9 +223,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //            dataToForceMap.put(data, data);
             long forceVersionNow = forceVersion.get();
             parkedThreadMap.put(Thread.currentThread(), Thread.currentThread());
+            // 在这里读阻塞数，避免判断阻塞数量时和后续的 clear 操作冲突
+            int parkedThreadCount = parkedThreadMap.size();
             mergeBufferLock.unlock();
 
-            if(parkedThreadMap.size() < MERGE_MIN_THREAD_COUNT) {
+            if(parkedThreadCount < MERGE_MIN_THREAD_COUNT) {
                 long start = System.currentTimeMillis();
                 unsafe.park(true, System.currentTimeMillis() + THREAD_PARK_TIMEOUT);  // ms
                 long stop = System.currentTimeMillis();
