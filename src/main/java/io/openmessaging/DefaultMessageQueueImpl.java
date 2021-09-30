@@ -22,7 +22,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final File dataFile = new File(DISC_ROOT, "data");
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
-    public static final int THREAD_PARK_TIMEOUT = 5;
+    public static final int THREAD_PARK_TIMEOUT = 10;
     public static final int MERGE_MIN_THREAD_COUNT = 5;
 
 
