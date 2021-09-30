@@ -222,7 +222,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
             if(dataToForceMap.size() < MERGE_MIN_THREAD_COUNT) {
                 long start = System.currentTimeMillis();
-                unsafe.park(false, 1);
                 unsafe.park(true, System.currentTimeMillis() + THREAD_PARK_TIMEOUT);  // ms
                 long stop = System.currentTimeMillis();
                 if (DEBUG){
@@ -233,7 +232,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             if (dataToForceMap.containsKey(data)){
                 mergeBufferLock.lock();
                 if (dataToForceMap.containsKey(data)){
-
                     long start = System.currentTimeMillis();
                     mergeBuffer.limit((int) (mergeBufferPosition.get() - initialAddress));
                     dataWriteChannel.write(mergeBuffer);
@@ -249,6 +247,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
                     dataToForceMap.clear();
                     // 叫醒各个线程
+                    parkedThreadMap.remove(Thread.currentThread());
                     for (Thread thread : parkedThreadMap.keySet()) {
                         unsafe.unpark(thread);
                     }
