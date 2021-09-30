@@ -19,7 +19,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class DefaultMessageQueueImpl extends MessageQueue {
 
-    public static final boolean DEBUG = true;
+    public static final boolean DEBUG = false;
     public static final File DISC_ROOT = new File("/essd");
     public static final File PMEM_ROOT = new File("/pmem");
     public static final File dataFile = new File(DISC_ROOT, "data");
@@ -196,7 +196,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 // 登记需要刷盘的数据
                 // 登记需要被唤醒的数据
                 long l5 = System.currentTimeMillis();
-                System.out.println("l4 - l5: " + (l5 - l4));
+//                System.out.println("l4 - l5: " + (l5 - l4));
                 unsafe.park(true, THREAD_PARK_TIMEOUT);
             }
 
@@ -219,9 +219,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 long start = System.currentTimeMillis();
                 dataWriteChannel.write(mergeBuffer);
                 dataWriteChannel.force(true);
-                mergeBuffer.clear();
                 long stop = System.currentTimeMillis();
-                System.out.println(String.format("mergeSize: %d kb, use time: %d", mergeBuffer.limit() / 1024, stop - start));
+//                System.out.println(String.format("mergeSize: %d kb, use time: %d", mergeBuffer.limit() / 1024, stop - start));
+                mergeBuffer.clear();
                 // 叫醒各个线程
                 for (Thread thread : parkedThreadSet.keySet()) {
                     unsafe.unpark(thread);
@@ -232,7 +232,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 mergeBufferLock.unlock();
                 long l8 = System.currentTimeMillis();
 
-                System.out.println(String.format("l1 - l4: %d, l2 - l3: %d, l6 - l7: %d, l7 - l8: %d", l4 - l1, l3 - l2, l7 - l6, l8 - l7));
+//                System.out.println(String.format("l1 - l4: %d, l2 - l3: %d, l6 - l7: %d, l7 - l8: %d", l4 - l1, l3 - l2, l7 - l6, l8 - l7));
 //                writeLock.unlock();
             }
             long pos = channelPosition + writeAddress - initialAddress + DATA_INFORMATION_LENGTH;
@@ -241,6 +241,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         } catch (Exception ignored) { }
         return 0L;
     }
+
 
     /**
      * 创建或并返回topic对应的topicId
