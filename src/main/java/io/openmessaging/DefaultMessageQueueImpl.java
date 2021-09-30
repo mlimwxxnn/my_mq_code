@@ -9,6 +9,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
@@ -46,6 +47,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final AtomicLong[] mergeBufferPositions = new AtomicLong[groupCount];
     public static volatile Map<ByteBuffer, ByteBuffer>[] dataToForceMaps = new Map[groupCount];
     public static volatile Map<Thread, Thread>[] parkedThreadMaps = new Map[groupCount];
+    public static volatile Semaphore[] semaphores = new Semaphore[groupCount];
 
     public static void init() throws IOException {
         for (int i = 0; i < groupCount; i++) {
@@ -183,6 +185,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             Map<ByteBuffer, ByteBuffer> dataToForceMap = dataToForceMaps[id];
             Map<Thread, Thread> parkedThreadMap = parkedThreadMaps[id];
 
+            Semaphore semaphore = semaphores[id];
+
             long offset;
             byte topicId = getTopicId(topic);
             int dataLength = data.remaining(); // 默认data的position是从 0 开始的
@@ -218,6 +222,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
             if(dataToForceMap.size() < MERGE_MIN_THREAD_COUNT) {
                 long start = System.currentTimeMillis();
+                unsafe.park(false, 1);
                 unsafe.park(true, System.currentTimeMillis() + THREAD_PARK_TIMEOUT);  // ms
                 long stop = System.currentTimeMillis();
                 if (DEBUG){
