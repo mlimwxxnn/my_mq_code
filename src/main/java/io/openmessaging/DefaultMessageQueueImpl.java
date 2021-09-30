@@ -239,7 +239,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     long stop = System.currentTimeMillis();
 
                     if (DEBUG){
-                        System.out.println(String.format("mergeThreadCount: %d, mergeSize: %d kb, writeCostTime: %d", dataToForceMap.size(), mergeBuffer.limit() / 1024, stop - start));
+                        System.out.println(String.format("groupId: %d, mergeThreadCount: %d, mergeSize: %d kb, writeCostTime: %d", id, dataToForceMap.size(), mergeBuffer.limit() / 1024, stop - start));
                     }
 
                     mergeBuffer.clear();
