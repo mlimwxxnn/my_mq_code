@@ -19,7 +19,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class DefaultMessageQueueImpl extends MessageQueue {
 
-    public static final boolean DEBUG = false;
+    public static final boolean DEBUG = true;
     public static final File DISC_ROOT = new File("/essd");
     public static final File PMEM_ROOT = new File("/pmem");
     public static final File dataFile = new File(DISC_ROOT, "data");
@@ -220,6 +220,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 dataWriteChannel.write(mergeBuffer);
                 dataWriteChannel.force(true);
                 long stop = System.currentTimeMillis();
+                if (DEBUG){
+                    System.out.println(String.format("mergeThreadCount: %d, mergeSize: %d kb, costTime: %d", parkedThreadSet.size(), mergeBuffer.limit() / 1024, stop - start));
+                }
+
 //                System.out.println(String.format("mergeSize: %d kb, use time: %d", mergeBuffer.limit() / 1024, stop - start));
                 mergeBuffer.clear();
                 // 叫醒各个线程
