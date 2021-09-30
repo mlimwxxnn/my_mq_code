@@ -9,7 +9,6 @@ import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
@@ -27,7 +26,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static FileChannel dataReadChannel;
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
-    public static final int THREAD_PARK_TIMEOUT = 3;
+    public static final int THREAD_PARK_TIMEOUT = 1;
     public static final int MERGE_MIN_THREAD_COUNT = 20;
     static {
         try {
@@ -204,40 +203,33 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             // 自己的 data 还没被 force
             if (dataToForceSet.containsKey(data)){
 //                writeLock.lock();
-
                 mergeBufferLock.lock();
-                long l7 = System.currentTimeMillis();
-//
-//                // 等待各个线程拷贝完毕
-//                while (parkedThreadSet.size() != dataToForceSet.size()){
-//                    Thread.sleep(1);
-//                }
-                dataToForceSet.clear();
-
-
-                mergeBuffer.limit((int) (mergeBufferPosition.get() - initialAddress));
-                long start = System.currentTimeMillis();
-                dataWriteChannel.write(mergeBuffer);
-                dataWriteChannel.force(true);
-                long stop = System.currentTimeMillis();
-                if (DEBUG){
-                    System.out.println(String.format("mergeThreadCount: %d, mergeSize: %d kb, costTime: %d", parkedThreadSet.size(), mergeBuffer.limit() / 1024, stop - start));
-                }
-
+                if (dataToForceSet.containsKey(data)){
+                    long l7 = System.currentTimeMillis();
+                    dataToForceSet.clear();
+                    mergeBuffer.limit((int) (mergeBufferPosition.get() - initialAddress));
+                    long start = System.currentTimeMillis();
+                    dataWriteChannel.write(mergeBuffer);
+                    dataWriteChannel.force(true);
+                    long stop = System.currentTimeMillis();
+                    if (DEBUG){
+                        System.out.println(String.format("mergeThreadCount: %d, mergeSize: %d kb, costTime: %d", parkedThreadSet.size(), mergeBuffer.limit() / 1024, stop - start));
+                    }
 //                System.out.println(String.format("mergeSize: %d kb, use time: %d", mergeBuffer.limit() / 1024, stop - start));
-                mergeBuffer.clear();
-                // 叫醒各个线程
-                for (Thread thread : parkedThreadSet.keySet()) {
-                    unsafe.unpark(thread);
-                }
-                parkedThreadSet.clear();
-                mergeBufferPosition.set(initialAddress);
+                    mergeBuffer.clear();
+                    // 叫醒各个线程
+                    for (Thread thread : parkedThreadSet.keySet()) {
+                        unsafe.unpark(thread);
+                    }
+                    parkedThreadSet.clear();
+                    mergeBufferPosition.set(initialAddress);
 
-                mergeBufferLock.unlock();
-                long l8 = System.currentTimeMillis();
+                    mergeBufferLock.unlock();
+                    long l8 = System.currentTimeMillis();
 
 //                System.out.println(String.format("l1 - l4: %d, l2 - l3: %d, l6 - l7: %d, l7 - l8: %d", l4 - l1, l3 - l2, l7 - l6, l8 - l7));
 //                writeLock.unlock();
+                }
             }
             long pos = channelPosition + writeAddress - initialAddress + DATA_INFORMATION_LENGTH;
             queueInfo.add(new long[]{pos, dataLength}); // todo: 占用大小待优化
