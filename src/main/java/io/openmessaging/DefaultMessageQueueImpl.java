@@ -11,22 +11,20 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 
 public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static final boolean DEBUG = true;
-    public static final File DISC_ROOT = new File("/essd");
-    public static final File PMEM_ROOT = new File("/pmem");
+    public static final File DISC_ROOT = new File("./essd");
+    public static final File PMEM_ROOT = new File("./pmem");
     public static final File dataFile = new File(DISC_ROOT, "data");
     public static FileChannel dataWriteChannel;
     public static FileChannel dataReadChannel;
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
-    public static final int THREAD_PARK_TIMEOUT = 10;
+    public static final int THREAD_PARK_TIMEOUT = 5;
     public static final int MERGE_MIN_THREAD_COUNT = 20;
     static {
         try {
@@ -44,25 +42,24 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     // topicId, queueId, dataPosition
     public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, ArrayList<long[]>>> metaInfo = new ConcurrentHashMap<>();
     public static final Unsafe unsafe = UnsafeUtil.unsafe;
-    // 用来控制不同轮次的数据不被干扰
-    public static final ReentrantReadWriteLock readWriteLock = new ReentrantReadWriteLock();
-    public static final Lock writeLock = readWriteLock.writeLock();
-    public static final Lock readLock = readWriteLock.readLock();
-    public static volatile Map<Thread, Thread> parkedThreadSet = new ConcurrentHashMap<>(100);  // 存储调用过append方法的线程 k: thread, v: self
-    public static volatile Map<ByteBuffer, ByteBuffer> dataToForceSet = new ConcurrentHashMap<>();  // 存储需要被force的data, k: byteBuffer, v: self
+//    public static volatile Map<Thread, Thread> parkedThreadSet = new ConcurrentHashMap<>(100);  // 存储调用过append方法的线程 k: thread, v: self
+    public static volatile Map<ByteBuffer, Thread> dataToForceMap = new ConcurrentHashMap<>();  // 存储需要被force的data, k: byteBuffer, v: self
+    public static volatile Map<Thread, ThreadWorkContext> threadContextMap = new ConcurrentHashMap<>();
 
     public static volatile ByteBuffer mergeBuffer = ByteBuffer.allocateDirect(18 * 1024 * 50);
-    public static final AtomicInteger mergePosition = new AtomicInteger();
 
     public static final int positionMask = (1 << 24) - 1;
     public static final int statusMask = 1 << 25;  // 这个位置为 0 不在force中，为 1 是正在force中
 
     public static final ReentrantLock mergeBufferLock = new ReentrantLock();
     public static final AtomicLong mergeBufferPosition = new AtomicLong(((DirectBuffer) mergeBuffer).address());
-//    public static final AtomicBoolean isForcing = new AtomicBoolean(false);
 
     public static final long TIMEOUT = 3*60;  // seconds
     public static final int DATA_INFORMATION_LENGTH = 7;
+
+    class ThreadWorkContext{
+        public int groupId;
+    }
 
     public static void killSelf(long timeout) {
         new Thread(()->{
@@ -140,7 +137,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-
         }
 
         try {
@@ -164,17 +160,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             offset = queueInfo.size();
             long initialAddress = ((DirectBuffer) mergeBuffer).address();
 
-            long l1 = System.currentTimeMillis();
-//            readLock.lock();
-            long l2 = System.currentTimeMillis();
-            // 如果正在刷盘中，就自旋等待
-
-//            int mergePositionValue = mergePosition.get();
-//            while (isForcing(mergePositionValue)){
-//                Thread.sleep(1);
-//                mergePositionValue = mergePosition.get();
-//            }
-
             mergeBufferLock.lock();
             long writeAddress = mergeBufferPosition.getAndAdd(DATA_INFORMATION_LENGTH + dataLength);
             int index = (int)(writeAddress - initialAddress);
@@ -183,52 +168,33 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             mergeBuffer.putShort(index + 5, (short) dataLength);
             unsafe.copyMemory(data.array(), 16 + data.position(), null, writeAddress + DATA_INFORMATION_LENGTH, dataLength);
 
-            long l3 = System.currentTimeMillis();
-//            readLock.unlock();
-            long l4 = System.currentTimeMillis();
-            dataToForceSet.put(data, data);
-            parkedThreadSet.put(Thread.currentThread(), Thread.currentThread());
+            // 登记需要刷盘的数据和对应的线程
+            dataToForceMap.put(data, Thread.currentThread());
             mergeBufferLock.unlock();
-
-
-            if(parkedThreadSet.size() < MERGE_MIN_THREAD_COUNT) {
-                // 登记需要刷盘的数据
-                // 登记需要被唤醒的数据
-                long l5 = System.currentTimeMillis();
-//                System.out.println("l4 - l5: " + (l5 - l4));
+            if(dataToForceMap.size() < MERGE_MIN_THREAD_COUNT) {
                 unsafe.park(true, THREAD_PARK_TIMEOUT);
             }
-
-            long l6 = System.currentTimeMillis();
             // 自己的 data 还没被 force
-            if (dataToForceSet.containsKey(data)){
-//                writeLock.lock();
+            if (dataToForceMap.containsKey(data)){
                 mergeBufferLock.lock();
-                if (dataToForceSet.containsKey(data)){
-                    long l7 = System.currentTimeMillis();
-                    dataToForceSet.clear();
+                if (dataToForceMap.containsKey(data)){
                     mergeBuffer.limit((int) (mergeBufferPosition.get() - initialAddress));
                     long start = System.currentTimeMillis();
                     dataWriteChannel.write(mergeBuffer);
                     dataWriteChannel.force(true);
                     long stop = System.currentTimeMillis();
                     if (DEBUG){
-                        System.out.println(String.format("mergeThreadCount: %d, mergeSize: %d kb, costTime: %d", parkedThreadSet.size(), mergeBuffer.limit() / 1024, stop - start));
+                        System.out.println(String.format("mergeThreadCount: %d, mergeSize: %d kb, writeCostTime: %d", dataToForceMap.size(), mergeBuffer.limit() / 1024, stop - start));
                     }
-//                System.out.println(String.format("mergeSize: %d kb, use time: %d", mergeBuffer.limit() / 1024, stop - start));
                     mergeBuffer.clear();
                     // 叫醒各个线程
-                    for (Thread thread : parkedThreadSet.keySet()) {
+                    for (Thread thread : dataToForceMap.values()) {
                         unsafe.unpark(thread);
                     }
-                    parkedThreadSet.clear();
+                    dataToForceMap.clear();
                     mergeBufferPosition.set(initialAddress);
-
                     mergeBufferLock.unlock();
-                    long l8 = System.currentTimeMillis();
 
-//                System.out.println(String.format("l1 - l4: %d, l2 - l3: %d, l6 - l7: %d, l7 - l8: %d", l4 - l1, l3 - l2, l7 - l6, l8 - l7));
-//                writeLock.unlock();
                 }
             }
             long pos = channelPosition + writeAddress - initialAddress + DATA_INFORMATION_LENGTH;
