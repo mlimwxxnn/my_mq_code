@@ -45,9 +45,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static volatile ByteBuffer[] mergeBuffers = new ByteBuffer[groupCount];
     public static final ReentrantLock[] mergeBufferLocks = new ReentrantLock[groupCount];
     public static final AtomicLong[] mergeBufferPositions = new AtomicLong[groupCount];
-    public static volatile Map<ByteBuffer, ByteBuffer>[] dataToForceMaps = new Map[groupCount];
+//    public static volatile Map<ByteBuffer, ByteBuffer>[] dataToForceMaps = new Map[groupCount];
     public static volatile Map<Thread, Thread>[] parkedThreadMaps = new Map[groupCount];
-    public static volatile Semaphore[] semaphores = new Semaphore[groupCount];
+    public static final AtomicLong[] forceVersions = new AtomicLong[groupCount];
 
     public static void init() throws IOException {
         for (int i = 0; i < groupCount; i++) {
@@ -64,8 +64,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             mergeBuffers[i] = ByteBuffer.allocateDirect(18 * 1024 * (50 + groupCount - 1) / groupCount);
             mergeBufferLocks[i] = new  ReentrantLock();
             mergeBufferPositions[i] = new AtomicLong(((DirectBuffer) mergeBuffers[i]).address());
-            dataToForceMaps[i] = new ConcurrentHashMap<>();
+//            dataToForceMaps[i] = new ConcurrentHashMap<>();
             parkedThreadMaps[i] = new ConcurrentHashMap<>();
+            forceVersions[i] = new AtomicLong();
         }
     }
 
@@ -182,10 +183,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             ByteBuffer mergeBuffer = mergeBuffers[id];
             ReentrantLock mergeBufferLock = mergeBufferLocks[id];
             AtomicLong mergeBufferPosition = mergeBufferPositions[id];
-            Map<ByteBuffer, ByteBuffer> dataToForceMap = dataToForceMaps[id];
+//            Map<ByteBuffer, ByteBuffer> dataToForceMap = dataToForceMaps[id];
             Map<Thread, Thread> parkedThreadMap = parkedThreadMaps[id];
-
-            Semaphore semaphore = semaphores[id];
+            AtomicLong forceVersion = forceVersions[id];
 
             long offset;
             byte topicId = getTopicId(topic);
@@ -216,11 +216,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             unsafe.copyMemory(data.array(), 16 + data.position(), null, writeAddress + DATA_INFORMATION_LENGTH, dataLength);
 
             // 登记需要刷盘的数据和对应的线程
-            dataToForceMap.put(data, data);
+//            dataToForceMap.put(data, data);
+            long forceVersionNow = forceVersion.get();
             parkedThreadMap.put(Thread.currentThread(), Thread.currentThread());
             mergeBufferLock.unlock();
 
-            if(dataToForceMap.size() < MERGE_MIN_THREAD_COUNT) {
+            if(parkedThreadMap.size() < MERGE_MIN_THREAD_COUNT) {
                 long start = System.currentTimeMillis();
                 unsafe.park(true, System.currentTimeMillis() + THREAD_PARK_TIMEOUT);  // ms
                 long stop = System.currentTimeMillis();
@@ -229,9 +230,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 }
             }
             // 自己的 data 还没被 force
-            if (dataToForceMap.containsKey(data)){
+//            if (dataToForceMap.containsKey(data)){
+            if (forceVersionNow == forceVersion.get()){
                 mergeBufferLock.lock();
-                if (dataToForceMap.containsKey(data)){
+//                if (dataToForceMap.containsKey(data)){
+                if (forceVersionNow == forceVersion.get()){
                     long start = System.currentTimeMillis();
                     mergeBuffer.limit((int) (mergeBufferPosition.get() - initialAddress));
                     dataWriteChannel.write(mergeBuffer);
@@ -239,13 +242,14 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     long stop = System.currentTimeMillis();
 
                     if (DEBUG){
-                        System.out.println(String.format("groupId: %d, mergeThreadCount: %d, mergeSize: %d kb, writeCostTime: %d", id, dataToForceMap.size(), mergeBuffer.limit() / 1024, stop - start));
+                        System.out.println(String.format("groupId: %d, mergeThreadCount: %d, mergeSize: %d kb, writeCostTime: %d", id, parkedThreadMap.size(), mergeBuffer.limit() / 1024, stop - start));
                     }
 
                     mergeBuffer.clear();
                     mergeBufferPosition.set(initialAddress);
 
-                    dataToForceMap.clear();
+//                    dataToForceMap.clear();
+                    forceVersion.getAndIncrement();
                     // 叫醒各个线程
                     parkedThreadMap.remove(Thread.currentThread());
                     for (Thread thread : parkedThreadMap.keySet()) {
@@ -320,9 +324,22 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         return ret;
     }
 
+    // 工具函数
+    public static String getNow() {
+        Calendar cal = Calendar.getInstance();
+        return Integer.toString(cal.get(Calendar.YEAR)) + "/"
+                + Integer.toString(cal.get(Calendar.MONTH) + 1) + "/"
+                + Integer.toString(cal.get(Calendar.DATE)) + " "
+                + Integer.toString(cal.get(Calendar.HOUR_OF_DAY)) + ":"
+                + Integer.toString(cal.get(Calendar.MINUTE)) + ":"
+                + Integer.toString(cal.get(Calendar.SECOND)) + "."
+                + Integer.toString(cal.get(Calendar.MILLISECOND)) + " ";
+    }
+
 
     public static void main(String[] args) throws IOException, InterruptedException {
         DefaultMessageQueueImpl inst = new DefaultMessageQueueImpl();
+        final int n = 1000;
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -336,7 +353,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
                     long offset;
 
-                    for (int i = 0; i < 1000; i++) {
+                    for (int i = 0; i < n; i++) {
                         ByteBuffer byteBuffer = ByteBuffer.allocate(8);
                         byteBuffer.putLong(12345L);
                         byteBuffer.flip();
@@ -368,7 +385,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         long offset;
 
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < n; i++) {
             ByteBuffer byteBuffer = ByteBuffer.allocate(8);
             byteBuffer.putLong(12345L);
             byteBuffer.flip();
