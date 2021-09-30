@@ -17,9 +17,8 @@ import java.util.concurrent.locks.ReentrantLock;
 public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static final boolean DEBUG = true;
-    public static final File DISC_ROOT = new File("/essd");
-    public static final File PMEM_ROOT = new File("/pmem");
-    public static final File dataFile = new File(DISC_ROOT, "data");
+    public static File DISC_ROOT;
+    public static File PMEM_ROOT;
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
     public static final long KILL_SELF_TIMEOUT = 1 * 60;  // seconds
@@ -45,7 +44,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static volatile ByteBuffer[] mergeBuffers = new ByteBuffer[groupCount];
     public static final ReentrantLock[] mergeBufferLocks = new ReentrantLock[groupCount];
     public static final AtomicLong[] mergeBufferPositions = new AtomicLong[groupCount];
-    public static volatile Map<ByteBuffer, Thread>[] dataToForceMaps = new Map[groupCount];
+    public static volatile Map<ByteBuffer, ByteBuffer>[] dataToForceMaps = new Map[groupCount];
+    public static volatile Map<Thread, Thread>[] parkedThreadMaps = new Map[groupCount];
 
     public static void init() throws IOException {
         for (int i = 0; i < groupCount; i++) {
@@ -63,6 +63,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             mergeBufferLocks[i] = new  ReentrantLock();
             mergeBufferPositions[i] = new AtomicLong(((DirectBuffer) mergeBuffers[i]).address());
             dataToForceMaps[i] = new ConcurrentHashMap<>();
+            parkedThreadMaps[i] = new ConcurrentHashMap<>();
         }
     }
 
@@ -113,6 +114,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
     public DefaultMessageQueueImpl() {
+        DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./essd") : new File("/essd");
+        PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
         try {
             init();
         } catch (IOException e) {
@@ -177,7 +180,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             ByteBuffer mergeBuffer = mergeBuffers[id];
             ReentrantLock mergeBufferLock = mergeBufferLocks[id];
             AtomicLong mergeBufferPosition = mergeBufferPositions[id];
-            Map<ByteBuffer, Thread> dataToForceMap = dataToForceMaps[id];
+            Map<ByteBuffer, ByteBuffer> dataToForceMap = dataToForceMaps[id];
+            Map<Thread, Thread> parkedThreadMap = parkedThreadMaps[id];
 
             long offset;
             byte topicId = getTopicId(topic);
@@ -208,7 +212,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             unsafe.copyMemory(data.array(), 16 + data.position(), null, writeAddress + DATA_INFORMATION_LENGTH, dataLength);
 
             // 登记需要刷盘的数据和对应的线程
-            dataToForceMap.put(data, Thread.currentThread());
+            dataToForceMap.put(data, data);
+            parkedThreadMap.put(Thread.currentThread(), Thread.currentThread());
             mergeBufferLock.unlock();
 
             if(dataToForceMap.size() < MERGE_MIN_THREAD_COUNT) {
@@ -237,13 +242,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     mergeBuffer.clear();
                     mergeBufferPosition.set(initialAddress);
 
+                    dataToForceMap.clear();
                     // 叫醒各个线程
-                    for (Thread thread : dataToForceMap.values()) {
+                    for (Thread thread : parkedThreadMap.keySet()) {
                         unsafe.unpark(thread);
                     }
-                    dataToForceMap.clear();
-
-                    System.out.println("to force map cleared: " + dataToForceMap.size());
+                    parkedThreadMap.clear();
 
                     mergeBufferLock.unlock();
                 }
