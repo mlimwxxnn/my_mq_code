@@ -121,18 +121,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         return context;
     }
 
-//    public static int getThreadGroupId(Thread thread){
-//        Integer id = groupIdMap.get(thread);
-//        if (id != null){
-//            return id;
-//        }
-//        id = threadCountNow.getAndIncrement() % groupCount;
-//        // threadCountNow.get() / groupCount - 5 为每个分组的线程数少 5 个为最小 merge 数
-//        MERGE_MIN_THREAD_COUNT.set(Math.max(threadCountNow.get() / groupCount - 5, MERGE_MIN_THREAD_COUNT.get()));
-//        groupIdMap.put(thread, id);
-//        return id;
-//    }
-
     public DefaultMessageQueueImpl() {
         DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./essd") : new File("/essd");
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
@@ -197,7 +185,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
         }
         try {
-            ThreadWorkContext context = getThreadWorkContext(Thread.currentThread());
+            Thread selfThread = Thread.currentThread();
+            ThreadWorkContext context = getThreadWorkContext(selfThread);
             int id = context.id;
 
             FileChannel dataWriteChannel = dataWriteChannels[id];
@@ -237,7 +226,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
             // 登记需要刷盘的数据和对应的线程
             long forceVersionNow = forceVersion.get();
-            parkedThreadMap.put(Thread.currentThread(), Thread.currentThread());
+            parkedThreadMap.put(selfThread, selfThread);
             // 在这里读阻塞数，避免判断阻塞数量时和后续的 clear 操作冲突
             int parkedThreadCount = parkedThreadMap.size();
             mergeBufferLock.unlock();
@@ -247,7 +236,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 unsafe.park(true, System.currentTimeMillis() + THREAD_PARK_TIMEOUT);  // ms
                 long stop = System.currentTimeMillis();
                 if (DEBUG){
-                    System.out.println(String.format("Thread: %s, id: %d, park for time : %d ms", Thread.currentThread().getName(), id, stop - start));
+                    System.out.println(String.format("Thread: %s, id: %d, park for time : %d ms", selfThread.getName(), id, stop - start));
                 }
             }
             // 自己的 data 还没被 force
@@ -268,7 +257,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     mergeBufferPosition.set(initialAddress);
                     forceVersion.getAndIncrement();
                     // 叫醒各个线程
-                    parkedThreadMap.remove(Thread.currentThread());
+                    parkedThreadMap.remove(selfThread);
                     for (Thread thread : parkedThreadMap.keySet()) {
                         unsafe.unpark(thread);
                     }
