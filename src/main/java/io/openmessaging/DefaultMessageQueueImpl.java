@@ -21,7 +21,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File PMEM_ROOT;
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
-    public static final long KILL_SELF_TIMEOUT = 10 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 30 * 60;  // seconds
     public static final long THREAD_PARK_TIMEOUT = 2;  // ms
     public static AtomicInteger MERGE_MIN_THREAD_COUNT = new AtomicInteger(5);  // 只是起始
     public static final int groupCount = 3;
@@ -309,7 +309,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 int id = (int) (p[1] >> 32);
                 dataReadChannels[id].read(buf, p[0]);
                 buf.flip();
-                ret.put(i, buf);
+                ret.put(i - (int) offset, buf);
             }
         }catch (Exception ignored){ }
         // 打印总体已经响应查询的次数
