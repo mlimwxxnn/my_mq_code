@@ -13,6 +13,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 
 public class DefaultMessageQueueImpl extends MessageQueue {
@@ -44,7 +45,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final FileChannel[] dataWriteChannels = new FileChannel[groupCount];
     public static final FileChannel[] dataReadChannels = new FileChannel[groupCount];
     public static volatile ByteBuffer[] mergeBuffers = new ByteBuffer[groupCount];
-    public static final ReentrantLock[] mergeBufferLocks = new ReentrantLock[groupCount];
+//    public static final ReentrantLock[] mergeBufferLocks = new ReentrantLock[groupCount];
+    public static final ReentrantReadWriteLock[] mergeBufferRWLocks = new ReentrantReadWriteLock[groupCount];
     public static final AtomicLong[] mergeBufferPositions = new AtomicLong[groupCount];
     public static volatile Map<Thread, Thread>[] parkedThreadMaps = new Map[groupCount];
     public static final AtomicLong[] forceVersions = new AtomicLong[groupCount];
@@ -64,7 +66,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             dataWriteChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.APPEND, StandardOpenOption.WRITE);
             dataReadChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.READ);
             mergeBuffers[i] = ByteBuffer.allocateDirect(18 * 1024 * maxThreadCountPerGroup);
-            mergeBufferLocks[i] = new  ReentrantLock();
+            mergeBufferRWLocks[i] = new ReentrantReadWriteLock();
             mergeBufferPositions[i] = new AtomicLong(((DirectBuffer) mergeBuffers[i]).address());
             parkedThreadMaps[i] = new ConcurrentHashMap<>();
             forceVersions[i] = new AtomicLong();
@@ -195,7 +197,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
             FileChannel dataWriteChannel = dataWriteChannels[id];
             ByteBuffer mergeBuffer = mergeBuffers[id];
-            ReentrantLock mergeBufferLock = mergeBufferLocks[id];
+//            ReentrantLock mergeBufferLock = mergeBufferLocks[id];
+            ReentrantReadWriteLock mergeBufferRWLock = mergeBufferRWLocks[id];
             AtomicLong mergeBufferPosition = mergeBufferPositions[id];
             Map<Thread, Thread> parkedThreadMap = parkedThreadMaps[id];
             AtomicLong forceVersion = forceVersions[id];
@@ -219,7 +222,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             offset = queueInfo.size();
             long initialAddress = ((DirectBuffer) mergeBuffer).address();
 
-            mergeBufferLock.lock();
+            mergeBufferRWLock.readLock().lock();
             long channelPosition = dataWriteChannel.position();
             long writeAddress = mergeBufferPosition.getAndAdd(DATA_INFORMATION_LENGTH + dataLength);
             int index = (int)(writeAddress - initialAddress);
@@ -233,7 +236,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             parkedThreadMap.put(selfThread, selfThread);
             // 在这里读阻塞数，避免判断阻塞数量时和后续的 clear 操作冲突
             int parkedThreadCount = parkedThreadMap.size();
-            mergeBufferLock.unlock();
+            mergeBufferRWLock.readLock().unlock();
 
             if(parkedThreadCount < MERGE_MIN_THREAD_COUNT.get()) {
                 long start = System.currentTimeMillis();
@@ -245,7 +248,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
             // 自己的 data 还没被 force
             if (forceVersionNow == forceVersion.get()){
-                mergeBufferLock.lock();
+                mergeBufferRWLock.writeLock().lock();
                 if (forceVersionNow == forceVersion.get()){
                     long start = System.currentTimeMillis();
                     mergeBuffer.limit((int) (mergeBufferPosition.get() - initialAddress));
@@ -267,7 +270,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     }
                     parkedThreadMap.clear();
                 }
-                mergeBufferLock.unlock();
+                mergeBufferRWLock.writeLock().unlock();
             }
             long pos = channelPosition + writeAddress - initialAddress + DATA_INFORMATION_LENGTH;
             pos |= ((long)dataLength) << 40;
