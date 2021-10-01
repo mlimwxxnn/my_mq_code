@@ -341,10 +341,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
 
-    public static void main(String[] args) throws IOException, InterruptedException {
+    public static void main(String[] args) throws InterruptedException {
         final int threadCount = 40;
-        final int topicCountPerThread = 100;
-        final int queueIdCountPerTopic = 1000;
+        final int topicCountPerThread = 15;
+        final int queueIdCountPerTopic = 20;
         final int writeTimesPerQueueId = 30;
         ByteBuffer[][][] buffers = new ByteBuffer[threadCount][topicCountPerThread][queueIdCountPerTopic];
         DefaultMessageQueueImpl mq = new DefaultMessageQueueImpl();
@@ -379,76 +379,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             });
             threads[i].start();
         }
+        for (int i = 0; i < threadCount; i++) {
+            threads[i].join();
+        }
 
-        Map<Integer, ByteBuffer> res = mq.getRange("30", 100, 0, 100);
+        Map<Integer, ByteBuffer> res = mq.getRange("10", 15, 0, 100);
         System.out.println(res.size());
-
-
-//        final int n = 1000;
-//        new Thread(new Runnable() {
-//            @Override
-//            public void run() {
-//                try {
-//                    ByteBuffer[] buffers = new ByteBuffer[100];
-//                    for (byte i = 0; i < buffers.length; i++) {
-//                        buffers[i] = ByteBuffer.allocate(4);
-//                        buffers[i].put(i);
-//                        buffers[i].flip();
-//                    }
-//
-//                    long offset;
-//
-//                    for (int i = 0; i < n; i++) {
-//                        ByteBuffer byteBuffer = ByteBuffer.allocate(8);
-//                        byteBuffer.putLong(12345L);
-//                        byteBuffer.flip();
-//                        inst.append("abcmnp", 1000, byteBuffer);
-//                        Thread.sleep(4);
-//                    }
-//
-//                    offset = inst.append("abc1", 1000, buffers[77]);
-//                    Thread.sleep(100);
-//                    offset = inst.append("abc1", 1001, buffers[67]);
-//                    Thread.sleep(100);
-//                    offset = inst.append("abc1", 1001, buffers[42]);
-//                    offset = inst.append("abc1", 1001, buffers[33]);
-//                    Thread.sleep(100);
-//                    offset = inst.append("abd1", 1001, buffers[11]);
-//                }catch (Exception e){}
-//                Map<Integer, ByteBuffer> ret = inst.getRange("abc1", 1001, 0, 100);
-//                System.out.println(String.format("Keys: %d", ret.keySet().size()));
-//            }
-//        }).start();
-//
-//
-//        ByteBuffer[] buffers = new ByteBuffer[100];
-//        for (byte i = 0; i < buffers.length; i++) {
-//            buffers[i] = ByteBuffer.allocate(4);
-//            buffers[i].put(i);
-//            buffers[i].flip();
-//        }
-//
-//        long offset;
-//
-//        for (int i = 0; i < n; i++) {
-//            ByteBuffer byteBuffer = ByteBuffer.allocate(8);
-//            byteBuffer.putLong(12345L);
-//            byteBuffer.flip();
-//            inst.append("abcdef", 1000, byteBuffer);
-//            Thread.sleep(4);
-//        }
-//
-//        offset = inst.append("abc", 1000, buffers[77]);
-//        Thread.sleep(100);
-//        offset = inst.append("abc", 1001, buffers[67]);
-//        Thread.sleep(100);
-//        offset = inst.append("abc", 1001, buffers[42]);
-//        offset = inst.append("abc", 1001, buffers[33]);
-//        Thread.sleep(100);
-//        offset = inst.append("abd", 1001, buffers[11]);
-//
-//        Map<Integer, ByteBuffer> ret = inst.getRange("abc", 1001, 0, 100);
-//        System.out.println(String.format("Keys: %d", ret.keySet().size()));
-
     }
 }
