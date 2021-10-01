@@ -5,3 +5,7 @@
 target/
 *.txt
 essd/
+*.log
+*.prefs
+*.project
+*.classpath
