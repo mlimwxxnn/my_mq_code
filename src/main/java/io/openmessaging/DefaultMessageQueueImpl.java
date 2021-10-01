@@ -235,10 +235,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 }
             }
             // 自己的 data 还没被 force
-//            if (dataToForceMap.containsKey(data)){
             if (forceVersionNow == forceVersion.get()){
                 mergeBufferLock.lock();
-//                if (dataToForceMap.containsKey(data)){
                 if (forceVersionNow == forceVersion.get()){
                     long start = System.currentTimeMillis();
                     mergeBuffer.limit((int) (mergeBufferPosition.get() - initialAddress));
@@ -252,7 +250,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
                     mergeBuffer.clear();
                     mergeBufferPosition.set(initialAddress);
-//                    dataToForceMap.clear();
                     forceVersion.getAndIncrement();
                     // 叫醒各个线程
                     parkedThreadMap.remove(Thread.currentThread());
@@ -279,9 +276,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
      * @throws IOException
      */
     private Byte getTopicId(String topic) {
-
         Byte topicId = topicNameToTopicId.get(topic);
         if (topicId == null) {
+
             File topicIdFile = new File(DISC_ROOT, topic);
             try {
                 if (!topicIdFile.exists()) {
@@ -328,22 +325,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         return ret;
     }
 
-    // 工具函数
-    public static String getNow() {
-        Calendar cal = Calendar.getInstance();
-        return Integer.toString(cal.get(Calendar.YEAR)) + "/"
-                + Integer.toString(cal.get(Calendar.MONTH) + 1) + "/"
-                + Integer.toString(cal.get(Calendar.DATE)) + " "
-                + Integer.toString(cal.get(Calendar.HOUR_OF_DAY)) + ":"
-                + Integer.toString(cal.get(Calendar.MINUTE)) + ":"
-                + Integer.toString(cal.get(Calendar.SECOND)) + "."
-                + Integer.toString(cal.get(Calendar.MILLISECOND)) + " ";
-    }
-
-
     public static void main(String[] args) throws InterruptedException {
-        final int threadCount = 40;
-        final int topicCountPerThread = 15;
+        final int threadCount = 25;
+        final int topicCountPerThread = 4;  // threadCount * topicCountPerThread <= 100
         final int queueIdCountPerTopic = 20;
         final int writeTimesPerQueueId = 30;
         ByteBuffer[][][] buffers = new ByteBuffer[threadCount][topicCountPerThread][queueIdCountPerTopic];
@@ -368,7 +352,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 @Override
                 public void run() {
                     for (int topicIndex = 0; topicIndex < topicCountPerThread; topicIndex++) {
-                        String topic = topicIndex + "";
+                        String topic = threadIndex + "-" + topicIndex;
                         for (int queueIndex = 0; queueIndex < queueIdCountPerTopic; queueIndex++) {
                             for (int t = 0; t < writeTimesPerQueueId; t++) {
                                 mq.append(topic, queueIndex, buffers[threadIndex][topicIndex][queueIndex]);
@@ -383,7 +367,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             threads[i].join();
         }
 
-        Map<Integer, ByteBuffer> res = mq.getRange("10", 15, 0, 100);
+        Map<Integer, ByteBuffer> res = mq.getRange("10-3", 15, 0, 100);
         System.out.println(res.size());
     }
 }
