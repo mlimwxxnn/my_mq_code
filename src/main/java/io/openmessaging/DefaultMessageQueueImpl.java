@@ -272,21 +272,26 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     private Byte getTopicId(String topic) {
         Byte topicId = topicNameToTopicId.get(topic);
         if (topicId == null) {
-            File topicIdFile = new File(DISC_ROOT, topic);
-            try {
-                if (!topicIdFile.exists()) {
-                    // 文件不存在，这是一个新的Topic，保存topic名称到topicId的映射，文件名为topic，内容为id
-                    topicNameToTopicId.put(topic, topicId = (byte) topicCount.getAndIncrement());
-                    FileOutputStream fos = new FileOutputStream(new File(DISC_ROOT, topic));
-                    fos.write(topicId);
-                    fos.flush();
-                    fos.close();
-                } else {
-                    // 文件存在，topic不在内存，从文件恢复
-                    FileInputStream fis = new FileInputStream(new File(DISC_ROOT, topic));
-                    topicId = (byte) fis.read();
+            synchronized (topicNameToTopicId) {
+                if((topicId = topicNameToTopicId.get(topic)) == null) {
+                    File topicIdFile = new File(DISC_ROOT, topic);
+                    try {
+                        if (!topicIdFile.exists()) {
+                            // 文件不存在，这是一个新的Topic，保存topic名称到topicId的映射，文件名为topic，内容为id
+                            topicNameToTopicId.put(topic, topicId = (byte) topicCount.getAndIncrement());
+                            FileOutputStream fos = new FileOutputStream(new File(DISC_ROOT, topic));
+                            fos.write(topicId);
+                            fos.flush();
+                            fos.close();
+                        } else {
+                            // 文件存在，topic不在内存，从文件恢复
+                            FileInputStream fis = new FileInputStream(new File(DISC_ROOT, topic));
+                            topicId = (byte) fis.read();
+                        }
+                    } catch (Exception ignored) {
+                    }
                 }
-            }catch(Exception ignored) {}
+            }
         }
         return topicId;
     }
