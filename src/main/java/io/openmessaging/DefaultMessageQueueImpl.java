@@ -11,7 +11,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
 
 
 public class DefaultMessageQueueImpl extends MessageQueue {
@@ -21,31 +21,28 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File PMEM_ROOT;
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
-    public static final long KILL_SELF_TIMEOUT = 15 * 60;  // seconds  869
+    public static final long KILL_SELF_TIMEOUT = 1 * 60;  // seconds
     public static final long THREAD_PARK_TIMEOUT = 2;  // ms
-//    public static AtomicInteger MERGE_MIN_THREAD_COUNT = new AtomicInteger(5);  // 只是起始
-    public static final int INIT_MERGE_MIN_THREAD_COUNT = 5;
-    public static final int groupCount = 5;
-    public static final int READ_SEMAPHORE_PER_GROUP = 2;
-
-    public static final int REDUCE_COUNT = 2; // 合并超时后，将合并线程数调整为 组内存活线程数 - REDUCE_COUNT
+    public static final int groupCount = 4;
+    public static final int REDUCE_COUNT = 2; // 合并超时后，将合并线程数调整为 组内存活线程数
 
     public static AtomicInteger topicCount = new AtomicInteger();
     ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
     // topicId, queueId, dataPosition
-    public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, ArrayList<Long>>> metaInfo = new ConcurrentHashMap<>();
+    public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, ArrayList<long[]>>> metaInfo = new ConcurrentHashMap<>();
     public static final Unsafe unsafe = UnsafeUtil.unsafe;
 
 
     public static final int DATA_INFORMATION_LENGTH = 7;
 
+    public static volatile Map<Thread, Integer> groupIdMap = new ConcurrentHashMap<>();
     public static volatile Map<Thread, ThreadWorkContext> threadWorkContextMap = new ConcurrentHashMap<>();
 
     public static final AtomicInteger threadCountNow = new AtomicInteger();
     public static final FileChannel[] dataWriteChannels = new FileChannel[groupCount];
     public static final FileChannel[] dataReadChannels = new FileChannel[groupCount];
     public static volatile ByteBuffer[] mergeBuffers = new ByteBuffer[groupCount];
-    public static final ReentrantReadWriteLock[] mergeBufferRWLocks = new ReentrantReadWriteLock[groupCount];
+    public static final ReentrantLock[] mergeBufferLocks = new ReentrantLock[groupCount];
     public static final AtomicLong[] mergeBufferPositions = new AtomicLong[groupCount];
     public static volatile Map<Thread, Thread>[] parkedThreadMaps = new Map[groupCount];
     public static final AtomicLong[] forceVersions = new AtomicLong[groupCount];
@@ -65,12 +62,22 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             dataWriteChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.APPEND, StandardOpenOption.WRITE);
             dataReadChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.READ);
             mergeBuffers[i] = ByteBuffer.allocateDirect(18 * 1024 * maxThreadCountPerGroup);
-            mergeBufferRWLocks[i] = new ReentrantReadWriteLock();
+            mergeBufferLocks[i] = new  ReentrantLock();
             mergeBufferPositions[i] = new AtomicLong(((DirectBuffer) mergeBuffers[i]).address());
             parkedThreadMaps[i] = new ConcurrentHashMap<>();
             forceVersions[i] = new AtomicLong();
-            mergerMinThreadCounts[i] = new AtomicInteger(INIT_MERGE_MIN_THREAD_COUNT);
+            mergerMinThreadCounts[i] = new AtomicInteger();
         }
+    }
+
+    public static int getAliveThreadCountByGroupId(int id){
+        int count = 0;
+        for (Thread thread : threadWorkContextMap.keySet()) {
+            if (thread.isAlive() && threadWorkContextMap.get(thread).id == id ){
+                count++;
+            }
+        }
+        return count;
     }
 
     public static long getTotalFileSize(){
@@ -83,16 +90,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
         }
         return fileSize;
-    }
-
-    public static int getAliveThreadCountByGroupId(int id){
-        int count = 0;
-        for (Thread thread : threadWorkContextMap.keySet()) {
-            if (thread.isAlive() && threadWorkContextMap.get(thread).id == id ){
-                count++;
-            }
-        }
-        return count;
     }
 
     public static void killSelf(long timeout) {
@@ -154,8 +151,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     byte topicId;
                     int queueId;
                     short dataLen = 0;
-                    ConcurrentHashMap<Integer, ArrayList<Long>> topicInfo;
-                    ArrayList<Long> queueInfo;
+                    ConcurrentHashMap<Integer, ArrayList<long[]>> topicInfo;
+                    ArrayList<long[]> queueInfo;
                     long dataFilesize = channel.size();
                     while (channel.position() + dataLen < dataFilesize) {
                         channel.position(channel.position() + dataLen); // 跳过数据部分只读取数据头部的索引信息
@@ -176,10 +173,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                             queueInfo = new ArrayList<>(64);
                             topicInfo.put(queueId, queueInfo);
                         }
-                        long pos = channel.position();
-                        pos |= ((long)dataLen) << 40;
-                        pos |= ((long)id) << 56;
-                        queueInfo.add(pos);
+                        long groupIdAndDataLength = (((long) id) << 32) | dataLen;
+                        queueInfo.add(new long[]{channel.position(), groupIdAndDataLength});
                     }
                 }
             } catch (IOException e) {
@@ -198,13 +193,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
         }
         try {
-            Thread selfThread = Thread.currentThread();
-            ThreadWorkContext context = getThreadWorkContext(selfThread);
+            ThreadWorkContext context = getThreadWorkContext(Thread.currentThread());
             int id = context.id;
 
             FileChannel dataWriteChannel = dataWriteChannels[id];
             ByteBuffer mergeBuffer = mergeBuffers[id];
-            ReentrantReadWriteLock mergeBufferRWLock = mergeBufferRWLocks[id];
+            ReentrantLock mergeBufferLock = mergeBufferLocks[id];
             AtomicLong mergeBufferPosition = mergeBufferPositions[id];
             Map<Thread, Thread> parkedThreadMap = parkedThreadMaps[id];
             AtomicLong forceVersion = forceVersions[id];
@@ -215,13 +209,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             int dataLength = data.remaining(); // 默认data的position是从 0 开始的
 
             // 根据topicId获取topic下的全部队列的信息
-            ConcurrentHashMap<Integer, ArrayList<Long>> topicInfo = metaInfo.get(topicId);
+            ConcurrentHashMap<Integer, ArrayList<long[]>> topicInfo = metaInfo.get(topicId);
             if (topicInfo == null) {
                 topicInfo = new ConcurrentHashMap<>();
                 metaInfo.put(topicId, topicInfo);
             }
             // 根据queueId获取队列在文件中的位置信息
-            ArrayList<Long> queueInfo = topicInfo.get(queueId);
+            ArrayList<long[]> queueInfo = topicInfo.get(queueId);
             if (queueInfo == null) {
                 queueInfo = new ArrayList<>();
                 topicInfo.put(queueId, queueInfo);
@@ -229,7 +223,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             offset = queueInfo.size();
             long initialAddress = ((DirectBuffer) mergeBuffer).address();
 
-            mergeBufferRWLock.readLock().lock();
+            mergeBufferLock.lock();
             long channelPosition = dataWriteChannel.position();
             long writeAddress = mergeBufferPosition.getAndAdd(DATA_INFORMATION_LENGTH + dataLength);
             int index = (int)(writeAddress - initialAddress);
@@ -240,23 +234,22 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
             // 登记需要刷盘的数据和对应的线程
             long forceVersionNow = forceVersion.get();
-            parkedThreadMap.put(selfThread, selfThread);
+            parkedThreadMap.put(Thread.currentThread(), Thread.currentThread());
             // 在这里读阻塞数，避免判断阻塞数量时和后续的 clear 操作冲突
             int parkedThreadCount = parkedThreadMap.size();
-            mergeBufferRWLock.readLock().unlock();
+            mergeBufferLock.unlock();
 
             if(parkedThreadCount < mergeMinThreadCount.get()) {
                 long start = System.currentTimeMillis();
-
                 unsafe.park(true, System.currentTimeMillis() + THREAD_PARK_TIMEOUT);  // ms
                 long stop = System.currentTimeMillis();
                 if (DEBUG){
-                    System.out.println(String.format("Thread: %s, id: %d, park for time : %d ms", selfThread.getName(), id, stop - start));
+                    System.out.println(String.format("Thread: %s, id: %d, park for time : %d ms", Thread.currentThread().getName(), id, stop - start));
                 }
             }
             // 自己的 data 还没被 force
             if (forceVersionNow == forceVersion.get()){
-                mergeBufferRWLock.writeLock().lock();
+                mergeBufferLock.lock();
                 if (forceVersionNow == forceVersion.get()){
                     long start = System.currentTimeMillis();
                     mergeBuffer.limit((int) (mergeBufferPosition.get() - initialAddress));
@@ -275,18 +268,17 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         mergeMinThreadCount.set(getAliveThreadCountByGroupId(id) - REDUCE_COUNT);
                     }
                     // 叫醒各个线程
-                    parkedThreadMap.remove(selfThread);
+                    parkedThreadMap.remove(Thread.currentThread());
                     for (Thread thread : parkedThreadMap.keySet()) {
                         unsafe.unpark(thread);
                     }
                     parkedThreadMap.clear();
                 }
-                mergeBufferRWLock.writeLock().unlock();
+                mergeBufferLock.unlock();
             }
             long pos = channelPosition + writeAddress - initialAddress + DATA_INFORMATION_LENGTH;
-            pos |= ((long)dataLength) << 40;
-            pos |= ((long)id) << 56;
-            queueInfo.add(pos);
+            long groupAndDataLength = (((long) id) << 32) | dataLength;
+            queueInfo.add(new long[]{pos, groupAndDataLength}); // todo: 占用大小待优化
             return offset;
         } catch (Exception ignored) { }
         return 0L;
@@ -329,29 +321,22 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     @Override
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
         Byte topicId = getTopicId(topic);
+        ArrayList<long[]> queueInfo = metaInfo.get(topicId).get(queueId);
         HashMap<Integer, ByteBuffer> ret = new HashMap<>();
-        ArrayList<Long> queueInfo = metaInfo.get(topicId).get(queueId);
-        if(queueInfo == null){
-            return ret;
-        }
         ThreadWorkContext context = getThreadWorkContext(Thread.currentThread());
         ByteBuffer[] buffers = context.buffers;
         try {
             for (int i = 0; i < fetchNum && (i + offset) < queueInfo.size(); i++){
-                long p = queueInfo.get(i + (int) offset);
-                long dataPosition = p & 0xffffffffffL;
-                int dataLen = (int)((p>>>40) & 0xffff);
-                int id = (int)(p >>> 56);
+                long[] p = queueInfo.get(i + (int) offset);
                 ByteBuffer buf = buffers[i];
                 buf.clear();
-                buf.limit(dataLen);
-                dataReadChannels[id].read(buf, dataPosition);
+                buf.limit((int) p[1]);
+                int id = (int) (p[1] >> 32);
+                dataReadChannels[id].read(buf, p[0]);
                 buf.flip();
                 ret.put(i, buf);
             }
-        }catch (Exception e){
-            e.printStackTrace();
-        }
+        }catch (Exception ignored){ }
         // 打印总体已经响应查询的次数
         if (DEBUG){
             int getRangeCountNow = getRangeCount.incrementAndGet();
