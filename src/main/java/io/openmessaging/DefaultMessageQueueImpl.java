@@ -43,12 +43,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static volatile ByteBuffer[] mergeBuffers = new ByteBuffer[groupCount];
     public static final ReentrantLock[] mergeBufferLocks = new ReentrantLock[groupCount];
     public static final AtomicLong[] mergeBufferPositions = new AtomicLong[groupCount];
-//    public static volatile Map<ByteBuffer, ByteBuffer>[] dataToForceMaps = new Map[groupCount];
     public static volatile Map<Thread, Thread>[] parkedThreadMaps = new Map[groupCount];
     public static final AtomicLong[] forceVersions = new AtomicLong[groupCount];
     public static int maxThreadCountPerGroup = (50 + groupCount - 1) / groupCount;
-
-    public static Thread[][] threads = new Thread[groupCount][maxThreadCountPerGroup];
 
     public static void init() throws IOException {
         for (int i = 0; i < groupCount; i++) {
@@ -65,7 +62,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             mergeBuffers[i] = ByteBuffer.allocateDirect(18 * 1024 * maxThreadCountPerGroup);
             mergeBufferLocks[i] = new  ReentrantLock();
             mergeBufferPositions[i] = new AtomicLong(((DirectBuffer) mergeBuffers[i]).address());
-//            dataToForceMaps[i] = new ConcurrentHashMap<>();
             parkedThreadMaps[i] = new ConcurrentHashMap<>();
             forceVersions[i] = new AtomicLong();
         }
@@ -186,7 +182,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             ByteBuffer mergeBuffer = mergeBuffers[id];
             ReentrantLock mergeBufferLock = mergeBufferLocks[id];
             AtomicLong mergeBufferPosition = mergeBufferPositions[id];
-//            Map<ByteBuffer, ByteBuffer> dataToForceMap = dataToForceMaps[id];
             Map<Thread, Thread> parkedThreadMap = parkedThreadMaps[id];
             AtomicLong forceVersion = forceVersions[id];
 
@@ -219,7 +214,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             unsafe.copyMemory(data.array(), 16 + data.position(), null, writeAddress + DATA_INFORMATION_LENGTH, dataLength);
 
             // 登记需要刷盘的数据和对应的线程
-//            dataToForceMap.put(data, data);
             long forceVersionNow = forceVersion.get();
             parkedThreadMap.put(Thread.currentThread(), Thread.currentThread());
             // 在这里读阻塞数，避免判断阻塞数量时和后续的 clear 操作冲突
