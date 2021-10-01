@@ -29,7 +29,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int groupCount = 5;
     public static final int READ_SEMAPHORE_PER_GROUP = 2;
 
-    public static final int REDUCE_COUNT = 4; // 合并超时后，将合并线程数调整为 组内存活线程数 - REDUCE_COUNT
+    public static final int REDUCE_COUNT = 2; // 合并超时后，将合并线程数调整为 组内存活线程数 - REDUCE_COUNT
 
     public static AtomicInteger topicCount = new AtomicInteger();
     ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
@@ -40,14 +40,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static final int DATA_INFORMATION_LENGTH = 7;
 
-    public static volatile Map<Thread, Integer> groupIdMap = new ConcurrentHashMap<>();
     public static volatile Map<Thread, ThreadWorkContext> threadWorkContextMap = new ConcurrentHashMap<>();
 
     public static final AtomicInteger threadCountNow = new AtomicInteger();
     public static final FileChannel[] dataWriteChannels = new FileChannel[groupCount];
     public static final FileChannel[] dataReadChannels = new FileChannel[groupCount];
     public static volatile ByteBuffer[] mergeBuffers = new ByteBuffer[groupCount];
-//    public static final ReentrantLock[] mergeBufferLocks = new ReentrantLock[groupCount];
     public static final ReentrantReadWriteLock[] mergeBufferRWLocks = new ReentrantReadWriteLock[groupCount];
     public static final AtomicLong[] mergeBufferPositions = new AtomicLong[groupCount];
     public static volatile Map<Thread, Thread>[] parkedThreadMaps = new Map[groupCount];
@@ -134,8 +132,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }
         int id = threadCountNow.getAndIncrement() % groupCount;
         context = new ThreadWorkContext(id);
-
-
+        mergerMinThreadCounts[id].set(getAliveThreadCountByGroupId(id));
         threadWorkContextMap.put(thread, context);
         return context;
     }
@@ -254,6 +251,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
             if(parkedThreadCount < mergeMinThreadCount.get()) {
                 long start = System.currentTimeMillis();
+
                 unsafe.park(true, System.currentTimeMillis() + THREAD_PARK_TIMEOUT);  // ms
                 long stop = System.currentTimeMillis();
 //                if (DEBUG){
