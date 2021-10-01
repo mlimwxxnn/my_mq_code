@@ -9,7 +9,6 @@ import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -50,7 +49,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final AtomicLong[] mergeBufferPositions = new AtomicLong[groupCount];
     public static volatile Map<Thread, Thread>[] parkedThreadMaps = new Map[groupCount];
     public static final AtomicLong[] forceVersions = new AtomicLong[groupCount];
-    public static final Semaphore[] readSemaphores = new Semaphore[groupCount];
     public static final AtomicInteger[] mergerMinThreadCounts = new AtomicInteger[groupCount];
     public static int maxThreadCountPerGroup = (50 + groupCount - 1) / groupCount;
 
@@ -71,7 +69,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             mergeBufferPositions[i] = new AtomicLong(((DirectBuffer) mergeBuffers[i]).address());
             parkedThreadMaps[i] = new ConcurrentHashMap<>();
             forceVersions[i] = new AtomicLong();
-            readSemaphores[i] = new Semaphore(READ_SEMAPHORE_PER_GROUP);
             mergerMinThreadCounts[i] = new AtomicInteger(INIT_MERGE_MIN_THREAD_COUNT);
         }
     }
@@ -207,7 +204,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
             FileChannel dataWriteChannel = dataWriteChannels[id];
             ByteBuffer mergeBuffer = mergeBuffers[id];
-//            ReentrantLock mergeBufferLock = mergeBufferLocks[id];
             ReentrantReadWriteLock mergeBufferRWLock = mergeBufferRWLocks[id];
             AtomicLong mergeBufferPosition = mergeBufferPositions[id];
             Map<Thread, Thread> parkedThreadMap = parkedThreadMaps[id];
@@ -254,9 +250,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
                 unsafe.park(true, System.currentTimeMillis() + THREAD_PARK_TIMEOUT);  // ms
                 long stop = System.currentTimeMillis();
-//                if (DEBUG){
-//                    System.out.println(String.format("Thread: %s, id: %d, park for time : %d ms", selfThread.getName(), id, stop - start));
-//                }
+                if (DEBUG){
+                    System.out.println(String.format("Thread: %s, id: %d, park for time : %d ms", selfThread.getName(), id, stop - start));
+                }
             }
             // 自己的 data 还没被 force
             if (forceVersionNow == forceVersion.get()){
@@ -340,19 +336,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }
         ThreadWorkContext context = getThreadWorkContext(Thread.currentThread());
         ByteBuffer[] buffers = context.buffers;
-        boolean acquiredReadSemaphore = false;
-        int groupId = 0;
         try {
             for (int i = 0; i < fetchNum && (i + offset) < queueInfo.size(); i++){
                 long p = queueInfo.get(i + (int) offset);
                 long dataPosition = p & 0xffffffffffL;
                 int dataLen = (int)((p>>>40) & 0xffff);
                 int id = (int)(p >>> 56);
-                if (!acquiredReadSemaphore){
-                    readSemaphores[id].acquire();
-                    groupId = id;
-                    acquiredReadSemaphore = true;
-                }
                 ByteBuffer buf = buffers[i];
                 buf.clear();
                 buf.limit(dataLen);
@@ -362,10 +351,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
         }catch (Exception e){
             e.printStackTrace();
-        }finally {
-            if (acquiredReadSemaphore){
-                readSemaphores[groupId].release();
-            }
         }
         // 打印总体已经响应查询的次数
         if (DEBUG){
