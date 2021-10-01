@@ -17,7 +17,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class DefaultMessageQueueImpl extends MessageQueue {
 
-    public static final boolean DEBUG = true;
+    public static final boolean DEBUG = false;
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
     public static final AtomicInteger appendCount = new AtomicInteger();
@@ -28,6 +28,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int INIT_MERGE_MIN_THREAD_COUNT = 5;
     public static final int groupCount = 5;
     public static final int READ_SEMAPHORE_PER_GROUP = 2;
+
+    public static final int REDUCE_COUNT = 4; // 合并超时后，将合并线程数调整为 组内存活线程数 - REDUCE_COUNT
 
     public static AtomicInteger topicCount = new AtomicInteger();
     ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
@@ -133,8 +135,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         int id = threadCountNow.getAndIncrement() % groupCount;
         context = new ThreadWorkContext(id);
 
-        // threadCountNow.get() / groupCount - 5 为每个分组的线程数少 5 个为最小 merge 数
-        mergerMinThreadCounts[id].set(Math.max(threadCountNow.get() / groupCount - 3, INIT_MERGE_MIN_THREAD_COUNT));
+
         threadWorkContextMap.put(thread, context);
         return context;
     }
@@ -251,7 +252,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             int parkedThreadCount = parkedThreadMap.size();
             mergeBufferRWLock.readLock().unlock();
 
-            if(parkedThreadCount < MERGE_MIN_THREAD_COUNT.get()) {
+            if(parkedThreadCount < mergeMinThreadCount.get()) {
                 long start = System.currentTimeMillis();
                 unsafe.park(true, System.currentTimeMillis() + THREAD_PARK_TIMEOUT);  // ms
                 long stop = System.currentTimeMillis();
@@ -276,7 +277,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     mergeBuffer.clear();
                     mergeBufferPosition.set(initialAddress);
                     forceVersion.getAndIncrement();
-                    if(parkedThreadMap.size() < )
+                    if(parkedThreadMap.size() < mergeMinThreadCount.get()) {
+                        mergeMinThreadCount.set(getAliveThreadCountByGroupId(id) - REDUCE_COUNT);
+                    }
                     // 叫醒各个线程
                     parkedThreadMap.remove(selfThread);
                     for (Thread thread : parkedThreadMap.keySet()) {
