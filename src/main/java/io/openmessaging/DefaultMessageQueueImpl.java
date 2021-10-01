@@ -21,10 +21,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File PMEM_ROOT;
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
-    public static final long KILL_SELF_TIMEOUT = 30 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 15 * 60;  // seconds
     public static final long THREAD_PARK_TIMEOUT = 2;  // ms
     public static AtomicInteger MERGE_MIN_THREAD_COUNT = new AtomicInteger(5);  // 只是起始
-    public static final int groupCount = 3;
+    public static final int groupCount = 5;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
@@ -32,11 +32,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, ArrayList<Long>>> metaInfo = new ConcurrentHashMap<>();
     public static final Unsafe unsafe = UnsafeUtil.unsafe;
 
-    public static final int positionMask = (1 << 24) - 1;
-    public static final int statusMask = 1 << 25;  // 这个位置为 0 不在force中，为 1 是正在force中
 
     public static final int DATA_INFORMATION_LENGTH = 7;
+
     public static volatile Map<Thread, Integer> groupIdMap = new ConcurrentHashMap<>();
+    public static volatile Map<Thread, ThreadWorkContext> threadWorkContextMap = new ConcurrentHashMap<>();
+
     public static final AtomicInteger threadCountNow = new AtomicInteger();
     public static final FileChannel[] dataWriteChannels = new FileChannel[groupCount];
     public static final FileChannel[] dataReadChannels = new FileChannel[groupCount];
@@ -95,25 +96,42 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }).start();
     }
 
-    public static int getThreadGroupId(Thread thread){
-        Integer id = groupIdMap.get(thread);
-        if (id != null){
-            return id;
+    static class ThreadWorkContext {
+        public final int id; // groupId
+        public final ByteBuffer[] buffers = new ByteBuffer[100]; // 用来响应查询的buffer
+        public ThreadWorkContext(int id){
+            this.id = id;
+            for (int i = 0; i < buffers.length; i++) {
+                buffers[i] = ByteBuffer.allocateDirect(17 * 1024);
+            }
         }
-        id = threadCountNow.getAndIncrement() % groupCount;
+    }
+
+    public static ThreadWorkContext getThreadWorkContext(Thread thread){
+        ThreadWorkContext context = threadWorkContextMap.get(thread);
+        if (context != null){
+            return context;
+        }
+        int id = threadCountNow.getAndIncrement() % groupCount;
+        context = new ThreadWorkContext(id);
+
         // threadCountNow.get() / groupCount - 5 为每个分组的线程数少 5 个为最小 merge 数
-        MERGE_MIN_THREAD_COUNT.set(Math.max(threadCountNow.get() / groupCount - 5, MERGE_MIN_THREAD_COUNT.get()));
-        groupIdMap.put(thread, id);
-        return id;
+        MERGE_MIN_THREAD_COUNT.set(Math.max(threadCountNow.get() / groupCount - 3, MERGE_MIN_THREAD_COUNT.get()));
+        threadWorkContextMap.put(thread, context);
+        return context;
     }
 
-    public static int getPosition(int mergePositionValue){
-        return mergePositionValue & positionMask;
-    }
-
-    public static boolean isForcing(int mergePositionValue){
-        return (mergePositionValue & statusMask) == statusMask;
-    }
+//    public static int getThreadGroupId(Thread thread){
+//        Integer id = groupIdMap.get(thread);
+//        if (id != null){
+//            return id;
+//        }
+//        id = threadCountNow.getAndIncrement() % groupCount;
+//        // threadCountNow.get() / groupCount - 5 为每个分组的线程数少 5 个为最小 merge 数
+//        MERGE_MIN_THREAD_COUNT.set(Math.max(threadCountNow.get() / groupCount - 5, MERGE_MIN_THREAD_COUNT.get()));
+//        groupIdMap.put(thread, id);
+//        return id;
+//    }
 
     public DefaultMessageQueueImpl() {
         DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./essd") : new File("/essd");
@@ -179,7 +197,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
         }
         try {
-            int id = getThreadGroupId(Thread.currentThread());
+            ThreadWorkContext context = getThreadWorkContext(Thread.currentThread());
+            int id = context.id;
+
             FileChannel dataWriteChannel = dataWriteChannels[id];
             ByteBuffer mergeBuffer = mergeBuffers[id];
             ReentrantLock mergeBufferLock = mergeBufferLocks[id];
@@ -305,17 +325,20 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         ArrayList<Long> queueInfo = metaInfo.get(topicId).get(queueId);
 
         HashMap<Integer, ByteBuffer> ret = new HashMap<>();
+        ThreadWorkContext context = getThreadWorkContext(Thread.currentThread());
+        ByteBuffer[] buffers = context.buffers;
         try {
-            for (int i = (int) offset; i < (int) (offset + fetchNum) && i < queueInfo.size(); ++i) {
-                long p = queueInfo.get(i);
+            for (int i = 0; i < fetchNum && (i + offset) < queueInfo.size(); i++){
+                long p = queueInfo.get(i + (int) offset);
                 long dataPosition = p & 0xffffffffffL;
                 int dataLen = (int)((p>>>40) & 0xffff);
                 int id = (int)(p >>> 56);
-                ByteBuffer buf = ByteBuffer.allocate(dataLen);  // (int) p[1] 已经只取了后四位，即长度所在的位置
-
+                ByteBuffer buf = buffers[i];
+                buf.clear();
+                buf.limit(dataLen);
                 dataReadChannels[id].read(buf, dataPosition);
                 buf.flip();
-                ret.put(i - (int) offset, buf);
+                ret.put(i, buf);
             }
         }catch (Exception ignored){ }
         // 打印总体已经响应查询的次数
