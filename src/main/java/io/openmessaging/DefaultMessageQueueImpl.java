@@ -9,6 +9,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
@@ -25,6 +26,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final long THREAD_PARK_TIMEOUT = 2;  // ms
     public static AtomicInteger MERGE_MIN_THREAD_COUNT = new AtomicInteger(5);  // 只是起始
     public static final int groupCount = 5;
+    public static final int READ_SEMAPHORE_PER_GROUP = 2;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
@@ -46,6 +48,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final AtomicLong[] mergeBufferPositions = new AtomicLong[groupCount];
     public static volatile Map<Thread, Thread>[] parkedThreadMaps = new Map[groupCount];
     public static final AtomicLong[] forceVersions = new AtomicLong[groupCount];
+    public static final Semaphore[] readSemaphores = new Semaphore[groupCount];
     public static int maxThreadCountPerGroup = (50 + groupCount - 1) / groupCount;
 
     public static void init() throws IOException {
@@ -65,6 +68,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             mergeBufferPositions[i] = new AtomicLong(((DirectBuffer) mergeBuffers[i]).address());
             parkedThreadMaps[i] = new ConcurrentHashMap<>();
             forceVersions[i] = new AtomicLong();
+            readSemaphores[i] = new Semaphore(READ_SEMAPHORE_PER_GROUP);
         }
     }
 
@@ -316,12 +320,19 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         HashMap<Integer, ByteBuffer> ret = new HashMap<>();
         ThreadWorkContext context = getThreadWorkContext(Thread.currentThread());
         ByteBuffer[] buffers = context.buffers;
+        boolean acquiredReadSemaphore = false;
+        int groupId = 0;
         try {
             for (int i = 0; i < fetchNum && (i + offset) < queueInfo.size(); i++){
                 long p = queueInfo.get(i + (int) offset);
                 long dataPosition = p & 0xffffffffffL;
                 int dataLen = (int)((p>>>40) & 0xffff);
                 int id = (int)(p >>> 56);
+                if (!acquiredReadSemaphore){
+                    readSemaphores[id].acquire();
+                    groupId = id;
+                    acquiredReadSemaphore = true;
+                }
                 ByteBuffer buf = buffers[i];
                 buf.clear();
                 buf.limit(dataLen);
@@ -329,7 +340,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 buf.flip();
                 ret.put(i, buf);
             }
-        }catch (Exception ignored){ }
+        }catch (Exception e){
+            e.printStackTrace();
+        }finally {
+            if (acquiredReadSemaphore){
+                readSemaphores[groupId].release();
+            }
+        }
         // 打印总体已经响应查询的次数
         if (DEBUG){
             int getRangeCountNow = getRangeCount.incrementAndGet();
