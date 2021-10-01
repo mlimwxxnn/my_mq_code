@@ -38,14 +38,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static final int DATA_INFORMATION_LENGTH = 7;
 
-    public static volatile Map<Thread, Integer> groupIdMap = new ConcurrentHashMap<>();
     public static volatile Map<Thread, ThreadWorkContext> threadWorkContextMap = new ConcurrentHashMap<>();
 
     public static final AtomicInteger threadCountNow = new AtomicInteger();
     public static final FileChannel[] dataWriteChannels = new FileChannel[groupCount];
     public static final FileChannel[] dataReadChannels = new FileChannel[groupCount];
     public static volatile ByteBuffer[] mergeBuffers = new ByteBuffer[groupCount];
-//    public static final ReentrantLock[] mergeBufferLocks = new ReentrantLock[groupCount];
     public static final ReentrantReadWriteLock[] mergeBufferRWLocks = new ReentrantReadWriteLock[groupCount];
     public static final AtomicLong[] mergeBufferPositions = new AtomicLong[groupCount];
     public static volatile Map<Thread, Thread>[] parkedThreadMaps = new Map[groupCount];
@@ -131,7 +129,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         int id = threadCountNow.getAndIncrement() % groupCount;
         context = new ThreadWorkContext(id);
 
-        // threadCountNow.get() / groupCount - 5 为每个分组的线程数少 5 个为最小 merge 数
         MERGE_MIN_THREAD_COUNT.set(Math.max(threadCountNow.get() / groupCount - 3, MERGE_MIN_THREAD_COUNT.get()));
         threadWorkContextMap.put(thread, context);
         return context;
@@ -250,6 +247,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
             if(parkedThreadCount < MERGE_MIN_THREAD_COUNT.get()) {
                 long start = System.currentTimeMillis();
+
                 unsafe.park(true, System.currentTimeMillis() + THREAD_PARK_TIMEOUT);  // ms
                 long stop = System.currentTimeMillis();
 //                if (DEBUG){
