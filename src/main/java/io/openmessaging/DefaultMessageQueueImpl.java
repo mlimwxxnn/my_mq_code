@@ -272,7 +272,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     private Byte getTopicId(String topic) {
         Byte topicId = topicNameToTopicId.get(topic);
         if (topicId == null) {
-
             File topicIdFile = new File(DISC_ROOT, topic);
             try {
                 if (!topicIdFile.exists()) {
@@ -296,17 +295,16 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
         Byte topicId = getTopicId(topic);
         ArrayList<long[]> queueInfo = metaInfo.get(topicId).get(queueId);
+
         HashMap<Integer, ByteBuffer> ret = new HashMap<>();
         try {
-            synchronized (queueInfo) {
-                for (int i = (int) offset; i < (int) (offset + fetchNum) && i < queueInfo.size(); ++i) {
-                    long[] p = queueInfo.get(i);
-                    ByteBuffer buf = ByteBuffer.allocate((int) p[1]);  // (int) p[1] 已经只取了后四位，即长度所在的位置
-                    int id = (int) (p[1] >> 32);
-                    dataReadChannels[id].read(buf, p[0]);
-                    buf.flip();
-                    ret.put(i, buf);
-                }
+            for (int i = (int) offset; i < (int) (offset + fetchNum) && i < queueInfo.size(); ++i) {
+                long[] p = queueInfo.get(i);
+                ByteBuffer buf = ByteBuffer.allocate((int) p[1]);  // (int) p[1] 已经只取了后四位，即长度所在的位置
+                int id = (int) (p[1] >> 32);
+                dataReadChannels[id].read(buf, p[0]);
+                buf.flip();
+                ret.put(i, buf);
             }
         }catch (Exception ignored){ }
         // 打印总体已经响应查询的次数

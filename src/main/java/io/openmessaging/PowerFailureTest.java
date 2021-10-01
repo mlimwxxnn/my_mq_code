@@ -6,7 +6,7 @@ import java.util.Map;
 public class PowerFailureTest {
     public static void main(String[] args) throws InterruptedException {
         DefaultMessageQueueImpl mq = new DefaultMessageQueueImpl();
-        Map<Integer, ByteBuffer> res = mq.getRange("10", 15, 0, 100);
+        Map<Integer, ByteBuffer> res = mq.getRange("11", 15, 0, 100);
         System.out.println("");
     }
 }
