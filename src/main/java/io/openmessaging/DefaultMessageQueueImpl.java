@@ -22,9 +22,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
     public static final long KILL_SELF_TIMEOUT = 15 * 60;  // seconds
-    public static final long THREAD_PARK_TIMEOUT = 1;  // ms
+    public static final long THREAD_PARK_TIMEOUT = 2;  // ms
     public static AtomicInteger MERGE_MIN_THREAD_COUNT = new AtomicInteger(5);  // 只是起始
-    public static final int groupCount = 3;
+    public static final int groupCount = 5;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
@@ -116,7 +116,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         context = new ThreadWorkContext(id);
 
         // threadCountNow.get() / groupCount - 5 为每个分组的线程数少 5 个为最小 merge 数
-        MERGE_MIN_THREAD_COUNT.set(Math.max(threadCountNow.get() / groupCount - 5, MERGE_MIN_THREAD_COUNT.get()));
+        MERGE_MIN_THREAD_COUNT.set(Math.max(threadCountNow.get() / groupCount - 3, MERGE_MIN_THREAD_COUNT.get()));
         threadWorkContextMap.put(thread, context);
         return context;
     }
