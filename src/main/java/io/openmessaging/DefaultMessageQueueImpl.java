@@ -17,12 +17,12 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class DefaultMessageQueueImpl extends MessageQueue {
 
-    public static final boolean DEBUG = false;
+    public static final boolean DEBUG = true;
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
-    public static final long KILL_SELF_TIMEOUT = 869;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 1 * 60;  // seconds  869
     public static final long THREAD_PARK_TIMEOUT = 2;  // ms
     public static AtomicInteger MERGE_MIN_THREAD_COUNT = new AtomicInteger(5);  // 只是起始
     public static final int groupCount = 5;
@@ -239,9 +239,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 long start = System.currentTimeMillis();
                 unsafe.park(true, System.currentTimeMillis() + THREAD_PARK_TIMEOUT);  // ms
                 long stop = System.currentTimeMillis();
-                if (DEBUG){
-                    System.out.println(String.format("Thread: %s, id: %d, park for time : %d ms", selfThread.getName(), id, stop - start));
-                }
+//                if (DEBUG){
+//                    System.out.println(String.format("Thread: %s, id: %d, park for time : %d ms", selfThread.getName(), id, stop - start));
+//                }
             }
             // 自己的 data 还没被 force
             if (forceVersionNow == forceVersion.get()){
