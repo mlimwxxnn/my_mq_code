@@ -86,6 +86,16 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         return fileSize;
     }
 
+    public static int getAliveThreadCountByGroupId(int id){
+        int count = 0;
+        for (Thread thread : threadWorkContextMap.keySet()) {
+            if (thread.isAlive() && threadWorkContextMap.get(thread).id == id ){
+                count++;
+            }
+        }
+        return count;
+    }
+
     public static void killSelf(long timeout) {
         new Thread(()->{
             try {
