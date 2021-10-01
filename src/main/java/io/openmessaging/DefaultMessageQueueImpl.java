@@ -188,7 +188,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             long offset;
             byte topicId = getTopicId(topic);
             int dataLength = data.remaining(); // 默认data的position是从 0 开始的
-            long channelPosition = dataWriteChannel.position();
 
             // 根据topicId获取topic下的全部队列的信息
             ConcurrentHashMap<Integer, ArrayList<long[]>> topicInfo = metaInfo.get(topicId);
@@ -206,6 +205,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             long initialAddress = ((DirectBuffer) mergeBuffer).address();
 
             mergeBufferLock.lock();
+            long channelPosition = dataWriteChannel.position();
             long writeAddress = mergeBufferPosition.getAndAdd(DATA_INFORMATION_LENGTH + dataLength);
             int index = (int)(writeAddress - initialAddress);
             mergeBuffer.put(index, topicId);
