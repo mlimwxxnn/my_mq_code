@@ -21,7 +21,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File PMEM_ROOT;
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
-    public static final long KILL_SELF_TIMEOUT = 1 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 15 * 60;  // seconds
     public static final long THREAD_PARK_TIMEOUT = 2;  // ms
     public static final int groupCount = 4;
     public static final int REDUCE_COUNT = 2; // 合并超时后，将合并线程数调整为 组内存活线程数
