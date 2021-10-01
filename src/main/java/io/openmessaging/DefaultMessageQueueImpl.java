@@ -29,7 +29,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static AtomicInteger topicCount = new AtomicInteger();
     ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
     // topicId, queueId, dataPosition
-    public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, ArrayList<long[]>>> metaInfo = new ConcurrentHashMap<>();
+    public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, ArrayList<Long>>> metaInfo = new ConcurrentHashMap<>();
     public static final Unsafe unsafe = UnsafeUtil.unsafe;
 
     public static final int positionMask = (1 << 24) - 1;
@@ -135,8 +135,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     byte topicId;
                     int queueId;
                     short dataLen = 0;
-                    ConcurrentHashMap<Integer, ArrayList<long[]>> topicInfo;
-                    ArrayList<long[]> queueInfo;
+                    ConcurrentHashMap<Integer, ArrayList<Long>> topicInfo;
+                    ArrayList<Long> queueInfo;
                     long dataFilesize = channel.size();
                     while (channel.position() + dataLen < dataFilesize) {
                         channel.position(channel.position() + dataLen); // 跳过数据部分只读取数据头部的索引信息
@@ -157,8 +157,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                             queueInfo = new ArrayList<>(64);
                             topicInfo.put(queueId, queueInfo);
                         }
-                        long groupIdAndDataLength = (((long) id) << 32) | dataLen;
-                        queueInfo.add(new long[]{channel.position(), groupIdAndDataLength});
+                        long pos = channel.position();
+                        pos |= ((long)dataLen) << 40;
+                        pos |= ((long)id) << 56;
+                        queueInfo.add(pos);
                     }
                 }
             } catch (IOException e) {
@@ -190,13 +192,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             int dataLength = data.remaining(); // 默认data的position是从 0 开始的
 
             // 根据topicId获取topic下的全部队列的信息
-            ConcurrentHashMap<Integer, ArrayList<long[]>> topicInfo = metaInfo.get(topicId);
+            ConcurrentHashMap<Integer, ArrayList<Long>> topicInfo = metaInfo.get(topicId);
             if (topicInfo == null) {
                 topicInfo = new ConcurrentHashMap<>();
                 metaInfo.put(topicId, topicInfo);
             }
             // 根据queueId获取队列在文件中的位置信息
-            ArrayList<long[]> queueInfo = topicInfo.get(queueId);
+            ArrayList<Long> queueInfo = topicInfo.get(queueId);
             if (queueInfo == null) {
                 queueInfo = new ArrayList<>();
                 topicInfo.put(queueId, queueInfo);
@@ -255,8 +257,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 mergeBufferLock.unlock();
             }
             long pos = channelPosition + writeAddress - initialAddress + DATA_INFORMATION_LENGTH;
-            long groupAndDataLength = (((long) id) << 32) | dataLength;
-            queueInfo.add(new long[]{pos, groupAndDataLength}); // todo: 占用大小待优化
+            pos |= ((long)dataLength) << 40;
+            pos |= ((long)id) << 56;
+            queueInfo.add(pos);
             return offset;
         } catch (Exception ignored) { }
         return 0L;
@@ -299,15 +302,18 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     @Override
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
         Byte topicId = getTopicId(topic);
-        ArrayList<long[]> queueInfo = metaInfo.get(topicId).get(queueId);
+        ArrayList<Long> queueInfo = metaInfo.get(topicId).get(queueId);
 
         HashMap<Integer, ByteBuffer> ret = new HashMap<>();
         try {
             for (int i = (int) offset; i < (int) (offset + fetchNum) && i < queueInfo.size(); ++i) {
-                long[] p = queueInfo.get(i);
-                ByteBuffer buf = ByteBuffer.allocate((int) p[1]);  // (int) p[1] 已经只取了后四位，即长度所在的位置
-                int id = (int) (p[1] >> 32);
-                dataReadChannels[id].read(buf, p[0]);
+                long p = queueInfo.get(i);
+                long dataPosition = p & 0xffffffffffL;
+                int dataLen = (int)((p>>>40) & 0xffff);
+                int id = (int)(p >>> 56);
+                ByteBuffer buf = ByteBuffer.allocate(dataLen);  // (int) p[1] 已经只取了后四位，即长度所在的位置
+
+                dataReadChannels[id].read(buf, dataPosition);
                 buf.flip();
                 ret.put(i - (int) offset, buf);
             }

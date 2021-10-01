@@ -8,6 +8,7 @@ public class PowerFailureTest {
         DefaultMessageQueueImpl mq = new DefaultMessageQueueImpl();
         Map<Integer, ByteBuffer> res = mq.getRange("11", 15, 5, 100);
         System.out.println("");
+
     }
 }
 
