@@ -23,8 +23,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final AtomicInteger getRangeCount = new AtomicInteger();
     public static final long KILL_SELF_TIMEOUT = 15 * 60;  // seconds
     public static final long THREAD_PARK_TIMEOUT = 2;  // ms
-    public static final int groupCount = 4;
-    public static final int REDUCE_COUNT = 2; // 合并超时后，将合并线程数调整为 组内存活线程数
+    public static final int groupCount = 5;
+    public static final int REDUCE_COUNT = 4; // 合并超时后，将合并线程数调整为 组内存活线程数
 
     public static AtomicInteger topicCount = new AtomicInteger();
     ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
