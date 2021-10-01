@@ -333,9 +333,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     @Override
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
         Byte topicId = getTopicId(topic);
-        ArrayList<Long> queueInfo = metaInfo.get(topicId).get(queueId);
-
         HashMap<Integer, ByteBuffer> ret = new HashMap<>();
+        ArrayList<Long> queueInfo = metaInfo.get(topicId).get(queueId);
+        if(queueInfo == null){
+            return ret;
+        }
         ThreadWorkContext context = getThreadWorkContext(Thread.currentThread());
         ByteBuffer[] buffers = context.buffers;
         boolean acquiredReadSemaphore = false;
