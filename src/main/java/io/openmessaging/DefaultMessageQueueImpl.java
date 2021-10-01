@@ -130,8 +130,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }
         int id = threadCountNow.getAndIncrement() % groupCount;
         context = new ThreadWorkContext(id);
-        // threadCountNow.get() / groupCount - 5 为每个分组的线程数少 5 个为最小 merge 数
-        mergerMinThreadCounts[id].set(Math.max(threadCountNow.get() / groupCount - 3, INIT_MERGE_MIN_THREAD_COUNT));
+        mergerMinThreadCounts[id].set(getAliveThreadCountByGroupId(id));
         threadWorkContextMap.put(thread, context);
         return context;
     }
