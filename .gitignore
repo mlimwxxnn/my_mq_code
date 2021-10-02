@@ -9,3 +9,4 @@ essd/
 *.prefs
 *.project
 *.classpath
+*.log
