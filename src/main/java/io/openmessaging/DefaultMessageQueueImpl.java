@@ -228,12 +228,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             long writeAddress = mergeBufferPosition.getAndAdd(DATA_INFORMATION_LENGTH + dataLength);
             int index = (int)(writeAddress - initialAddress);
 
-//            mergeBuffer.put(index, topicId);
-//            mergeBuffer.putInt(index + 1, queueId);
-//            mergeBuffer.putShort(index + 5, (short) dataLength);
             unsafe.putByte(writeAddress, topicId);
-            unsafe.putInt(writeAddress + 1, queueId);
-            unsafe.putShort(writeAddress + 5, (short) dataLength);
+            unsafe.putInt(writeAddress + 1, Integer.reverseBytes(queueId));
+            unsafe.putShort(writeAddress + 5L, Short.reverseBytes((short) dataLength));
             unsafe.copyMemory(data.array(), 16 + data.position(), null, writeAddress + DATA_INFORMATION_LENGTH, dataLength);
             // 登记需要刷盘的数据和对应的线程
             long forceVersionNow = forceVersion.get();
