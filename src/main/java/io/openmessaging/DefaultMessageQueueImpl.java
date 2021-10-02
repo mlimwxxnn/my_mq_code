@@ -11,7 +11,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 
@@ -24,7 +23,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final AtomicInteger getRangeCount = new AtomicInteger();
     public static final long KILL_SELF_TIMEOUT = 16 * 60;  // seconds
     public static final long THREAD_PARK_TIMEOUT = 2;  // ms
-    public static final int groupCount = 2;
+    public static final int groupCount = 4;
     public static final int REDUCE_COUNT = 4; // 合并超时后，将合并线程数调整为 组内存活线程数
 
     public static AtomicInteger topicCount = new AtomicInteger();
@@ -228,11 +227,14 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             long channelPosition = dataWriteChannel.position();
             long writeAddress = mergeBufferPosition.getAndAdd(DATA_INFORMATION_LENGTH + dataLength);
             int index = (int)(writeAddress - initialAddress);
-            mergeBuffer.put(index, topicId);
-            mergeBuffer.putInt(index + 1, queueId);
-            mergeBuffer.putShort(index + 5, (short) dataLength);
-            unsafe.copyMemory(data.array(), 16 + data.position(), null, writeAddress + DATA_INFORMATION_LENGTH, dataLength);
 
+//            mergeBuffer.put(index, topicId);
+//            mergeBuffer.putInt(index + 1, queueId);
+//            mergeBuffer.putShort(index + 5, (short) dataLength);
+            unsafe.putByte(writeAddress, topicId);
+            unsafe.putInt(writeAddress + 1, queueId);
+            unsafe.putShort(writeAddress + 5, (short) dataLength);
+            unsafe.copyMemory(data.array(), 16 + data.position(), null, writeAddress + DATA_INFORMATION_LENGTH, dataLength);
             // 登记需要刷盘的数据和对应的线程
             long forceVersionNow = forceVersion.get();
             parkedThreadMap.put(Thread.currentThread(), Thread.currentThread());
