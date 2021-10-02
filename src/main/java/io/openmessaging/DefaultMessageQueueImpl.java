@@ -121,18 +121,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         return context;
     }
 
-//    public static int getThreadGroupId(Thread thread){
-//        Integer id = groupIdMap.get(thread);
-//        if (id != null){
-//            return id;
-//        }
-//        id = threadCountNow.getAndIncrement() % groupCount;
-//        // threadCountNow.get() / groupCount - 5 为每个分组的线程数少 5 个为最小 merge 数
-//        MERGE_MIN_THREAD_COUNT.set(Math.max(threadCountNow.get() / groupCount - 5, MERGE_MIN_THREAD_COUNT.get()));
-//        groupIdMap.put(thread, id);
-//        return id;
-//    }
-
     public DefaultMessageQueueImpl() {
         DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./essd") : new File("/essd");
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
