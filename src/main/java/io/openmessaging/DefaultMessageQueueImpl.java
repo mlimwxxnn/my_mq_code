@@ -11,7 +11,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
 
 
 public class DefaultMessageQueueImpl extends MessageQueue {
@@ -21,7 +21,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File PMEM_ROOT;
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
-    public static final long KILL_SELF_TIMEOUT = 16 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 15 * 60;  // seconds
     public static final long THREAD_PARK_TIMEOUT = 2;  // ms
     public static final int groupCount = 4;
     public static final int REDUCE_COUNT = 4; // 合并超时后，将合并线程数调整为 组内存活线程数
@@ -42,11 +42,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final FileChannel[] dataWriteChannels = new FileChannel[groupCount];
     public static final FileChannel[] dataReadChannels = new FileChannel[groupCount];
     public static volatile ByteBuffer[] mergeBuffers = new ByteBuffer[groupCount];
+    public static final ReentrantLock[] mergeBufferLocks = new ReentrantLock[groupCount];
     public static final AtomicLong[] mergeBufferPositions = new AtomicLong[groupCount];
     public static volatile Map<Thread, Thread>[] parkedThreadMaps = new Map[groupCount];
     public static final AtomicLong[] forceVersions = new AtomicLong[groupCount];
     public static final AtomicInteger[] mergerMinThreadCounts = new AtomicInteger[groupCount];
-    public static final ReentrantReadWriteLock[] mergeBufferRWLocks = new ReentrantReadWriteLock[groupCount];
     public static int maxThreadCountPerGroup = (50 + groupCount - 1) / groupCount;
 
     public static void init() throws IOException {
@@ -62,7 +62,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             dataWriteChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.APPEND, StandardOpenOption.WRITE);
             dataReadChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.READ);
             mergeBuffers[i] = ByteBuffer.allocateDirect(18 * 1024 * maxThreadCountPerGroup);
-            mergeBufferRWLocks[i] = new ReentrantReadWriteLock();
+            mergeBufferLocks[i] = new  ReentrantLock();
             mergeBufferPositions[i] = new AtomicLong(((DirectBuffer) mergeBuffers[i]).address());
             parkedThreadMaps[i] = new ConcurrentHashMap<>();
             forceVersions[i] = new AtomicLong();
@@ -198,7 +198,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
             FileChannel dataWriteChannel = dataWriteChannels[id];
             ByteBuffer mergeBuffer = mergeBuffers[id];
-            ReentrantReadWriteLock mergeBufferRWLock = mergeBufferRWLocks[id];
+            ReentrantLock mergeBufferLock = mergeBufferLocks[id];
             AtomicLong mergeBufferPosition = mergeBufferPositions[id];
             Map<Thread, Thread> parkedThreadMap = parkedThreadMaps[id];
             AtomicLong forceVersion = forceVersions[id];
@@ -223,21 +223,21 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             offset = queueInfo.size();
             long initialAddress = ((DirectBuffer) mergeBuffer).address();
 
-            mergeBufferRWLock.readLock().lock();
+            mergeBufferLock.lock();
             long channelPosition = dataWriteChannel.position();
             long writeAddress = mergeBufferPosition.getAndAdd(DATA_INFORMATION_LENGTH + dataLength);
             int index = (int)(writeAddress - initialAddress);
-
-            unsafe.putByte(writeAddress, topicId);
-            unsafe.putInt(writeAddress + 1, Integer.reverseBytes(queueId));
-            unsafe.putShort(writeAddress + 5L, Short.reverseBytes((short) dataLength));
+            mergeBuffer.put(index, topicId);
+            mergeBuffer.putInt(index + 1, queueId);
+            mergeBuffer.putShort(index + 5, (short) dataLength);
             unsafe.copyMemory(data.array(), 16 + data.position(), null, writeAddress + DATA_INFORMATION_LENGTH, dataLength);
+
             // 登记需要刷盘的数据和对应的线程
             long forceVersionNow = forceVersion.get();
             parkedThreadMap.put(Thread.currentThread(), Thread.currentThread());
             // 在这里读阻塞数，避免判断阻塞数量时和后续的 clear 操作冲突
             int parkedThreadCount = parkedThreadMap.size();
-            mergeBufferRWLock.readLock().unlock();
+            mergeBufferLock.unlock();
 
             if(parkedThreadCount < mergeMinThreadCount.get()) {
                 long start = System.currentTimeMillis();
@@ -249,7 +249,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
             // 自己的 data 还没被 force
             if (forceVersionNow == forceVersion.get()){
-                mergeBufferRWLock.writeLock().lock();
+                mergeBufferLock.lock();
                 if (forceVersionNow == forceVersion.get()){
                     long start = System.currentTimeMillis();
                     mergeBuffer.limit((int) (mergeBufferPosition.get() - initialAddress));
@@ -274,7 +274,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     }
                     parkedThreadMap.clear();
                 }
-                mergeBufferRWLock.writeLock().unlock();
+                mergeBufferLock.unlock();
             }
             long pos = channelPosition + writeAddress - initialAddress + DATA_INFORMATION_LENGTH;
             long groupAndDataLength = (((long) id) << 32) | dataLength;
