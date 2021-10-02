@@ -21,10 +21,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File PMEM_ROOT;
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
-    public static final long KILL_SELF_TIMEOUT = 15 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 16 * 60;  // seconds
     public static final long THREAD_PARK_TIMEOUT = 2;  // ms
-    public static final int groupCount = 4;
-    public static final int REDUCE_COUNT = 4; // 合并超时后，将合并线程数调整为 组内存活线程数
+    public static AtomicInteger MERGE_MIN_THREAD_COUNT = new AtomicInteger(5);  // 只是起始
+    public static final int groupCount = 5;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
@@ -46,7 +46,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final AtomicLong[] mergeBufferPositions = new AtomicLong[groupCount];
     public static volatile Map<Thread, Thread>[] parkedThreadMaps = new Map[groupCount];
     public static final AtomicLong[] forceVersions = new AtomicLong[groupCount];
-    public static final AtomicInteger[] mergerMinThreadCounts = new AtomicInteger[groupCount];
     public static int maxThreadCountPerGroup = (50 + groupCount - 1) / groupCount;
 
     public static void init() throws IOException {
@@ -66,18 +65,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             mergeBufferPositions[i] = new AtomicLong(((DirectBuffer) mergeBuffers[i]).address());
             parkedThreadMaps[i] = new ConcurrentHashMap<>();
             forceVersions[i] = new AtomicLong();
-            mergerMinThreadCounts[i] = new AtomicInteger();
         }
-    }
-
-    public static int getAliveThreadCountByGroupId(int id){
-        int count = 0;
-        for (Thread thread : threadWorkContextMap.keySet()) {
-            if (thread.isAlive() && threadWorkContextMap.get(thread).id == id ){
-                count++;
-            }
-        }
-        return count;
     }
 
     public static long getTotalFileSize(){
@@ -126,10 +114,24 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }
         int id = threadCountNow.getAndIncrement() % groupCount;
         context = new ThreadWorkContext(id);
-        mergerMinThreadCounts[id].set(getAliveThreadCountByGroupId(id));
+
+        // threadCountNow.get() / groupCount - 5 为每个分组的线程数少 5 个为最小 merge 数
+        MERGE_MIN_THREAD_COUNT.set(Math.max(threadCountNow.get() / groupCount - 3, MERGE_MIN_THREAD_COUNT.get()));
         threadWorkContextMap.put(thread, context);
         return context;
     }
+
+//    public static int getThreadGroupId(Thread thread){
+//        Integer id = groupIdMap.get(thread);
+//        if (id != null){
+//            return id;
+//        }
+//        id = threadCountNow.getAndIncrement() % groupCount;
+//        // threadCountNow.get() / groupCount - 5 为每个分组的线程数少 5 个为最小 merge 数
+//        MERGE_MIN_THREAD_COUNT.set(Math.max(threadCountNow.get() / groupCount - 5, MERGE_MIN_THREAD_COUNT.get()));
+//        groupIdMap.put(thread, id);
+//        return id;
+//    }
 
     public DefaultMessageQueueImpl() {
         DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./essd") : new File("/essd");
@@ -202,7 +204,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             AtomicLong mergeBufferPosition = mergeBufferPositions[id];
             Map<Thread, Thread> parkedThreadMap = parkedThreadMaps[id];
             AtomicLong forceVersion = forceVersions[id];
-            AtomicInteger mergeMinThreadCount = mergerMinThreadCounts[id];
 
             long offset;
             byte topicId = getTopicId(topic);
@@ -239,7 +240,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             int parkedThreadCount = parkedThreadMap.size();
             mergeBufferLock.unlock();
 
-            if(parkedThreadCount < mergeMinThreadCount.get()) {
+            if(parkedThreadCount < MERGE_MIN_THREAD_COUNT.get()) {
                 long start = System.currentTimeMillis();
                 unsafe.park(true, System.currentTimeMillis() + THREAD_PARK_TIMEOUT);  // ms
                 long stop = System.currentTimeMillis();
@@ -264,9 +265,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     mergeBuffer.clear();
                     mergeBufferPosition.set(initialAddress);
                     forceVersion.getAndIncrement();
-                    if(parkedThreadMap.size() < mergeMinThreadCount.get()) {
-                        mergeMinThreadCount.set(getAliveThreadCountByGroupId(id) - REDUCE_COUNT);
-                    }
                     // 叫醒各个线程
                     parkedThreadMap.remove(Thread.currentThread());
                     for (Thread thread : parkedThreadMap.keySet()) {
