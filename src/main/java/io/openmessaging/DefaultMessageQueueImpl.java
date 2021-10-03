@@ -1,5 +1,6 @@
 package io.openmessaging;
 
+import javax.sound.midi.Soundbank;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -116,14 +117,14 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public void powerFailureRecovery(ConcurrentHashMap<Byte, HashMap<Short, HashMap<Integer, long[]>>> metaInfo) {
         if (getTotalFileSize() > 0) {
-            try {
-                for (int id = 0; id < dataWriteChannels.length; id++) {
-                    FileChannel channel = dataWriteChannels[id];
-                    ByteBuffer readBuffer = ByteBuffer.allocate(DATA_INFORMATION_LENGTH);
-                    byte topicId;
-                    short queueId;
-                    short dataLen = 0;
-                    int offset;
+            for (int id = 0; id < dataWriteChannels.length; id++) {
+                FileChannel channel = dataWriteChannels[id];
+                ByteBuffer readBuffer = ByteBuffer.allocate(DATA_INFORMATION_LENGTH);
+                byte topicId;
+                short queueId;
+                short dataLen = 0;
+                int offset;
+                try {
                     HashMap<Short, HashMap<Integer, long[]>> topicInfo;
                     HashMap<Integer, long[]> queueInfo;
                     long dataFilesize = channel.size();
@@ -151,10 +152,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         long groupIdAndDataLength = (((long) id) << 32) | dataLen;
                         queueInfo.put(offset, new long[]{channel.position(), groupIdAndDataLength});
                     }
+                }catch (Exception e){
+                    System.out.println("ignore exception while rectory");
                 }
-            } catch (IOException e) {
-                e.printStackTrace();
             }
+
         }else {
             if(isTestPowerFailure){
                 testPowerFailureRecovery();
