@@ -87,8 +87,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 Thread.sleep(timeout * 1000);
                 long writtenSize = 0;
                 for (FileChannel dataWriteChannel : dataWriteChannels) {
-                    writtenSize += dataWriteChannel.position() / (1024 * 1024);  // M
+                    writtenSize += dataWriteChannel.position();  // M
                 }
+                writtenSize /=  (1024 * 1024);
                 System.out.println(String.format("kill self(written: %d)", writtenSize));
                 System.exit(-1);
             } catch (Exception e) {
@@ -162,7 +163,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static void testPowerFailureRecovery(){
         new Thread(()->{
             try {
-                Thread.sleep(10 * 1000);
+                Thread.sleep(13 * 1000);
                 isBlockAppend.set(true);
                 Thread.sleep(3 * 1000);
                 DefaultMessageQueueImpl myDemo = new DefaultMessageQueueImpl();
@@ -171,6 +172,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 }else{
                     System.out.println("not right!");
                 }
+                System.out.println(String.format("written: %d", getTotalFileSize() / (1024 * 1024)));
                 System.exit(-1);
 
             }catch (Exception ex){
