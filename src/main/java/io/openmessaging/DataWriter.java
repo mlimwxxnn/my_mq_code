@@ -45,8 +45,8 @@ public class DataWriter {
             while (true) {
                 try {
                     MergedData mergedData = new MergedData(freeMergeBufferQueue.take()); // 这里只要buffer设置得足够多就不会返回null的
-                    for (int i = 0; i < 20; i++) {  // todo 随便设置的一个数，后面可以通过一个变量来控制
-                        WrappedData data = wrappedDataQueue.poll(2, TimeUnit.MILLISECONDS);// todo 这里可以用变量来控制
+                    for (int i = 0; i < 20 ; i++) {  // todo 随便设置的一个数，后面可以通过一个变量来控制
+                        WrappedData data = wrappedDataQueue.poll(3500, TimeUnit.MICROSECONDS);// todo 这里可以用变量来控制
                         if (data != null) {
                             mergedData.putData(data);
                         } else {
