@@ -8,6 +8,8 @@ import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
@@ -19,7 +21,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
     public static final long KILL_SELF_TIMEOUT = 16 * 60;  // seconds
-    public static final long WAITE_DATA_TIMEOUT = 2000;  // 微秒
+    public static final long WAITE_DATA_TIMEOUT = 500;  // 微秒
     public static final int WRITE_THREAD_COUNT = 5;
 
     public static AtomicInteger topicCount = new AtomicInteger();
@@ -39,6 +41,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final FileChannel[] dataReadChannels = new FileChannel[WRITE_THREAD_COUNT];
     public static DataWriter dataWriter;
     public static int initThreadCount = 0;
+
+    static AtomicBoolean isBlockAppend = new AtomicBoolean();
 
     public static void init() throws IOException {
         for (int i = 0; i < WRITE_THREAD_COUNT; i++) {
@@ -114,6 +118,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         killSelf(KILL_SELF_TIMEOUT);
 
         // 如果数据文件里有东西就从文件恢复索引
+        powerFailureRecovery(metaInfo);
+        initThreadCount = Thread.activeCount();
+
+    }
+
+    public static void powerFailureRecovery(ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, ArrayList<long[]>>> metaInfo) {
         if (getTotalFileSize() > 0) {
             try {
                 for (int id = 0; id < dataReadChannels.length; id++) {
@@ -152,16 +162,39 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 e.printStackTrace();
             }
         }
-        initThreadCount = Thread.activeCount();
-
     }
 
+    public static void restPowerFailureRecovery(){
+        new Thread(()->{
+            try {
+                while (true) {
+                    Thread.sleep(1000 * 60);
+                    isBlockAppend.set(true);
+                    Thread.sleep(1000);
+                    DefaultMessageQueueImpl defaultMessageQueue = new DefaultMessageQueueImpl();
 
+
+                    isBlockAppend.set(false);
+                }
+            }catch (Exception ex){
+                ex.printStackTrace();
+                System.exit(-1);
+            }
+        }).start();
+    }
 //    public volatile Map<Thread, Integer> appendThread = new ConcurrentHashMap<>();
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
 //        Thread thread = Thread.currentThread();
 //        appendThread.put(Thread.currentThread(), appendThread.getOrDefault(Thread.currentThread(), 0) + 1);
+
+//        while(isBlockAppend.get()){
+//            try {
+//                Thread.sleep(10);
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
+//        }
 
         Byte topicId = getTopicId(topic);
         WrappedData wrappedData = new WrappedData(topicId, queueId, null, data);
@@ -212,41 +245,52 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     @Override
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
-        Byte topicId = getTopicId(topic);
-        ArrayList<long[]> queueInfo = metaInfo.get(topicId).get(queueId);
-        HashMap<Integer, ByteBuffer> ret = new HashMap<>();
-
-        ThreadWorkContext context = getThreadWorkContext(Thread.currentThread());
-        ByteBuffer[] buffers = context.buffers;
         try {
-            for (int i = 0; i < fetchNum && (i + offset) < queueInfo.size(); i++){
-                long[] p = queueInfo.get(i + (int) offset);
-                ByteBuffer buf = buffers[i];
-                buf.clear();
-                buf.limit((int) p[1]);
-                int id = (int) (p[1] >> 32);
-                dataReadChannels[id].read(buf, p[0]);
-                buf.flip();
-                ret.put(i, buf);
+            Byte topicId = getTopicId(topic);
+            ArrayList<long[]> queueInfo = metaInfo.get(topicId).get(queueId);
+            HashMap<Integer, ByteBuffer> ret = new HashMap<>();
+            if(queueInfo == null){
+                String key = topicId + "-" + queueId;
+                System.out.println("是否写过这个数据：" + dataWriter.done.containsKey(key));
+                System.out.println("queueInfo 为空");
+                System.exit(-1);
             }
-        }catch (Exception e){
+            ThreadWorkContext context = getThreadWorkContext(Thread.currentThread());
+            ByteBuffer[] buffers = context.buffers;
+            try {
+                for (int i = 0; i < fetchNum && (i + offset) < queueInfo.size(); i++) {
+                    long[] p = queueInfo.get(i + (int) offset);
+                    ByteBuffer buf = buffers[i];
+                    buf.clear();
+                    buf.limit((int) p[1]);
+                    int id = (int) (p[1] >> 32);
+                    dataReadChannels[id].read(buf, p[0]);
+                    buf.flip();
+                    ret.put(i, buf);
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            // 打印总体已经响应查询的次数
+            if (DEBUG) {
+                int getRangeCountNow = getRangeCount.incrementAndGet();
+                if (getRangeCountNow % 10000 == 0) {
+                    System.out.println("getRangeCountNow: " + getRangeCountNow);
+                }
+            }
+
+            return ret;
+        }catch(Exception e){
             e.printStackTrace();
         }
-        // 打印总体已经响应查询的次数
-        if (DEBUG){
-            int getRangeCountNow = getRangeCount.incrementAndGet();
-            if (getRangeCountNow % 10000 == 0){
-                System.out.println("getRangeCountNow: " + getRangeCountNow);
-            }
-        }
-        return ret;
+        return null;
     }
 
     public static void main(String[] args) throws InterruptedException {
         final int threadCount = 40;
         final int topicCountPerThread = 2;  // threadCount * topicCountPerThread <= 100
-        final int queueIdCountPerTopic = 20;
-        final int writeTimesPerQueueId = 30;
+        final int queueIdCountPerTopic = 200;
+        final int writeTimesPerQueueId = 60;
         ByteBuffer[][][] buffers = new ByteBuffer[threadCount][topicCountPerThread][queueIdCountPerTopic];
         DefaultMessageQueueImpl mq = new DefaultMessageQueueImpl();
 
@@ -274,6 +318,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                             for (int t = 0; t < writeTimesPerQueueId; t++) {
                                 mq.append(topic, queueIndex, buffers[threadIndex][topicIndex][queueIndex]);
                             }
+                            mq.getRange(topic, queueIndex, 0, 100);
                         }
                     }
                 }
