@@ -1,6 +1,5 @@
 package io.openmessaging;
 
-import javax.sound.midi.Soundbank;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -17,14 +16,14 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
     public static final boolean isTestPowerFailure = true;
-    public static final int DATA_INFORMATION_LENGTH = 7;
+    public static final int DATA_INFORMATION_LENGTH = 9;
     public static final long KILL_SELF_TIMEOUT = 3 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 500;  // 微秒
     public static final int WRITE_THREAD_COUNT = 5;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
-    public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, ArrayList<long[]>>> metaInfo;
+    public static volatile ConcurrentHashMap<Byte, HashMap<Short, HashMap<Integer, long[]>>> metaInfo;
     public static volatile Map<Thread, ThreadWorkContext> threadWorkContextMap = new ConcurrentHashMap<>();
     public static final FileChannel[] dataWriteChannels = new FileChannel[WRITE_THREAD_COUNT];
     public static final FileChannel[] dataReadChannels = new FileChannel[WRITE_THREAD_COUNT];
@@ -115,17 +114,18 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     }
 
-    public static void powerFailureRecovery(ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, ArrayList<long[]>>> metaInfo) {
+    public void powerFailureRecovery(ConcurrentHashMap<Byte, HashMap<Short, HashMap<Integer, long[]>>> metaInfo) {
         if (getTotalFileSize() > 0) {
             try {
                 for (int id = 0; id < dataReadChannels.length; id++) {
                     FileChannel channel = dataReadChannels[id];
                     ByteBuffer readBuffer = ByteBuffer.allocate(DATA_INFORMATION_LENGTH);
                     byte topicId;
-                    int queueId;
+                    short queueId;
                     short dataLen = 0;
-                    ConcurrentHashMap<Integer, ArrayList<long[]>> topicInfo;
-                    ArrayList<long[]> queueInfo;
+                    int offset;
+                    HashMap<Short, HashMap<Integer, long[]>> topicInfo;
+                    HashMap<Integer, long[]> queueInfo;
                     long dataFilesize = channel.size();
                     while (channel.position() + dataLen < dataFilesize) {
                         channel.position(channel.position() + dataLen); // 跳过数据部分只读取数据头部的索引信息
@@ -134,20 +134,22 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
                         readBuffer.flip();
                         topicId = readBuffer.get();
-                        queueId = readBuffer.getInt();
+                        queueId = readBuffer.getShort();
                         dataLen = readBuffer.getShort();
+                        offset = readBuffer.getInt();
+
                         topicInfo = metaInfo.get(topicId);
                         if (topicInfo == null) {
-                            topicInfo = new ConcurrentHashMap<>(5000);
+                            topicInfo = new HashMap<>(5000);
                             metaInfo.put(topicId, topicInfo);
                         }
                         queueInfo = topicInfo.get(queueId);
                         if (queueInfo == null) {
-                            queueInfo = new ArrayList<>(64);
+                            queueInfo = new HashMap<>(64);
                             topicInfo.put(queueId, queueInfo);
                         }
                         long groupIdAndDataLength = (((long) id) << 32) | dataLen;
-                        queueInfo.add(new long[]{channel.position(), groupIdAndDataLength});
+                        queueInfo.put(offset, new long[]{channel.position(), groupIdAndDataLength});
                     }
                 }
             } catch (IOException e) {
@@ -160,14 +162,15 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }
     }
 
-    public static void testPowerFailureRecovery(){
+    public void testPowerFailureRecovery(){
+        final DefaultMessageQueueImpl my = this;
         new Thread(()->{
             try {
                 Thread.sleep(20 * 1000);
                 isBlockAppend.set(true);
                 Thread.sleep(3 * 1000);
-                DefaultMessageQueueImpl myDemo = new DefaultMessageQueueImpl();
-                if(isMyDemoRight(officialDemo, myDemo)){
+//                DefaultMessageQueueImpl myDemo = new DefaultMessageQueueImpl();
+                if(isMyDemoRight(officialDemo, my)){
                     System.out.println("my demo is right for power failure recovery!");
                 }else{
                     System.out.println("not right!");
@@ -239,15 +242,29 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //        String key = topicId + "-" + queueId;
 //        appendDone.put(key, key);
 
-        data.position(position);
-        WrappedData wrappedData = new WrappedData(topicId, queueId, data);
+        HashMap<Short, HashMap<Integer, long[]>> topicInfo = metaInfo.get(topicId);
+        if (topicInfo == null) {
+            topicInfo = new HashMap<>();
+            metaInfo.put(topicId, topicInfo);
+        }
+        HashMap<Integer, long[]> queueInfo = topicInfo.get((short)queueId);
+        if (queueInfo == null) {
+            queueInfo = new HashMap<>(1000);
+            topicInfo.put((short)queueId, queueInfo);
+        }
+        int offset = queueInfo.size();
+        if (offset != 0) {
+            System.out.println("hello");
+        }
+        data.position(position); // todo 这里是为了测试
+        WrappedData wrappedData = new WrappedData(topicId, (short)queueId, data, offset, queueInfo);
         dataWriter.pushWrappedData(wrappedData);
         try {
             wrappedData.getMeta().countDownLatch.await();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        return metaInfo.get(topicId).get(queueId).size() - 1;
+        return offset;
     }
 
     /**
@@ -298,7 +315,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 return ret;
             }
 
-            ArrayList<long[]> queueInfo = metaInfo.get(topicId).get(queueId);
+            HashMap<Integer, long[]> queueInfo = metaInfo.get(topicId).get((short)queueId);
             if(queueInfo == null){
                 return ret;
 //                String key = topicId + "-" + queueId;
@@ -332,10 +349,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
     public static void main(String[] args) throws InterruptedException {
-        final int threadCount = 40;
+        final int threadCount = 30;
         final int topicCountPerThread = 2;  // threadCount * topicCountPerThread <= 100
-        final int queueIdCountPerTopic = 200;
-        final int writeTimesPerQueueId = 60;
+        final int queueIdCountPerTopic = 5;
+        final int writeTimesPerQueueId = 30;
         ByteBuffer[][][] buffers = new ByteBuffer[threadCount][topicCountPerThread][queueIdCountPerTopic];
         DefaultMessageQueueImpl mq = new DefaultMessageQueueImpl();
 
@@ -361,6 +378,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         String topic = threadIndex + "-" + topicIndex;
                         for (int queueIndex = 0; queueIndex < queueIdCountPerTopic; queueIndex++) {
                             for (int t = 0; t < writeTimesPerQueueId; t++) {
+                                buffers[threadIndex][topicIndex][queueIndex].putInt(t);
+                                buffers[threadIndex][topicIndex][queueIndex].position(0);
                                 mq.append(topic, queueIndex, buffers[threadIndex][topicIndex][queueIndex]);
                             }
 //                            mq.getRange(topic, queueIndex, 0, 100);
@@ -374,7 +393,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             threads[i].join();
         }
 
-        Map<Integer, ByteBuffer> res = mq.getRange("10-1", 15, 0, 100);
+        Map<Integer, ByteBuffer> res = mq.getRange("10-1", 3, 0, 100);
         System.out.println(res.size());
     }
 }

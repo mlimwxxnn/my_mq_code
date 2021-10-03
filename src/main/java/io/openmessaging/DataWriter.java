@@ -36,7 +36,8 @@ public class DataWriter {
             int minMergeCount = 20;
             try {
                 Thread.sleep(400);
-                minMergeCount = Math.max(Thread.activeCount() - DefaultMessageQueueImpl.initThreadCount - 5, minMergeCount);
+                minMergeCount = Math.max(Thread.activeCount() - DefaultMessageQueueImpl.initThreadCount - 5,
+                        minMergeCount);
                 System.out.println("minMergeCount: " + minMergeCount);
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -46,14 +47,15 @@ public class DataWriter {
                     MergedData mergedData = new MergedData(freeMergeBufferQueue.take()); // 这里只要buffer设置得足够多就不会返回null的
                     do {
                         for (int i = 0; i < minMergeCount / DefaultMessageQueueImpl.WRITE_THREAD_COUNT; i++) {
-                            WrappedData data = wrappedDataQueue.poll(DefaultMessageQueueImpl.WAITE_DATA_TIMEOUT, TimeUnit.MICROSECONDS);
-                            if (data != null) {
-                                mergedData.putData(data);
+                            WrappedData wrappedData = wrappedDataQueue.poll(DefaultMessageQueueImpl.WAITE_DATA_TIMEOUT,
+                                    TimeUnit.MICROSECONDS);
+                            if (wrappedData != null) {
+                                mergedData.putData(wrappedData);
                             } else {
                                 break;
                             }
                         }
-                    }while(mergedData.getCount() == 0);
+                    } while (mergedData.getCount() == 0);
                     mergedDataQueue.offer(mergedData);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
@@ -67,7 +69,7 @@ public class DataWriter {
             final long writeThreadId = i;
             new Thread(() -> {
                 try {
-                    FileChannel dataWriteChannel = DefaultMessageQueueImpl.dataWriteChannels[(int)writeThreadId];
+                    FileChannel dataWriteChannel = DefaultMessageQueueImpl.dataWriteChannels[(int) writeThreadId];
                     while (true) {
                         MergedData mergedData = mergedDataQueue.take();
                         ByteBuffer mergedBuffer = mergedData.getMergedBuffer();
@@ -87,21 +89,10 @@ public class DataWriter {
 //                            String key = topicId + "-" + queueId;
 //                            done.put(key, key);
 
-                            ConcurrentHashMap<Integer, ArrayList<long[]>> topicInfo =
-                                    DefaultMessageQueueImpl.metaInfo.get(topicId);
-                            if (topicInfo == null) {
-                                topicInfo = new ConcurrentHashMap<>();
-                                DefaultMessageQueueImpl.metaInfo.put(topicId, topicInfo);
-                            }
-                            ArrayList<long[]> queueInfo = topicInfo.get(queueId);
-                            if (queueInfo == null) {
-                                queueInfo = new ArrayList<>(5000);
-                                topicInfo.put(queueId, queueInfo);
-                            }
-                            queueInfo.add(new long[]{metaData.getOffsetInMergedBuffer() + pos,
+                            metaData.getQueueInfo().put(metaData.getOffset(),
+                                    new long[]{metaData.getOffsetInMergedBuffer() + pos,
                                     (writeThreadId << 32) | metaData.getDataLen()});
 
-//                            unsafe.unpark(metaData.getThread());
                             metaData.countDownLatch.countDown();
 
 //                            Integer count = unparkCount.getOrDefault(metaData.getThread(), 0);

@@ -20,19 +20,21 @@ public class MergedData {
         this.mergedBuffer = buffer;
     }
 
-    public void putData(WrappedData data) {
+    public void putData(WrappedData wrappedData) {
         count++;
-        // 放入数据的元信息，7字节
-        MetaData meta = data.getMeta();
+        // 放入数据的元信息，9 字节
+        MetaData meta = wrappedData.getMeta();
         metaSet.add(meta);
+
         mergedBuffer.put(meta.getTopicId());
-        mergedBuffer.putInt(meta.getQueueId());
-        int dataLen = meta.getDataLen();
-        mergedBuffer.putShort((short)dataLen);
+        mergedBuffer.putShort(meta.getQueueId());
+        short dataLen = meta.getDataLen();
+        mergedBuffer.putShort(dataLen);
+        mergedBuffer.putInt(wrappedData.getMeta().getOffset());
         meta.setOffsetInMergedBuffer(mergedBuffer.position());
 
         // 放入数据本体
-        unsafe.copyMemory(data.getData().array(), 16 + data.getData().position(), null, ((DirectBuffer)mergedBuffer).address() + mergedBuffer.position(), dataLen);
+        unsafe.copyMemory(wrappedData.getData().array(), 16 + wrappedData.getData().position(), null, ((DirectBuffer)mergedBuffer).address() + mergedBuffer.position(), dataLen);
         mergedBuffer.position(mergedBuffer.position() + dataLen);
     }
 

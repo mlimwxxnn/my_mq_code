@@ -1,18 +1,23 @@
 package io.openmessaging;
 
+import java.util.HashMap;
 import java.util.concurrent.CountDownLatch;
 
 public class MetaData {
     private final byte topicId;
-    private final int queueId;
+    private final short queueId;
+    private final int offset;
     private long offsetInMergedBuffer;
     private final short dataLen;
+    private final HashMap<Integer, long[]> queueInfo;
     public CountDownLatch countDownLatch = new CountDownLatch(1);
 
-    public MetaData(byte topicId, int queueId, short dataLen) {
+    public MetaData(byte topicId, short queueId, short dataLen, int offset, HashMap<Integer, long[]> queueInfo) {
         this.topicId = topicId;
         this.queueId = queueId;
         this.dataLen = dataLen;
+        this.offset = offset;
+        this.queueInfo = queueInfo;
     }
 
     public byte getTopicId() {
@@ -20,7 +25,7 @@ public class MetaData {
     }
 
 
-    public int getQueueId() {
+    public short getQueueId() {
         return queueId;
     }
 
@@ -36,4 +41,11 @@ public class MetaData {
         return dataLen;
     }
 
+    public int getOffset() {
+        return offset;
+    }
+
+    public HashMap<Integer, long[]> getQueueInfo() {
+        return queueInfo;
+    }
 }
