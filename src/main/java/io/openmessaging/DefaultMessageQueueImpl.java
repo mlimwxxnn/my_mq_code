@@ -15,9 +15,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
-    public static final boolean isTestPowerFailure = false;
+    public static final boolean isTestPowerFailure = true;
     public static final int DATA_INFORMATION_LENGTH = 9;
-    public static final long KILL_SELF_TIMEOUT = 18 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 3 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 500;  // 微秒
     public static final int WRITE_THREAD_COUNT = 5;
 
@@ -163,14 +163,14 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
     public void testPowerFailureRecovery(){
-        final DefaultMessageQueueImpl my = this;
+
         new Thread(()->{
             try {
                 Thread.sleep(20 * 1000);
                 isBlockAppend.set(true);
                 Thread.sleep(3 * 1000);
-//                DefaultMessageQueueImpl myDemo = new DefaultMessageQueueImpl();
-                if(isMyDemoRight(officialDemo, my)){
+                final DefaultMessageQueueImpl myDemo = new DefaultMessageQueueImpl();
+                if(isMyDemoRight(officialDemo, myDemo)){
                     System.out.println("my demo is right for power failure recovery!");
                 }else{
                     System.out.println("not right!");
@@ -226,18 +226,18 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //            }
 //        }
 
-//        int position = data.position();
-//        if (isTestPowerFailure){
-//            if (isBlockAppend.get()){
-//                try {
-//                    new CountDownLatch(1).await();
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//            officialDemo.append(topic, queueId, data);
-//        }
-//        data.position(position); // todo 这里是为了测试
+        int position = data.position();
+        if (isTestPowerFailure){
+            if (isBlockAppend.get()){
+                try {
+                    new CountDownLatch(1).await();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            officialDemo.append(topic, queueId, data);
+        }
+        data.position(position); // todo 这里是为了测试
 //
 
         Byte topicId = getTopicId(topic, true);
