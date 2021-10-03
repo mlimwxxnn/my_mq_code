@@ -19,8 +19,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
     public static final long KILL_SELF_TIMEOUT = 16 * 60;  // seconds
-    public static final long THREAD_PARK_TIMEOUT = 2;  // ms
-    public static AtomicInteger MERGE_MIN_THREAD_COUNT = new AtomicInteger(5);  // 只是起始
+    public static final long WAITE_DATA_TIMEOUT = 2000;  // 微秒
     public static final int WRITE_THREAD_COUNT = 5;
 
     public static AtomicInteger topicCount = new AtomicInteger();

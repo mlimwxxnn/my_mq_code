@@ -5,8 +5,6 @@ import sun.misc.Unsafe;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.*;
 
@@ -46,8 +44,8 @@ public class DataWriter {
                 try {
                     MergedData mergedData = new MergedData(freeMergeBufferQueue.take()); // 这里只要buffer设置得足够多就不会返回null的
                     do {
-                        for (int i = 0; i < minMergeCount / 5; i++) {  // todo 随便设置的一个数，后面可以通过一个变量来控制
-                            WrappedData data = wrappedDataQueue.poll(500, TimeUnit.MICROSECONDS);// todo 这里可以用变量来控制
+                        for (int i = 0; i < minMergeCount / DefaultMessageQueueImpl.WRITE_THREAD_COUNT; i++) {
+                            WrappedData data = wrappedDataQueue.poll(DefaultMessageQueueImpl.WAITE_DATA_TIMEOUT, TimeUnit.MICROSECONDS);
                             if (data != null) {
                                 mergedData.putData(data);
                             } else {
