@@ -163,7 +163,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static void testPowerFailureRecovery(){
         new Thread(()->{
             try {
-                Thread.sleep(13 * 1000);
+                Thread.sleep(20 * 1000);
                 isBlockAppend.set(true);
                 Thread.sleep(3 * 1000);
                 DefaultMessageQueueImpl myDemo = new DefaultMessageQueueImpl();
