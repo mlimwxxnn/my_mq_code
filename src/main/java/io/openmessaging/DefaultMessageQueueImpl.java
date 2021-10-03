@@ -162,7 +162,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //        appendThread.put(Thread.currentThread(), appendThread.getOrDefault(Thread.currentThread(), 0) + 1);
 
         Byte topicId = getTopicId(topic);
-        WrappedData wrappedData = new WrappedData(topicId, queueId, Thread.currentThread(), data);
+        WrappedData wrappedData = new WrappedData(topicId, queueId, null, data);
         dataWriter.pushWrappedData(wrappedData);
 //        unsafe.park(false, 0L);
         try {
