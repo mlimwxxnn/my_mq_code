@@ -1,5 +1,6 @@
 package io.openmessaging;
 
+import javax.sound.midi.Soundbank;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -152,7 +153,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 e.printStackTrace();
             }
         }else {
-            testPowerFailureRecovery();
+            if(isTestPowerFailure){
+                testPowerFailureRecovery();
+            }
         }
     }
 
@@ -184,10 +187,16 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             Map<Integer, Long> queueIdLenMap = appendOffset.get(topic);
             for (Integer queueId : queueIdLenMap.keySet()) {
                 Long offsetUpToNow = queueIdLenMap.get(queueId);
-                for (long offset = 0L; offset < offsetUpToNow; offset+=100) {
-                    Map<Integer, ByteBuffer> officialRes = officialDemo.getRange(topic, queueId, offset, 100);
-                    Map<Integer, ByteBuffer> myRes = myDemo.getRange(topic, queueId, offset, 100);
+                int fetchNum = 20;
+                for (long offset = 0L; offset + fetchNum < offsetUpToNow; offset+=fetchNum) {
+                    Map<Integer, ByteBuffer> officialRes = officialDemo.getRange(topic, queueId, offset, fetchNum);
+                    Map<Integer, ByteBuffer> myRes = myDemo.getRange(topic, queueId, offset, fetchNum);
                     if (!officialRes.equals(myRes)){
+                        System.out.println(String.format("query topic: %s, queueId: %d, offset: %d, fetchNum: %d", topic, queueId, offset, fetchNum));
+                        System.out.printf("official: (%d)\n", officialRes.size());
+                        System.out.println(officialRes);
+                        System.out.printf("mine: (%d)\n", myRes.size());
+                        System.out.println(myRes);
                         return false;
                     }
                 }
