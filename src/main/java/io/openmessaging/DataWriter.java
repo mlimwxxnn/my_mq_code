@@ -34,18 +34,18 @@ public class DataWriter {
 
     void mergeData() {
         new Thread(() -> {
-//            int minMergeCount = 20;
-//            try {
-//                Thread.sleep(1000);
-//                minMergeCount = Math.max(Thread.activeCount() - DefaultMessageQueueImpl.initThreadCount - 5, minMergeCount);
-//                System.out.println("minMergeCount: " + minMergeCount);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
+            int minMergeCount = 20;
+            try {
+                Thread.sleep(1000);
+                minMergeCount = Math.max(Thread.activeCount() - DefaultMessageQueueImpl.initThreadCount - 5, minMergeCount);
+                System.out.println("minMergeCount: " + minMergeCount);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
             while (true) {
                 try {
                     MergedData mergedData = new MergedData(freeMergeBufferQueue.take()); // 这里只要buffer设置得足够多就不会返回null的
-                    for (int i = 0; i < 20 ; i++) {  // todo 随便设置的一个数，后面可以通过一个变量来控制
+                    for (int i = 0; i < minMergeCount / 2 ; i++) {  // todo 随便设置的一个数，后面可以通过一个变量来控制
                         WrappedData data = wrappedDataQueue.poll(3500, TimeUnit.MICROSECONDS);// todo 这里可以用变量来控制
                         if (data != null) {
                             mergedData.putData(data);
