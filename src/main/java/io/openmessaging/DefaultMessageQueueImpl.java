@@ -18,7 +18,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File PMEM_ROOT;
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
-    public static final long KILL_SELF_TIMEOUT = 1 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 1 * 60 + 1;  // seconds
     public static final long THREAD_PARK_TIMEOUT = 2;  // ms
     public static AtomicInteger MERGE_MIN_THREAD_COUNT = new AtomicInteger(5);  // 只是起始
     public static final int WRITE_THREAD_COUNT = 3;
@@ -39,6 +39,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final FileChannel[] dataWriteChannels = new FileChannel[WRITE_THREAD_COUNT];
     public static final FileChannel[] dataReadChannels = new FileChannel[WRITE_THREAD_COUNT];
     public static DataWriter dataWriter;
+    public static int initThreadCount = 0;
 
     public static void init() throws IOException {
         for (int i = 0; i < WRITE_THREAD_COUNT; i++) {
@@ -152,6 +153,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 e.printStackTrace();
             }
         }
+        initThreadCount = Thread.activeCount();
+
     }
 
 
