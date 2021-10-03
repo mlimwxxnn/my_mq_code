@@ -16,9 +16,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
-    public static final boolean isTestPowerFailure = false;
+    public static final boolean isTestPowerFailure = true;
     public static final int DATA_INFORMATION_LENGTH = 9;
-    public static final long KILL_SELF_TIMEOUT = 18 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 3 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 500;  // 微秒
     public static final int WRITE_THREAD_COUNT = 5;
 
@@ -167,35 +167,47 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public void testPowerFailureRecovery(){
 
         new Thread(()->{
-            try {
-                Thread.sleep(20 * 1000);
-                isBlockAppend.set(true);
-                Thread.sleep(3 * 1000);
-                final DefaultMessageQueueImpl myDemo = new DefaultMessageQueueImpl();
-                if(isMyDemoRight(officialDemo, myDemo)){
-                    System.out.println("my demo is right for power failure recovery!");
-                }else{
-                    System.out.println("not right!");
+            while(true){
+                try {
+                    Thread.sleep(20 * 1000);
+                    isBlockAppend.set(true);
+                    Thread.sleep(3 * 1000);
+                    final DefaultMessageQueueImpl myDemo = new DefaultMessageQueueImpl();
+                    if(isMyDemoRight(officialDemo, myDemo)){
+                        System.out.println("my demo is right for power failure recovery!");
+                    }else{
+                        System.out.println("not right!");
+                        System.exit(-1);
+                    }
+                    System.out.println(String.format("written: %d", getTotalFileSize() / (1024 * 1024)));
+                }catch (Exception ex){
+                    ex.printStackTrace();
+                    System.exit(-1);
                 }
-                System.out.println(String.format("written: %d", getTotalFileSize() / (1024 * 1024)));
-                System.exit(-1);
-
-            }catch (Exception ex){
-                ex.printStackTrace();
-                System.exit(-1);
             }
+
         }).start();
     }
 
     private static boolean isMyDemoRight(OfficialDemo officialDemo, DefaultMessageQueueImpl myDemo) {
         ConcurrentHashMap<String, Map<Integer, Long>> appendOffset = officialDemo.appendOffset;
         ConcurrentHashMap<String, Map<Integer, Map<Long, ByteBuffer>>> appendData = officialDemo.appendData;
+        HashMap<String, Map<Integer, Long>> havenCheckedSet = officialDemo.havenCheckedSet;
+
         for (String topic : appendOffset.keySet()) {
             Map<Integer, Long> queueIdLenMap = appendOffset.get(topic);
             for (Integer queueId : queueIdLenMap.keySet()) {
                 Long offsetUpToNow = queueIdLenMap.get(queueId);
                 int fetchNum = 20;
-                for (long offset = 0L; offset + fetchNum < offsetUpToNow; offset+=fetchNum) {
+
+                long offsetCheckStart;
+                if (havenCheckedSet.size() == 0){
+                    offsetCheckStart = 0L;
+                }else {
+                    offsetCheckStart = havenCheckedSet.get(topic).get(queueId);
+                }
+                long offset;
+                for (offset = offsetCheckStart; offset + fetchNum < offsetUpToNow; offset+=fetchNum) {
                     Map<Integer, ByteBuffer> officialRes = officialDemo.getRange(topic, queueId, offset, fetchNum);
                     Map<Integer, ByteBuffer> myRes = myDemo.getRange(topic, queueId, offset, fetchNum);
                     if (!officialRes.equals(myRes)){
@@ -207,8 +219,23 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         return false;
                     }
                 }
+                if (offset < offsetUpToNow){
+                    int num = (int) (offsetUpToNow - offset);
+                    Map<Integer, ByteBuffer> officialRes = officialDemo.getRange(topic, queueId, offset, num);
+                    Map<Integer, ByteBuffer> myRes = myDemo.getRange(topic, queueId, offset, num);
+                    if (!officialRes.equals(myRes)){
+                        System.out.println(String.format("query topic: %s, queueId: %d, offset: %d, fetchNum: %d", topic, queueId, offset, fetchNum));
+                        System.out.printf("official: (%d)\n", officialRes.size());
+                        System.out.println(officialRes);
+                        System.out.printf("mine: (%d)\n", myRes.size());
+                        System.out.println(myRes);
+                        return false;
+                    }
+                }
             }
         }
+        officialDemo.clearAppendData();
+        officialDemo.setAllChecked();
         return true;
     }
 
@@ -228,18 +255,18 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //            }
 //        }
 
-//        int position = data.position();
-//        if (isTestPowerFailure){
-//            if (isBlockAppend.get()){
-//                try {
-//                    new CountDownLatch(1).await();
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//            officialDemo.append(topic, queueId, data);
-//        }
-//        data.position(position); // todo 这里是为了测试
+        int position = data.position();
+        if (isTestPowerFailure){
+            if (isBlockAppend.get()){
+                try {
+                    new CountDownLatch(1).await();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            officialDemo.append(topic, queueId, data);
+        }
+        data.position(position); // todo 这里是为了测试
 //
 
         Byte topicId = getTopicId(topic, true);

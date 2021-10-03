@@ -12,6 +12,8 @@ public class OfficialDemo extends MessageQueue {
     ConcurrentHashMap<String, Map<Integer, Long>> appendOffset = new ConcurrentHashMap<>();
     ConcurrentHashMap<String, Map<Integer, Map<Long, ByteBuffer>>> appendData = new ConcurrentHashMap<>();
 
+    HashMap<String, Map<Integer, Long>> havenCheckedSet = new HashMap<>();
+
     // getOrPutDefault 若指定key不存在，则插入defaultValue并返回
     private <K, V> V getOrPutDefault(Map<K, V> map, K key, V defaultValue){
         V retObj = map.get(key);
@@ -20,6 +22,15 @@ public class OfficialDemo extends MessageQueue {
         }
         map.put(key, defaultValue);
         return defaultValue;
+    }
+
+    public void clearAppendData(){
+        appendData.clear();
+    }
+
+    public void setAllChecked(){
+        havenCheckedSet.putAll(appendOffset);
+        appendOffset.clear();
     }
 
     @Override
