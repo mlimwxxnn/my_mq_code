@@ -220,6 +220,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //                e.printStackTrace();
 //            }
 //        }
+
+        int position = data.position();
         if (isTestPowerFailure){
             if (isBlockAppend.get()){
                 try {
@@ -235,6 +237,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //        String key = topicId + "-" + queueId;
 //        appendDone.put(key, key);
 
+        data.position(position);
         WrappedData wrappedData = new WrappedData(topicId, queueId, data);
         dataWriter.pushWrappedData(wrappedData);
         try {
@@ -358,7 +361,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                             for (int t = 0; t < writeTimesPerQueueId; t++) {
                                 mq.append(topic, queueIndex, buffers[threadIndex][topicIndex][queueIndex]);
                             }
-                            mq.getRange(topic, queueIndex, 0, 100);
+//                            mq.getRange(topic, queueIndex, 0, 100);
                         }
                     }
                 }
