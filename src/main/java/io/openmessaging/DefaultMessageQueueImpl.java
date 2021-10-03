@@ -11,7 +11,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 
@@ -22,15 +21,15 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File PMEM_ROOT;
     public static final AtomicInteger appendCount = new AtomicInteger();
     public static final AtomicInteger getRangeCount = new AtomicInteger();
-    public static final long KILL_SELF_TIMEOUT = 16 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 3;  // seconds
     public static final long THREAD_PARK_TIMEOUT = 2;  // ms
     public static AtomicInteger MERGE_MIN_THREAD_COUNT = new AtomicInteger(5);  // 只是起始
-    public static final int groupCount = 5;
+    public static final int WRITE_THREAD_COUNT = 3;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
     // topicId, queueId, dataPosition
-    public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, ArrayList<long[]>>> metaInfo = new ConcurrentHashMap<>();
+    public static volatile ConcurrentHashMap<Byte, HashMap<Integer, ArrayList<long[]>>> metaInfo = new ConcurrentHashMap<>();
     public static final Unsafe unsafe = UnsafeUtil.unsafe;
 
 
@@ -40,18 +39,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static volatile Map<Thread, ThreadWorkContext> threadWorkContextMap = new ConcurrentHashMap<>();
 
     public static final AtomicInteger threadCountNow = new AtomicInteger();
-    public static final FileChannel[] dataWriteChannels = new FileChannel[groupCount];
-    public static final FileChannel[] dataReadChannels = new FileChannel[groupCount];
-    public static volatile ByteBuffer[] mergeBuffers = new ByteBuffer[groupCount];
-//    public static final ReentrantLock[] mergeBufferLocks = new ReentrantLock[groupCount];
-    public static final ReentrantReadWriteLock[] mergeBufferRWLocks = new ReentrantReadWriteLock[groupCount];
-    public static final AtomicLong[] mergeBufferPositions = new AtomicLong[groupCount];
-    public static volatile Map<Thread, Thread>[] parkedThreadMaps = new Map[groupCount];
-    public static final AtomicLong[] forceVersions = new AtomicLong[groupCount];
-    public static int maxThreadCountPerGroup = (50 + groupCount - 1) / groupCount;
+    public static final FileChannel[] dataWriteChannels = new FileChannel[WRITE_THREAD_COUNT];
+    public static final FileChannel[] dataReadChannels = new FileChannel[WRITE_THREAD_COUNT];
+    public static DataWriter dataWriter;
 
     public static void init() throws IOException {
-        for (int i = 0; i < groupCount; i++) {
+        for (int i = 0; i < WRITE_THREAD_COUNT; i++) {
             File file = new File(DISC_ROOT, "data-" + i);
             File parentFile = file.getParentFile();
             if (!parentFile.exists()){
@@ -62,13 +55,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
             dataWriteChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.APPEND, StandardOpenOption.WRITE);
             dataReadChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.READ);
-            mergeBuffers[i] = ByteBuffer.allocateDirect(18 * 1024 * maxThreadCountPerGroup);
-//            mergeBufferLocks[i] = new  ReentrantLock();
-            mergeBufferRWLocks[i] = new ReentrantReadWriteLock();
-            mergeBufferPositions[i] = new AtomicLong(((DirectBuffer) mergeBuffers[i]).address());
-            parkedThreadMaps[i] = new ConcurrentHashMap<>();
-            forceVersions[i] = new AtomicLong();
         }
+        dataWriter = new DataWriter();
     }
 
     public static long getTotalFileSize(){
@@ -82,28 +70,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }
         return fileSize;
     }
-
-    public static void killSelf(long timeout) {
-        new Thread(()->{
-            try {
-                Thread.sleep(timeout * 1000);
-                long writtenSize = 0;
-                for (FileChannel dataWriteChannel : dataWriteChannels) {
-                    writtenSize += dataWriteChannel.position() / (1024 * 1024);  // M
-                }
-                System.out.println(String.format("kill myself(written: %d)", writtenSize));
-                System.exit(-1);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }).start();
-    }
-
     static class ThreadWorkContext {
-        public final int id; // groupId
         public final ByteBuffer[] buffers = new ByteBuffer[100]; // 用来响应查询的buffer
-        public ThreadWorkContext(int id){
-            this.id = id;
+        public ThreadWorkContext(){
             for (int i = 0; i < buffers.length; i++) {
                 buffers[i] = ByteBuffer.allocateDirect(17 * 1024);
             }
@@ -115,13 +84,25 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         if (context != null){
             return context;
         }
-        int id = threadCountNow.getAndIncrement() % groupCount;
-        context = new ThreadWorkContext(id);
-
-        // threadCountNow.get() / groupCount - 5 为每个分组的线程数少 5 个为最小 merge 数
-        MERGE_MIN_THREAD_COUNT.set(Math.max(threadCountNow.get() / groupCount - 3, MERGE_MIN_THREAD_COUNT.get()));
+        context = new ThreadWorkContext();
         threadWorkContextMap.put(thread, context);
         return context;
+    }
+
+    public static void killSelf(long timeout) {
+        new Thread(()->{
+            try {
+                Thread.sleep(timeout * 1000);
+                long writtenSize = 0;
+                for (FileChannel dataWriteChannel : dataWriteChannels) {
+                    writtenSize += dataWriteChannel.position() / (1024 * 1024);  // M
+                }
+                System.out.println(String.format("kill self(written: %d)", writtenSize));
+                System.exit(-1);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }).start();
     }
 
     public DefaultMessageQueueImpl() {
@@ -144,7 +125,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     byte topicId;
                     int queueId;
                     short dataLen = 0;
-                    ConcurrentHashMap<Integer, ArrayList<long[]>> topicInfo;
+                    HashMap<Integer, ArrayList<long[]>> topicInfo;
                     ArrayList<long[]> queueInfo;
                     long dataFilesize = channel.size();
                     while (channel.position() + dataLen < dataFilesize) {
@@ -158,7 +139,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         dataLen = readBuffer.getShort();
                         topicInfo = metaInfo.get(topicId);
                         if (topicInfo == null) {
-                            topicInfo = new ConcurrentHashMap<>(5000);
+                            topicInfo = new HashMap<>(5000);
                             metaInfo.put(topicId, topicInfo);
                         }
                         queueInfo = topicInfo.get(queueId);
@@ -178,100 +159,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
-        // 打印所有已经append的条数
-        if (DEBUG){
-            int appendCountNow = appendCount.incrementAndGet();
-            if (appendCountNow % 10000 == 0){
-                System.out.println(String.format("appendCountNow: %d", appendCountNow));
-            }
-        }
-        try {
-            ThreadWorkContext context = getThreadWorkContext(Thread.currentThread());
-            int id = context.id;
+        Byte topicId = getTopicId(topic);
+        WrappedData wrappedData = new WrappedData(topicId, queueId, Thread.currentThread(), data);
+        dataWriter.pushWrappedData(wrappedData);
+        unsafe.park(false, 0);
 
-            FileChannel dataWriteChannel = dataWriteChannels[id];
-            ByteBuffer mergeBuffer = mergeBuffers[id];
-//            ReentrantLock mergeBufferLock = mergeBufferLocks[id];
-            ReentrantReadWriteLock mergeBufferRWLock = mergeBufferRWLocks[id];
-            AtomicLong mergeBufferPosition = mergeBufferPositions[id];
-            Map<Thread, Thread> parkedThreadMap = parkedThreadMaps[id];
-            AtomicLong forceVersion = forceVersions[id];
-
-            long offset;
-            byte topicId = getTopicId(topic);
-            int dataLength = data.remaining(); // 默认data的position是从 0 开始的
-
-            // 根据topicId获取topic下的全部队列的信息
-            ConcurrentHashMap<Integer, ArrayList<long[]>> topicInfo = metaInfo.get(topicId);
-            if (topicInfo == null) {
-                topicInfo = new ConcurrentHashMap<>();
-                metaInfo.put(topicId, topicInfo);
-            }
-            // 根据queueId获取队列在文件中的位置信息
-            ArrayList<long[]> queueInfo = topicInfo.get(queueId);
-            if (queueInfo == null) {
-                queueInfo = new ArrayList<>();
-                topicInfo.put(queueId, queueInfo);
-            }
-            offset = queueInfo.size();
-            long initialAddress = ((DirectBuffer) mergeBuffer).address();
-
-            mergeBufferRWLock.readLock().lock();
-            long channelPosition = dataWriteChannel.position();
-            long writeAddress = mergeBufferPosition.getAndAdd(DATA_INFORMATION_LENGTH + dataLength);
-            int index = (int)(writeAddress - initialAddress);
-            mergeBuffer.put(index, topicId);
-            mergeBuffer.putInt(index + 1, queueId);
-            mergeBuffer.putShort(index + 5, (short) dataLength);
-            unsafe.copyMemory(data.array(), 16 + data.position(), null, writeAddress + DATA_INFORMATION_LENGTH, dataLength);
-
-            // 登记需要刷盘的数据和对应的线程
-            long forceVersionNow = forceVersion.get();
-            parkedThreadMap.put(Thread.currentThread(), Thread.currentThread());
-            // 在这里读阻塞数，避免判断阻塞数量时和后续的 clear 操作冲突
-            int parkedThreadCount = parkedThreadMap.size();
-            mergeBufferRWLock.readLock().unlock();
-
-            if(parkedThreadCount < MERGE_MIN_THREAD_COUNT.get()) {
-                long start = System.currentTimeMillis();
-                unsafe.park(true, System.currentTimeMillis() + THREAD_PARK_TIMEOUT);  // ms
-                long stop = System.currentTimeMillis();
-                if (DEBUG){
-                    System.out.println(String.format("Thread: %s, id: %d, park for time : %d ms", Thread.currentThread().getName(), id, stop - start));
-                }
-            }
-            // 自己的 data 还没被 force
-            if (forceVersionNow == forceVersion.get()){
-                mergeBufferRWLock.writeLock().lock();
-                if (forceVersionNow == forceVersion.get()){
-                    long start = System.currentTimeMillis();
-                    mergeBuffer.limit((int) (mergeBufferPosition.get() - initialAddress));
-                    dataWriteChannel.write(mergeBuffer);
-                    dataWriteChannel.force(true);
-                    long stop = System.currentTimeMillis();
-
-                    if (DEBUG){
-                        System.out.println(String.format("groupId: %d, mergeThreadCount: %d, mergeSize: %d kb, writeCostTime: %d", id, parkedThreadMap.size(), mergeBuffer.limit() / 1024, stop - start));
-                    }
-
-                    mergeBuffer.clear();
-                    mergeBufferPosition.set(initialAddress);
-                    forceVersion.getAndIncrement();
-                    // 叫醒各个线程
-                    parkedThreadMap.remove(Thread.currentThread());
-                    for (Thread thread : parkedThreadMap.keySet()) {
-                        unsafe.unpark(thread);
-                    }
-                    parkedThreadMap.clear();
-                }
-                mergeBufferRWLock.writeLock().unlock();
-            }
-            long pos = channelPosition + writeAddress - initialAddress + DATA_INFORMATION_LENGTH;
-            long groupAndDataLength = (((long) id) << 32) | dataLength;
-            queueInfo.add(new long[]{pos, groupAndDataLength}); // todo: 占用大小待优化
-            return offset;
-        } catch (Exception ignored) { }
-        return 0L;
+        int a = 1;
+        return metaInfo.get(topicId).get(queueId).size() - 1;
     }
 
     /**
@@ -300,7 +194,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                             FileInputStream fis = new FileInputStream(new File(DISC_ROOT, topic));
                             topicId = (byte) fis.read();
                         }
-                    } catch (Exception ignored) {
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
                 }
             }
@@ -313,6 +208,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         Byte topicId = getTopicId(topic);
         ArrayList<long[]> queueInfo = metaInfo.get(topicId).get(queueId);
         HashMap<Integer, ByteBuffer> ret = new HashMap<>();
+
         ThreadWorkContext context = getThreadWorkContext(Thread.currentThread());
         ByteBuffer[] buffers = context.buffers;
         try {
@@ -326,7 +222,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 buf.flip();
                 ret.put(i, buf);
             }
-        }catch (Exception ignored){ }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
         // 打印总体已经响应查询的次数
         if (DEBUG){
             int getRangeCountNow = getRangeCount.incrementAndGet();
@@ -338,7 +236,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
     public static void main(String[] args) throws InterruptedException {
-        final int threadCount = 25;
+        final int threadCount = 15;
         final int topicCountPerThread = 4;  // threadCount * topicCountPerThread <= 100
         final int queueIdCountPerTopic = 20;
         final int writeTimesPerQueueId = 30;
