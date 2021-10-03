@@ -26,7 +26,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static volatile ConcurrentHashMap<Byte, HashMap<Short, HashMap<Integer, long[]>>> metaInfo;
     public static volatile Map<Thread, ThreadWorkContext> threadWorkContextMap = new ConcurrentHashMap<>();
     public static final FileChannel[] dataWriteChannels = new FileChannel[WRITE_THREAD_COUNT];
-    public static final FileChannel[] dataReadChannels = new FileChannel[WRITE_THREAD_COUNT];
+//    public static final FileChannel[] dataReadChannels = new FileChannel[WRITE_THREAD_COUNT];
     public static DataWriter dataWriter;
     public static int initThreadCount = 0;
     public static OfficialDemo officialDemo = new OfficialDemo();
@@ -45,14 +45,14 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 file.createNewFile();
             }
             dataWriteChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.APPEND, StandardOpenOption.WRITE);
-            dataReadChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.READ);
+//            dataReadChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.READ);
         }
         dataWriter = new DataWriter();
     }
 
     public static long getTotalFileSize(){
         long fileSize = 0;
-        for (FileChannel dataWriteChannel : dataReadChannels) {
+        for (FileChannel dataWriteChannel : dataWriteChannels) {
             try {
                 fileSize += dataWriteChannel.size();
             } catch (IOException e) {
@@ -117,8 +117,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public void powerFailureRecovery(ConcurrentHashMap<Byte, HashMap<Short, HashMap<Integer, long[]>>> metaInfo) {
         if (getTotalFileSize() > 0) {
             try {
-                for (int id = 0; id < dataReadChannels.length; id++) {
-                    FileChannel channel = dataReadChannels[id];
+                for (int id = 0; id < dataWriteChannels.length; id++) {
+                    FileChannel channel = dataWriteChannels[id];
                     ByteBuffer readBuffer = ByteBuffer.allocate(DATA_INFORMATION_LENGTH);
                     byte topicId;
                     short queueId;
@@ -333,7 +333,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     buf.clear();
                     buf.limit((int) p[1]);
                     int id = (int) (p[1] >> 32);
-                    dataReadChannels[id].read(buf, p[0]);
+                    dataWriteChannels[id].read(buf, p[0]);
                     buf.flip();
                     ret.put(i, buf);
                 }
