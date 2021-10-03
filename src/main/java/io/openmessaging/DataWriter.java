@@ -46,7 +46,6 @@ public class DataWriter {
                         }
                     }
                     if (mergedData.getCount() > 0) {
-                        Thread.sleep(1);
                         mergedDataQueue.offer(mergedData);
                     }
                 } catch (InterruptedException e) {
