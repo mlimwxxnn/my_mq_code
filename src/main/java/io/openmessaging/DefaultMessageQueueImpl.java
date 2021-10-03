@@ -183,6 +183,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }).start();
     }
 //    public volatile Map<Thread, Integer> appendThread = new ConcurrentHashMap<>();
+    public static volatile Map<String, String> appendDone = new ConcurrentHashMap<>();
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
 //        Thread thread = Thread.currentThread();
@@ -196,7 +197,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //            }
 //        }
 
+
         Byte topicId = getTopicId(topic);
+        String key = topicId + "-" + queueId;
+        appendDone.put(key, key);
+
         WrappedData wrappedData = new WrappedData(topicId, queueId, null, data);
         dataWriter.pushWrappedData(wrappedData);
 //        unsafe.park(false, 0L);
@@ -251,7 +256,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             HashMap<Integer, ByteBuffer> ret = new HashMap<>();
             if(queueInfo == null){
                 String key = topicId + "-" + queueId;
-                System.out.println("是否写过这个数据：" + dataWriter.done.containsKey(key));
+                System.out.println("是否append过这个数据：" + appendDone.containsKey(key));
+                System.out.println("是否write过这个数据：" + dataWriter.done.containsKey(key));
                 System.out.println("queueInfo 为空");
                 System.exit(-1);
             }
