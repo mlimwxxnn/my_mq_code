@@ -44,7 +44,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             if (!file.exists()){
                 file.createNewFile();
             }
-            dataWriteChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.APPEND, StandardOpenOption.WRITE);
+            dataWriteChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.APPEND, StandardOpenOption.WRITE, StandardOpenOption.READ);
 //            dataReadChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.READ);
         }
         dataWriter = new DataWriter();
