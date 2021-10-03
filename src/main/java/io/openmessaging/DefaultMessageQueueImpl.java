@@ -198,7 +198,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //        }
 
 
-        Byte topicId = getTopicId(topic);
+        Byte topicId = getTopicId(topic, true);
         String key = topicId + "-" + queueId;
         appendDone.put(key, key);
 
@@ -220,7 +220,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
      * @return
      * @throws IOException
      */
-    private Byte getTopicId(String topic) {
+    private Byte getTopicId(String topic, boolean isCreateNew) {
         Byte topicId = topicNameToTopicId.get(topic);
         if (topicId == null) {
             synchronized (topicNameToTopicId) {
@@ -228,6 +228,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     File topicIdFile = new File(DISC_ROOT, topic);
                     try {
                         if (!topicIdFile.exists()) {
+                            if (!isCreateNew){
+                                return null;
+                            }
                             // 文件不存在，这是一个新的Topic，保存topic名称到topicId的映射，文件名为topic，内容为id
                             topicNameToTopicId.put(topic, topicId = (byte) topicCount.getAndIncrement());
                             FileOutputStream fos = new FileOutputStream(new File(DISC_ROOT, topic));
@@ -251,15 +254,21 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     @Override
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
         try {
-            Byte topicId = getTopicId(topic);
-            ArrayList<long[]> queueInfo = metaInfo.get(topicId).get(queueId);
             HashMap<Integer, ByteBuffer> ret = new HashMap<>();
+
+            Byte topicId = getTopicId(topic, false);
+            if (topicId == null){
+                return ret;
+            }
+
+            ArrayList<long[]> queueInfo = metaInfo.get(topicId).get(queueId);
             if(queueInfo == null){
-                String key = topicId + "-" + queueId;
-                System.out.println("是否append过这个数据：" + appendDone.containsKey(key));
-                System.out.println("是否write过这个数据：" + dataWriter.done.containsKey(key));
-                System.out.println("queueInfo 为空");
-                System.exit(-1);
+                return ret;
+//                String key = topicId + "-" + queueId;
+//                System.out.println("是否append过这个数据：" + appendDone.containsKey(key));
+//                System.out.println("是否write过这个数据：" + dataWriter.done.containsKey(key));
+//                System.out.println("queueInfo 为空");
+//                System.exit(-1);
             }
             ThreadWorkContext context = getThreadWorkContext(Thread.currentThread());
             ByteBuffer[] buffers = context.buffers;
