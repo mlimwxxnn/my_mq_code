@@ -21,7 +21,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final long KILL_SELF_TIMEOUT = 1 * 60;  // seconds
     public static final long THREAD_PARK_TIMEOUT = 2;  // ms
     public static AtomicInteger MERGE_MIN_THREAD_COUNT = new AtomicInteger(5);  // 只是起始
-    public static final int WRITE_THREAD_COUNT = 6;
+    public static final int WRITE_THREAD_COUNT = 5;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
