@@ -15,7 +15,7 @@ public class DataWriter {
     public final LinkedBlockingQueue<ByteBuffer> freeMergeBufferQueue = new LinkedBlockingQueue<>(); // 空闲的ByteBuffer
     final Unsafe unsafe = UnsafeUtil.unsafe;
 //
-    public volatile Map<String, String> done = new ConcurrentHashMap<>();
+//    public volatile Map<String, String> done = new ConcurrentHashMap<>();
 //    public volatile Map<Thread, Integer> unparkCount = new ConcurrentHashMap<>();
 //
 
@@ -84,8 +84,8 @@ public class DataWriter {
                             byte topicId = metaData.getTopicId();
                             int queueId = metaData.getQueueId();
 //
-                            String key = topicId + "-" + queueId;
-                            done.put(key, key);
+//                            String key = topicId + "-" + queueId;
+//                            done.put(key, key);
 
                             ConcurrentHashMap<Integer, ArrayList<long[]>> topicInfo =
                                     DefaultMessageQueueImpl.metaInfo.get(topicId);

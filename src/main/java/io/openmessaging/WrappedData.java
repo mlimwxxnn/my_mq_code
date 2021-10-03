@@ -3,13 +3,13 @@ package io.openmessaging;
 import java.nio.ByteBuffer;
 
 public class WrappedData {
-    private MetaData meta;
+    private final MetaData meta;
 
-    private ByteBuffer data;
+    private final ByteBuffer data;
 
 
-    public WrappedData(byte topicId, int queueId, Thread thread, ByteBuffer data) {
-        this.meta = new MetaData(topicId, queueId, thread, (short)data.remaining());
+    public WrappedData(byte topicId, int queueId, ByteBuffer data) {
+        this.meta = new MetaData(topicId, queueId, (short)data.remaining());
         this.data = data;
 
     }

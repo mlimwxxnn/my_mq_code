@@ -3,17 +3,15 @@ package io.openmessaging;
 import java.util.concurrent.CountDownLatch;
 
 public class MetaData {
-    private byte topicId;
-    private int queueId;
-    private Thread thread;
+    private final byte topicId;
+    private final int queueId;
     private long offsetInMergedBuffer;
-    private short dataLen;
+    private final short dataLen;
     public CountDownLatch countDownLatch = new CountDownLatch(1);
 
-    public MetaData(byte topicId, int queueId, Thread thread, short dataLen) {
+    public MetaData(byte topicId, int queueId, short dataLen) {
         this.topicId = topicId;
         this.queueId = queueId;
-        this.thread = thread;
         this.dataLen = dataLen;
     }
 
@@ -24,10 +22,6 @@ public class MetaData {
 
     public int getQueueId() {
         return queueId;
-    }
-
-    public Thread getThread() {
-        return thread;
     }
 
     public void setOffsetInMergedBuffer(long offsetInMergedBuffer) {

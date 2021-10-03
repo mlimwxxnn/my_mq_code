@@ -1,42 +1,28 @@
 package io.openmessaging;
 
-import sun.misc.Unsafe;
-
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
 public class DefaultMessageQueueImpl extends MessageQueue {
 
-    public static final boolean DEBUG = false;
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
-    public static final AtomicInteger appendCount = new AtomicInteger();
-    public static final AtomicInteger getRangeCount = new AtomicInteger();
-    public static final long KILL_SELF_TIMEOUT = 16 * 60;  // seconds
+    public static final int DATA_INFORMATION_LENGTH = 7;
+    public static final long KILL_SELF_TIMEOUT = 18 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 500;  // 微秒
     public static final int WRITE_THREAD_COUNT = 5;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
-    // topicId, queueId, dataPosition
     public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, ArrayList<long[]>>> metaInfo = new ConcurrentHashMap<>();
-    public static final Unsafe unsafe = UnsafeUtil.unsafe;
-
-
-    public static final int DATA_INFORMATION_LENGTH = 7;
-
-    public static volatile Map<Thread, Integer> groupIdMap = new ConcurrentHashMap<>();
     public static volatile Map<Thread, ThreadWorkContext> threadWorkContextMap = new ConcurrentHashMap<>();
-
-    public static final AtomicInteger threadCountNow = new AtomicInteger();
     public static final FileChannel[] dataWriteChannels = new FileChannel[WRITE_THREAD_COUNT];
     public static final FileChannel[] dataReadChannels = new FileChannel[WRITE_THREAD_COUNT];
     public static DataWriter dataWriter;
@@ -199,12 +185,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 
         Byte topicId = getTopicId(topic, true);
-        String key = topicId + "-" + queueId;
-        appendDone.put(key, key);
+//        String key = topicId + "-" + queueId;
+//        appendDone.put(key, key);
 
-        WrappedData wrappedData = new WrappedData(topicId, queueId, null, data);
+        WrappedData wrappedData = new WrappedData(topicId, queueId, data);
         dataWriter.pushWrappedData(wrappedData);
-//        unsafe.park(false, 0L);
         try {
             wrappedData.getMeta().countDownLatch.await();
         } catch (InterruptedException e) {
@@ -285,13 +270,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 }
             } catch (IOException e) {
                 e.printStackTrace();
-            }
-            // 打印总体已经响应查询的次数
-            if (DEBUG) {
-                int getRangeCountNow = getRangeCount.incrementAndGet();
-                if (getRangeCountNow % 10000 == 0) {
-                    System.out.println("getRangeCountNow: " + getRangeCountNow);
-                }
             }
 
             return ret;
