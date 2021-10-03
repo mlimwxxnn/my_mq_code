@@ -83,8 +83,8 @@ public class DataWriter {
 
                         // 在内存中创建索引，并唤醒append的线程
                         metaSet.forEach((metaData) -> {
-                            byte topicId = metaData.getTopicId();
-                            int queueId = metaData.getQueueId();
+//                            byte topicId = metaData.getTopicId();
+//                            int queueId = metaData.getQueueId();
 //
 //                            String key = topicId + "-" + queueId;
 //                            done.put(key, key);
