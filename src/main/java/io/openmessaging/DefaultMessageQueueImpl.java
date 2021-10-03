@@ -18,7 +18,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File PMEM_ROOT;
     public static final boolean isTestPowerFailure = true;
     public static final int DATA_INFORMATION_LENGTH = 9;
-    public static final long KILL_SELF_TIMEOUT = 3 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 30 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 500;  // 微秒
     public static final int WRITE_THREAD_COUNT = 5;
 
@@ -180,6 +180,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         System.exit(-1);
                     }
                     System.out.println(String.format("written: %d", getTotalFileSize() / (1024 * 1024)));
+                    isBlockAppend.set(false);
                 }catch (Exception ex){
                     ex.printStackTrace();
                     System.exit(-1);
@@ -247,19 +248,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //        Thread thread = Thread.currentThread();
 //        appendThread.put(Thread.currentThread(), appendThread.getOrDefault(Thread.currentThread(), 0) + 1);
 
-//        while(isBlockAppend.get()){
-//            try {
-//                Thread.sleep(10);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//        }
 
         int position = data.position();
         if (isTestPowerFailure){
-            if (isBlockAppend.get()){
+            while(isBlockAppend.get()){
                 try {
-                    new CountDownLatch(1).await();
+                    Thread.sleep(10);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
