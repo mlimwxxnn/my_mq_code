@@ -26,7 +26,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static AtomicInteger topicCount = new AtomicInteger();
     ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
     // topicId, queueId, dataPosition
-    public static volatile ConcurrentHashMap<Byte, HashMap<Integer, ArrayList<long[]>>> metaInfo = new ConcurrentHashMap<>();
+    public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, ArrayList<long[]>>> metaInfo = new ConcurrentHashMap<>();
     public static final Unsafe unsafe = UnsafeUtil.unsafe;
 
 
@@ -122,7 +122,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     byte topicId;
                     int queueId;
                     short dataLen = 0;
-                    HashMap<Integer, ArrayList<long[]>> topicInfo;
+                    ConcurrentHashMap<Integer, ArrayList<long[]>> topicInfo;
                     ArrayList<long[]> queueInfo;
                     long dataFilesize = channel.size();
                     while (channel.position() + dataLen < dataFilesize) {
@@ -136,7 +136,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         dataLen = readBuffer.getShort();
                         topicInfo = metaInfo.get(topicId);
                         if (topicInfo == null) {
-                            topicInfo = new HashMap<>(5000);
+                            topicInfo = new ConcurrentHashMap<>(5000);
                             metaInfo.put(topicId, topicInfo);
                         }
                         queueInfo = topicInfo.get(queueId);
@@ -154,14 +154,22 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }
     }
 
+
+//    public volatile Map<Thread, Integer> appendThread = new ConcurrentHashMap<>();
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
+//        Thread thread = Thread.currentThread();
+//        appendThread.put(Thread.currentThread(), appendThread.getOrDefault(Thread.currentThread(), 0) + 1);
+
         Byte topicId = getTopicId(topic);
         WrappedData wrappedData = new WrappedData(topicId, queueId, Thread.currentThread(), data);
         dataWriter.pushWrappedData(wrappedData);
-        unsafe.park(false, 0);
-
-        int a = 1;
+//        unsafe.park(false, 0L);
+        try {
+            wrappedData.getMeta().countDownLatch.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         return metaInfo.get(topicId).get(queueId).size() - 1;
     }
 
@@ -233,8 +241,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
     public static void main(String[] args) throws InterruptedException {
-        final int threadCount = 15;
-        final int topicCountPerThread = 4;  // threadCount * topicCountPerThread <= 100
+        final int threadCount = 40;
+        final int topicCountPerThread = 2;  // threadCount * topicCountPerThread <= 100
         final int queueIdCountPerTopic = 20;
         final int writeTimesPerQueueId = 30;
         ByteBuffer[][][] buffers = new ByteBuffer[threadCount][topicCountPerThread][queueIdCountPerTopic];
@@ -274,7 +282,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             threads[i].join();
         }
 
-        Map<Integer, ByteBuffer> res = mq.getRange("10-3", 15, 0, 100);
+        Map<Integer, ByteBuffer> res = mq.getRange("10-1", 15, 0, 100);
         System.out.println(res.size());
     }
 }

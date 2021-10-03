@@ -6,6 +6,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.*;
 
@@ -14,6 +15,10 @@ public class DataWriter {
     public final LinkedBlockingQueue<MergedData> mergedDataQueue = new LinkedBlockingQueue<>();
     public final LinkedBlockingQueue<ByteBuffer> freeMergeBufferQueue = new LinkedBlockingQueue<>(); // 空闲的ByteBuffer
     final Unsafe unsafe = UnsafeUtil.unsafe;
+//
+//    public volatile Map<String, String> done = new ConcurrentHashMap<>();
+//    public volatile Map<Thread, Integer> unparkCount = new ConcurrentHashMap<>();
+//
 
     public DataWriter() {
         for (int i = 0; i < 50; i++) {
@@ -41,7 +46,7 @@ public class DataWriter {
                         }
                     }
                     if (mergedData.getCount() > 0) {
-
+                        Thread.sleep(1);
                         mergedDataQueue.offer(mergedData);
                     }
                 } catch (InterruptedException e) {
@@ -72,11 +77,14 @@ public class DataWriter {
                         metaSet.forEach((metaData) -> {
                             byte topicId = metaData.getTopicId();
                             int queueId = metaData.getQueueId();
+//
+//                            String key = topicId + "-" + queueId;
+//                            done.put(key, key);
 
-                            HashMap<Integer, ArrayList<long[]>> topicInfo =
+                            ConcurrentHashMap<Integer, ArrayList<long[]>> topicInfo =
                                     DefaultMessageQueueImpl.metaInfo.get(topicId);
                             if (topicInfo == null) {
-                                topicInfo = new HashMap<>();
+                                topicInfo = new ConcurrentHashMap<>();
                                 DefaultMessageQueueImpl.metaInfo.put(topicId, topicInfo);
                             }
                             ArrayList<long[]> queueInfo = topicInfo.get(queueId);
@@ -86,7 +94,13 @@ public class DataWriter {
                             }
                             queueInfo.add(new long[]{metaData.getOffsetInMergedBuffer() + pos,
                                     (writeThreadId << 32) | metaData.getDataLen()});
-                            unsafe.unpark(metaData.getThread());
+
+//                            unsafe.unpark(metaData.getThread());
+                            metaData.countDownLatch.countDown();
+
+//                            Integer count = unparkCount.getOrDefault(metaData.getThread(), 0);
+//                            unparkCount.put(metaData.getThread(), count + 1);
+
                         });
                     }
                 } catch (Exception e) {

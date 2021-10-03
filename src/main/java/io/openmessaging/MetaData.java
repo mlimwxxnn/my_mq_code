@@ -1,11 +1,14 @@
 package io.openmessaging;
 
+import java.util.concurrent.CountDownLatch;
+
 public class MetaData {
     private byte topicId;
     private int queueId;
     private Thread thread;
     private long offsetInMergedBuffer;
     private short dataLen;
+    public CountDownLatch countDownLatch = new CountDownLatch(1);
 
     public MetaData(byte topicId, int queueId, Thread thread, short dataLen) {
         this.topicId = topicId;
