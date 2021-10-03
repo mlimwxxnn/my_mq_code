@@ -6,6 +6,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -14,23 +15,26 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
+    public static final boolean isTestPowerFailure = true;
     public static final int DATA_INFORMATION_LENGTH = 7;
-    public static final long KILL_SELF_TIMEOUT = 18 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 3 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 500;  // 微秒
     public static final int WRITE_THREAD_COUNT = 5;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
-    public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, ArrayList<long[]>>> metaInfo = new ConcurrentHashMap<>();
+    public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Integer, ArrayList<long[]>>> metaInfo;
     public static volatile Map<Thread, ThreadWorkContext> threadWorkContextMap = new ConcurrentHashMap<>();
     public static final FileChannel[] dataWriteChannels = new FileChannel[WRITE_THREAD_COUNT];
     public static final FileChannel[] dataReadChannels = new FileChannel[WRITE_THREAD_COUNT];
     public static DataWriter dataWriter;
     public static int initThreadCount = 0;
+    public static OfficialDemo officialDemo = new OfficialDemo();
 
     static AtomicBoolean isBlockAppend = new AtomicBoolean();
 
     public static void init() throws IOException {
+        metaInfo = new ConcurrentHashMap<>();
         for (int i = 0; i < WRITE_THREAD_COUNT; i++) {
             File file = new File(DISC_ROOT, "data-" + i);
             File parentFile = file.getParentFile();
@@ -147,28 +151,53 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             } catch (IOException e) {
                 e.printStackTrace();
             }
+        }else {
+            testPowerFailureRecovery();
         }
     }
 
-    public static void restPowerFailureRecovery(){
+    public static void testPowerFailureRecovery(){
         new Thread(()->{
             try {
-                while (true) {
-                    Thread.sleep(1000 * 60);
-                    isBlockAppend.set(true);
-                    Thread.sleep(1000);
-                    DefaultMessageQueueImpl defaultMessageQueue = new DefaultMessageQueueImpl();
-
-
-                    isBlockAppend.set(false);
+                Thread.sleep(10 * 1000);
+                isBlockAppend.set(true);
+                Thread.sleep(3 * 1000);
+                DefaultMessageQueueImpl myDemo = new DefaultMessageQueueImpl();
+                if(isMyDemoRight(officialDemo, myDemo)){
+                    System.out.println("my demo is right for power failure recovery!");
+                }else{
+                    System.out.println("not right!");
                 }
+                System.exit(-1);
+
             }catch (Exception ex){
                 ex.printStackTrace();
                 System.exit(-1);
             }
         }).start();
     }
-//    public volatile Map<Thread, Integer> appendThread = new ConcurrentHashMap<>();
+
+    private static boolean isMyDemoRight(OfficialDemo officialDemo, DefaultMessageQueueImpl myDemo) {
+        ConcurrentHashMap<String, Map<Integer, Long>> appendOffset = officialDemo.appendOffset;
+        ConcurrentHashMap<String, Map<Integer, Map<Long, ByteBuffer>>> appendData = officialDemo.appendData;
+        for (String topic : appendOffset.keySet()) {
+            Map<Integer, Long> queueIdLenMap = appendOffset.get(topic);
+            for (Integer queueId : queueIdLenMap.keySet()) {
+                Long offsetUpToNow = queueIdLenMap.get(queueId);
+                for (long offset = 0L; offset < offsetUpToNow; offset+=100) {
+                    Map<Integer, ByteBuffer> officialRes = officialDemo.getRange(topic, queueId, offset, 100);
+                    Map<Integer, ByteBuffer> myRes = myDemo.getRange(topic, queueId, offset, 100);
+                    if (!officialRes.equals(myRes)){
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+
+    //    public volatile Map<Thread, Integer> appendThread = new ConcurrentHashMap<>();
     public static volatile Map<String, String> appendDone = new ConcurrentHashMap<>();
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
@@ -182,7 +211,16 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //                e.printStackTrace();
 //            }
 //        }
-
+        if (isTestPowerFailure){
+            if (isBlockAppend.get()){
+                try {
+                    new CountDownLatch(1).await();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            officialDemo.append(topic, queueId, data);
+        }
 
         Byte topicId = getTopicId(topic, true);
 //        String key = topicId + "-" + queueId;
