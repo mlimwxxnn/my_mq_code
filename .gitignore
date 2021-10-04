@@ -10,3 +10,4 @@ essd/
 *.project
 *.classpath
 *.log
+pom.xml

@@ -4,20 +4,15 @@ import sun.misc.Unsafe;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.ArrayList;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.*;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 public class DataWriter {
     public final LinkedBlockingQueue<WrappedData> wrappedDataQueue = new LinkedBlockingQueue<>();
     public final LinkedBlockingQueue<MergedData> mergedDataQueue = new LinkedBlockingQueue<>();
     public final LinkedBlockingQueue<ByteBuffer> freeMergeBufferQueue = new LinkedBlockingQueue<>(); // 空闲的ByteBuffer
     final Unsafe unsafe = UnsafeUtil.unsafe;
-//
-//    public volatile Map<String, String> done = new ConcurrentHashMap<>();
-//    public volatile Map<Thread, Integer> unparkCount = new ConcurrentHashMap<>();
-//
 
     public DataWriter() {
         for (int i = 0; i < 50; i++) {
@@ -83,20 +78,12 @@ public class DataWriter {
 
                         // 在内存中创建索引，并唤醒append的线程
                         metaSet.forEach((metaData) -> {
-//                            byte topicId = metaData.getTopicId();
-//                            int queueId = metaData.getQueueId();
-//
-//                            String key = topicId + "-" + queueId;
-//                            done.put(key, key);
 
                             metaData.getQueueInfo().put(metaData.getOffset(),
                                     new long[]{metaData.getOffsetInMergedBuffer() + pos,
                                     (writeThreadId << 32) | metaData.getDataLen()});
 
                             metaData.countDownLatch.countDown();
-
-//                            Integer count = unparkCount.getOrDefault(metaData.getThread(), 0);
-//                            unparkCount.put(metaData.getThread(), count + 1);
 
                         });
                     }
