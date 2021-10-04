@@ -1,13 +1,11 @@
 package io.openmessaging;
 
-import javax.sound.midi.Soundbank;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -21,14 +19,16 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final long KILL_SELF_TIMEOUT = 30 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 1000;  // 微秒
     public static final int WRITE_THREAD_COUNT = 3;
+    public static final int READ_THREAD_COUNT = 6;
 
     public static AtomicInteger topicCount = new AtomicInteger();
-    ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
+    static ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
     public static volatile ConcurrentHashMap<Byte, HashMap<Short, HashMap<Integer, long[]>>> metaInfo;
-    public static volatile Map<Thread, ThreadWorkContext> threadWorkContextMap = new ConcurrentHashMap<>();
+    public static volatile Map<Thread, GetRangeTask> getRangeTaskMap = new ConcurrentHashMap<>();
     public static final FileChannel[] dataWriteChannels = new FileChannel[WRITE_THREAD_COUNT];
 //    public static final FileChannel[] dataReadChannels = new FileChannel[WRITE_THREAD_COUNT];
     public static DataWriter dataWriter;
+    public static DataReader dataReader;
     public static int initThreadCount = 0;
     public static OfficialDemo officialDemo = new OfficialDemo();
 
@@ -36,6 +36,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static void init() throws IOException {
         metaInfo = new ConcurrentHashMap<>();
+        dataReader = new DataReader();
         for (int i = 0; i < WRITE_THREAD_COUNT; i++) {
             File file = new File(DISC_ROOT, "data-" + i);
             File parentFile = file.getParentFile();
@@ -62,22 +63,14 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }
         return fileSize;
     }
-    static class ThreadWorkContext {
-        public final ByteBuffer[] buffers = new ByteBuffer[100]; // 用来响应查询的buffer
-        public ThreadWorkContext(){
-            for (int i = 0; i < buffers.length; i++) {
-                buffers[i] = ByteBuffer.allocateDirect(17 * 1024);
-            }
-        }
-    }
 
-    public static ThreadWorkContext getThreadWorkContext(Thread thread){
-        ThreadWorkContext context = threadWorkContextMap.get(thread);
+    public static GetRangeTask getTask(Thread thread){
+        GetRangeTask context = getRangeTaskMap.get(thread);
         if (context != null){
             return context;
         }
-        context = new ThreadWorkContext();
-        threadWorkContextMap.put(thread, context);
+        context = new GetRangeTask();
+        getRangeTaskMap.put(thread, context);
         return context;
     }
 
@@ -109,9 +102,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         } catch (IOException e) {
             System.out.println("init failed");
         }
-
         killSelf(KILL_SELF_TIMEOUT);
-
         // 如果数据文件里有东西就从文件恢复索引
         powerFailureRecovery(metaInfo);
         initThreadCount = Thread.activeCount();
@@ -280,7 +271,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     /**
      * 创建或并返回topic对应的topicId
      */
-    private Byte getTopicId(String topic, boolean isCreateNew) {
+    public static Byte getTopicId(String topic, boolean isCreateNew) {
         Byte topicId = topicNameToTopicId.get(topic);
         if (topicId == null) {
             synchronized (topicNameToTopicId) {
@@ -316,45 +307,20 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     @Override
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
+        GetRangeTask task = getTask(Thread.currentThread());
+        task.setGetRangeParameter(topic, queueId, offset, fetchNum);
+        dataReader.pushTask(task);
         try {
-            HashMap<Integer, ByteBuffer> ret = new HashMap<>();
-
-            Byte topicId = getTopicId(topic, false);
-            if (topicId == null){
-                return ret;
-            }
-
-            HashMap<Integer, long[]> queueInfo = metaInfo.get(topicId).get((short)queueId);
-            if(queueInfo == null){
-                return ret;
-//                String key = topicId + "-" + queueId;
-//                System.out.println("是否append过这个数据：" + appendDone.containsKey(key));
-//                System.out.println("是否write过这个数据：" + dataWriter.done.containsKey(key));
-//                System.out.println("queueInfo 为空");
-//                System.exit(-1);
-            }
-            ThreadWorkContext context = getThreadWorkContext(Thread.currentThread());
-            ByteBuffer[] buffers = context.buffers;
-            try {
-                for (int i = 0; i < fetchNum && (i + offset) < queueInfo.size(); i++) {
-                    long[] p = queueInfo.get(i + (int) offset);
-                    ByteBuffer buf = buffers[i];
-                    buf.clear();
-                    buf.limit((int) p[1]);
-                    int id = (int) (p[1] >> 32);
-                    dataWriteChannels[id].read(buf, p[0]);
-                    buf.flip();
-                    ret.put(i, buf);
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            return ret;
-        }catch(Exception e){
+            task.countDownLatch.await();
+        } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        return null;
+
+        return task.getResult();
+
+
+
+
     }
 
     public static void main(String[] args) throws InterruptedException {
