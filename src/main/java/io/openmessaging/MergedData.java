@@ -22,10 +22,10 @@ public class MergedData {
 
     public void putData(WrappedData wrappedData) {
         count++;
-        // 放入数据的元信息，9 字节
         MetaData meta = wrappedData.getMeta();
         metaSet.add(meta);
 
+        // 放入数据的元信息，9 字节
         mergedBuffer.put(meta.getTopicId());
         mergedBuffer.putShort(meta.getQueueId());
         short dataLen = meta.getDataLen();

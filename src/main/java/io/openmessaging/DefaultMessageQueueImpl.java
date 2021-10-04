@@ -16,7 +16,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
-    public static final boolean isTestPowerFailure = true;
+    public static final boolean isTestPowerFailure = false;
     public static final int DATA_INFORMATION_LENGTH = 9;
     public static final long KILL_SELF_TIMEOUT = 30 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 500;  // 微秒
@@ -82,6 +82,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
     public static void killSelf(long timeout) {
+        if (timeout <= 0){
+            return;
+        }
         new Thread(()->{
             try {
                 Thread.sleep(timeout * 1000);
@@ -139,16 +142,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         dataLen = readBuffer.getShort();
                         offset = readBuffer.getInt();
 
-                        topicInfo = metaInfo.get(topicId);
-                        if (topicInfo == null) {
-                            topicInfo = new HashMap<>(5000);
-                            metaInfo.put(topicId, topicInfo);
-                        }
-                        queueInfo = topicInfo.get(queueId);
-                        if (queueInfo == null) {
-                            queueInfo = new HashMap<>(64);
-                            topicInfo.put(queueId, queueInfo);
-                        }
+                        topicInfo = metaInfo.computeIfAbsent(topicId, k -> new HashMap<>(5000));
+                        queueInfo = topicInfo.computeIfAbsent(queueId, k -> new HashMap<>(64));
                         long groupIdAndDataLength = (((long) id) << 32) | dataLen;
                         queueInfo.put(offset, new long[]{channel.position(), groupIdAndDataLength});
                     }
@@ -267,16 +262,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //        String key = topicId + "-" + queueId;
 //        appendDone.put(key, key);
 
-        HashMap<Short, HashMap<Integer, long[]>> topicInfo = metaInfo.get(topicId);
-        if (topicInfo == null) {
-            topicInfo = new HashMap<>();
-            metaInfo.put(topicId, topicInfo);
-        }
-        HashMap<Integer, long[]> queueInfo = topicInfo.get((short)queueId);
-        if (queueInfo == null) {
-            queueInfo = new HashMap<>(1000);
-            topicInfo.put((short)queueId, queueInfo);
-        }
+        HashMap<Short, HashMap<Integer, long[]>> topicInfo = metaInfo.computeIfAbsent(topicId, k -> new HashMap<>());
+        HashMap<Integer, long[]> queueInfo = topicInfo.computeIfAbsent((short) queueId, k -> new HashMap<>(1000));
         int offset = queueInfo.size();
 
 
@@ -292,31 +279,30 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     /**
      * 创建或并返回topic对应的topicId
-     *
-     * @param topic 话题名
-     * @return
-     * @throws IOException
      */
     private Byte getTopicId(String topic, boolean isCreateNew) {
         Byte topicId = topicNameToTopicId.get(topic);
         if (topicId == null) {
             synchronized (topicNameToTopicId) {
                 if((topicId = topicNameToTopicId.get(topic)) == null) {
-                    File topicIdFile = new File(DISC_ROOT, topic);
+                    File topicIdFile = new File(DISC_ROOT, "topic/" + topic);
                     try {
                         if (!topicIdFile.exists()) {
                             if (!isCreateNew){
                                 return null;
                             }
+                            if(!topicIdFile.getParentFile().exists()){
+                                topicIdFile.getParentFile().mkdir();
+                            }
                             // 文件不存在，这是一个新的Topic，保存topic名称到topicId的映射，文件名为topic，内容为id
                             topicNameToTopicId.put(topic, topicId = (byte) topicCount.getAndIncrement());
-                            FileOutputStream fos = new FileOutputStream(new File(DISC_ROOT, topic));
+                            FileOutputStream fos = new FileOutputStream(topicIdFile);
                             fos.write(topicId);
                             fos.flush();
                             fos.close();
                         } else {
                             // 文件存在，topic不在内存，从文件恢复
-                            FileInputStream fis = new FileInputStream(new File(DISC_ROOT, topic));
+                            FileInputStream fis = new FileInputStream(topicIdFile);
                             topicId = (byte) fis.read();
                         }
                     } catch (Exception e) {
@@ -373,9 +359,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static void main(String[] args) throws InterruptedException {
         final int threadCount = 30;
-        final int topicCountPerThread = 2;  // threadCount * topicCountPerThread <= 100
+        final int topicCountPerThread = 3;  // threadCount * topicCountPerThread <= 100
         final int queueIdCountPerTopic = 5;
-        final int writeTimesPerQueueId = 30;
+        final int writeTimesPerQueueId = 10;
         ByteBuffer[][][] buffers = new ByteBuffer[threadCount][topicCountPerThread][queueIdCountPerTopic];
         DefaultMessageQueueImpl mq = new DefaultMessageQueueImpl();
 

@@ -10,7 +10,7 @@ public class MetaData {
     private long offsetInMergedBuffer;
     private final short dataLen;
     private final HashMap<Integer, long[]> queueInfo;
-    public CountDownLatch countDownLatch = new CountDownLatch(1);
+    public final CountDownLatch countDownLatch = new CountDownLatch(1);
 
     public MetaData(byte topicId, short queueId, short dataLen, int offset, HashMap<Integer, long[]> queueInfo) {
         this.topicId = topicId;

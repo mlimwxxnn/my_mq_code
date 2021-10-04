@@ -44,7 +44,7 @@ public class DataWriter {
             }
             while (true) {
                 try {
-                    MergedData mergedData = new MergedData(freeMergeBufferQueue.take()); // 这里只要buffer设置得足够多就不会返回null的
+                    MergedData mergedData = new MergedData(freeMergeBufferQueue.take());
                     do {
                         for (int i = 0; i < minMergeCount / DefaultMessageQueueImpl.WRITE_THREAD_COUNT; i++) {
                             WrappedData wrappedData = wrappedDataQueue.poll(DefaultMessageQueueImpl.WAITE_DATA_TIMEOUT,
@@ -78,8 +78,8 @@ public class DataWriter {
                         // 数据写入文件
                         long pos = dataWriteChannel.position();
                         dataWriteChannel.write(mergedBuffer);
-                        freeMergeBufferQueue.offer(mergedBuffer);
                         dataWriteChannel.force(true);
+                        freeMergeBufferQueue.offer(mergedBuffer);
 
                         // 在内存中创建索引，并唤醒append的线程
                         metaSet.forEach((metaData) -> {
