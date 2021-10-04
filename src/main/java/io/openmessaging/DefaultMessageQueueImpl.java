@@ -18,8 +18,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int DATA_INFORMATION_LENGTH = 9;
     public static final long KILL_SELF_TIMEOUT = 30 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 1000;  // 微秒
-    public static final int WRITE_THREAD_COUNT = 3;
-    public static final int READ_THREAD_COUNT = 6;
+    public static final int WRITE_THREAD_COUNT = 5;
+    public static final int READ_THREAD_COUNT = 20;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     static ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
