@@ -223,7 +223,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //            }
 //        }
 
-        System.out.printf("%s,%d,%d\n", topic, queueId, metaInfo.get(getTopicId(topic, false)).get((short)queueId).size());
+        try {
+            System.out.printf("%s,%d,%d\n", topic, queueId, metaInfo.get(getTopicId(topic, false)).get((short) queueId).size());
+        }catch (Exception e) {
+            System.out.println("--");
+        }
 
 
         GetRangeTask task = getTask(Thread.currentThread());
