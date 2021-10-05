@@ -1,5 +1,7 @@
 package io.openmessaging;
 
+import com.intel.pmem.llpl.Heap;
+import com.intel.pmem.llpl.MemoryBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,10 +94,36 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }).start();
     }
 
+    void test_llpl(){
+        boolean initialized = Heap.exists(PMEM_ROOT + "/persistent_heap");
+
+        Heap h = initialized ? Heap.openHeap(PMEM_ROOT + "/persistent_heap") : Heap.createHeap(PMEM_ROOT + "/persistent_heap", 60*1024*1024*1024L);
+
+        byte[] data = "hello world".getBytes();
+        int size = data.length;
+
+        // block allocation (transactional allocation)
+        MemoryBlock newBlock = h.allocateMemoryBlock(size, false);
+
+        //Attached the newBllock to the root address
+        h.setRoot(newBlock.handle());
+
+        // Write byte array (input) to newBlock @ offset 0 (on both) for 26 bytes
+        newBlock.copyFromArray(data, 0, 0, size);
+
+        //Ensure that the array (input) is in persistent memory
+        newBlock.flush();
+
+        //Convert byte array (input) to String format and write to console
+        System.out.printf("\nWrite the (%s) string to persistent-memory.\n",new String(data));
+
+    }
+
     public DefaultMessageQueueImpl() {
         log.info("DefaultMessageQueueImpl 开始构造");
         DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./essd") : new File("/essd");
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
+        test_llpl();
         try {
             init();
         } catch (IOException e) {
@@ -147,6 +175,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
+        try {
+            Thread.sleep(10000000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
 
         Byte topicId = getTopicId(topic, true);
 
