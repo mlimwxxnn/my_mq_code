@@ -102,6 +102,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             System.out.println("init failed");
         }
         killSelf(KILL_SELF_TIMEOUT);
+        if(getTotalFileSize()>0){
+            System.exit(0);
+        }
         powerFailureRecovery(metaInfo);
         initThreadCount = Thread.activeCount();
         log.info("DefaultMessageQueueImpl 构造完成");
@@ -194,33 +197,33 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         return topicId;
     }
 
-    final Object o = new Object();
-    Thread theThread = null;
+//    final Object o = new Object();
+//    Thread theThread = null;
     @Override
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
 
 
 
-        // todo 这一段代码是用来debug
-        if(theThread == null) {
-            synchronized (o) {
-                if (theThread == null) {
-                    theThread = Thread.currentThread();
-                    log.debug("topic,queueId,offset,fetchNum,queueLen");
-                }
-            }
-        }
+//        // todo 这一段代码是用来debug
+//        if(theThread == null) {
+//            synchronized (o) {
+//                if (theThread == null) {
+//                    theThread = Thread.currentThread();
+//                    log.debug("topic,queueId,offset,fetchNum,queueLen");
+//                }
+//            }
+//        }
 
 
-        if(Thread.currentThread() == theThread) {
-            try {
-                log.debug("{},{},{},{},{}", topic, queueId, offset, fetchNum, metaInfo.get(getTopicId(topic, false)).get((short)queueId).size());
-            }catch (Exception e){
-                e.printStackTrace();
-            }
-        }
+//        if(Thread.currentThread() == theThread) {
+//            try {
+//                log.debug("{}\t{}\t{}\t{}\t{}", topic, queueId, offset, fetchNum, metaInfo.get(getTopicId(topic, false)).get((short)queueId).size());
+//            }catch (Exception e){
+//                e.printStackTrace();
+//            }
+//        }
 
-
+        System.out.println(metaInfo.get(getTopicId(topic, false)).get((short)queueId).size());
         GetRangeTask task = getTask(Thread.currentThread());
         task.setGetRangeParameter(topic, queueId, offset, fetchNum);
         dataReader.pushTask(task);
@@ -229,6 +232,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+
+
 
 
         return task.getResult();
