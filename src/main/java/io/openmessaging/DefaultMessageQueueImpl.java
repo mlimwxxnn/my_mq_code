@@ -104,7 +104,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         killSelf(KILL_SELF_TIMEOUT);
         powerFailureRecovery(metaInfo);
         initThreadCount = Thread.activeCount();
-        log.info("DefaultMessageQueueImpl 构造完成")
+        log.info("DefaultMessageQueueImpl 构造完成");
     }
 
     public void powerFailureRecovery(ConcurrentHashMap<Byte, HashMap<Short, HashMap<Integer, long[]>>> metaInfo) {
@@ -194,7 +194,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         return topicId;
     }
 
-    Object o = new Object();
+    final Object o = new Object();
     Thread theThread = null;
     @Override
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
@@ -206,17 +206,19 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             synchronized (o) {
                 if (theThread == null) {
                     theThread = Thread.currentThread();
+                    log.debug("topic,queueId,offset,fetchNum,queueLen");
                 }
             }
         }
+
+
         if(Thread.currentThread() == theThread) {
             try {
-                log.debug("tpc:{},qId:{},off:{},fn:{}, qLen:{}", topic, queueId, offset, fetchNum, metaInfo.get(getTopicId(topic, false)).get(queueId).size());
+                log.debug("{},{},{},{},{}", topic, queueId, offset, fetchNum, metaInfo.get(getTopicId(topic, false)).get((short)queueId).size());
             }catch (Exception e){
                 e.printStackTrace();
             }
         }
-
 
 
         GetRangeTask task = getTask(Thread.currentThread());
@@ -227,6 +229,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+
+
         return task.getResult();
     }
 
