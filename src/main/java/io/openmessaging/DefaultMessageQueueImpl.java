@@ -35,21 +35,25 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static int initThreadCount = 0;
 
 
-    public static void init() throws IOException {
-        metaInfo = new ConcurrentHashMap<>();
-        dataReader = new DataReader();
-        for (int i = 0; i < WRITE_THREAD_COUNT; i++) {
-            File file = new File(DISC_ROOT, "data-" + i);
-            File parentFile = file.getParentFile();
-            if (!parentFile.exists()) {
-                parentFile.mkdirs();
+    public static void init() {
+        try {
+            metaInfo = new ConcurrentHashMap<>();
+            dataReader = new DataReader();
+            for (int i = 0; i < WRITE_THREAD_COUNT; i++) {
+                File file = new File(DISC_ROOT, "data-" + i);
+                File parentFile = file.getParentFile();
+                if (!parentFile.exists()) {
+                    parentFile.mkdirs();
+                }
+                if (!file.exists()) {
+                    file.createNewFile();
+                }
+                dataWriteChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
             }
-            if (!file.exists()) {
-                file.createNewFile();
-            }
-            dataWriteChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
+            dataWriter = new DataWriter();
+        }catch(IOException e){
+            e.printStackTrace();
         }
-        dataWriter = new DataWriter();
     }
 
     public static long getTotalFileSize() {
@@ -117,19 +121,32 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         //Convert byte array (input) to String format and write to console
         System.out.printf("\nWrite the (%s) string to persistent-memory.\n",new String(data));
 
+        System.exit(0);
+
+    }
+
+    void logThreadCount(){
+        new Thread(()->{
+            while(true){
+                try {
+                    Thread.sleep(10);
+                    System.out.printf("%d,%d\n", appendCount.get(), getRangeCount.get());
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
     }
 
     public DefaultMessageQueueImpl() {
         log.info("DefaultMessageQueueImpl 开始构造");
         DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./essd") : new File("/essd");
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
-        test_llpl();
-        try {
-            init();
-        } catch (IOException e) {
-            System.out.println("init failed");
-        }
+        init();
         killSelf(KILL_SELF_TIMEOUT);
+
+        logThreadCount();
+        // 阻止数据恢复，不知道为什么不起作用
         if(getTotalFileSize()>0){
             System.exit(0);
         }
@@ -173,13 +190,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
 
+    AtomicInteger appendCount = new AtomicInteger();
+    AtomicInteger getRangeCount = new AtomicInteger();
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
-        try {
-            Thread.sleep(10000000);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+        appendCount.getAndIncrement();
 
         Byte topicId = getTopicId(topic, true);
 
@@ -194,6 +209,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+        appendCount.getAndDecrement();
         return offset;
     }
 
@@ -235,7 +251,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     @Override
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
 
-
+        getRangeCount.getAndIncrement();
 
 //        // todo 这一段代码是用来debug
 //        if(theThread == null) {
@@ -256,11 +272,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //            }
 //        }
 
-        try {
-            System.out.printf("%s,%d,%d\n", topic, queueId, metaInfo.get(getTopicId(topic, false)).get((short) queueId).size());
-        }catch (Exception e) {
-            System.out.println("--");
-        }
+//        try {
+//            System.out.printf("%s,%d,%d\n", topic, queueId, metaInfo.get(getTopicId(topic, false)).get((short) queueId).size());
+//        }catch (Exception e) {
+//            System.out.println("--");
+//        }
 
 
         GetRangeTask task = getTask(Thread.currentThread());
@@ -271,9 +287,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-
-
-
+        getRangeCount.getAndDecrement();
 
         return task.getResult();
     }

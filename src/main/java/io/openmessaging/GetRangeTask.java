@@ -43,7 +43,8 @@ class GetRangeTask {
                 return ;
             }
 
-            for (int i = 0; i < fetchNum && (i + offset) < queueInfo.size(); i++) {
+            int tmp, n = fetchNum < (tmp = queueInfo.size() - (int)offset) ? fetchNum: tmp;
+            for (int i = 0; i < n; i++) {
                 long[] p = queueInfo.get(i + (int) offset);
                 ByteBuffer buf = buffers[i];
                 buf.clear();

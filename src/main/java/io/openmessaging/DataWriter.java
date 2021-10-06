@@ -33,7 +33,6 @@ public class DataWriter {
                 Thread.sleep(400);
                 minMergeCount = Math.max(Thread.activeCount() - DefaultMessageQueueImpl.initThreadCount - 5,
                         minMergeCount);
-                System.out.println("minMergeCount: " + minMergeCount);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
