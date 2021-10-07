@@ -58,7 +58,7 @@ public class DataWriter {
                                 break;
                             }
                         }
-                    } while (mergedData.getCount() < minMergeCount);
+                    } while (mergedData.getCount() < 3);
                     mergedDataQueue.offer(mergedData);
                 }
             } catch (InterruptedException e) {
