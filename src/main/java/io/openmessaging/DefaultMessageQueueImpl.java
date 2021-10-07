@@ -20,7 +20,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
     public static final int DATA_INFORMATION_LENGTH = 9;
-    public static final long KILL_SELF_TIMEOUT = 2 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 5 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 1000;  // 微秒
     public static final int WRITE_THREAD_COUNT = 5;
     public static final int READ_THREAD_COUNT = 20;
@@ -107,7 +107,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         byte[] data = "hello".getBytes();
         int size = data.length;
         // block allocation (transactional allocation)
-        MemoryBlock newBlock = h.allocateMemoryBlock(15*1024*1024*1024L, false);
+        MemoryBlock newBlock = h.allocateMemoryBlock(25*1024*1024*1024L, false);
         //Attached the newBllock to the root address
         h.setRoot(newBlock.handle());
         // Write byte array (input) to newBlock @ offset 0 (on both) for 26 bytes
