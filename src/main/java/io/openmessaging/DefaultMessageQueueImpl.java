@@ -20,7 +20,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
     public static final int DATA_INFORMATION_LENGTH = 9;
-    public static final long KILL_SELF_TIMEOUT = 10;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 2 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 1000;  // 微秒
     public static final int WRITE_THREAD_COUNT = 5;
     public static final int READ_THREAD_COUNT = 20;
@@ -99,6 +99,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
     void test_llpl(){
+        log.debug("开始");
         boolean initialized = Heap.exists(PMEM_ROOT + "/persistent_heap");
 
         Heap h = initialized ? Heap.openHeap(PMEM_ROOT + "/persistent_heap") : Heap.createHeap(PMEM_ROOT + "/persistent_heap", 60*1024*1024*1024L);
@@ -127,6 +128,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         data = new byte[128];
         newBlock.copyToArray(1, data, 0, 19);
         System.out.printf("\nRead the (%s) string from persistent-memory.\n",new String(data, 0, 9));
+        log.debug("结束");
         System.exit(-1);
 
     }
@@ -150,7 +152,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
         init();
         killSelf(KILL_SELF_TIMEOUT);
+
         test_llpl();
+
 //        logThreadCount();
         // 阻止数据恢复，不知道为什么不起作用
         if(getTotalFileSize()>0){
