@@ -59,7 +59,7 @@ public class DataWriter {
                                 break;
                             }
                         }
-                    } while (mergedData.getCount() < 3 && loopCount < 5);
+                    } while (mergedData.getCount() < 3 && loopCount < 10);
                     loopCount = 0;
                     mergedDataQueue.offer(mergedData);
                 }
