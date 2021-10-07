@@ -150,7 +150,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
         init();
         killSelf(KILL_SELF_TIMEOUT);
-        test_llpl()
+        test_llpl();
 //        logThreadCount();
         // 阻止数据恢复，不知道为什么不起作用
         if(getTotalFileSize()>0){
