@@ -39,6 +39,7 @@ public class DataWriter {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
+            minMergeCount /= DefaultMessageQueueImpl.WRITE_THREAD_COUNT;
 
 
             try {
@@ -48,7 +49,7 @@ public class DataWriter {
                     mergedData = freeMergedDataQueue.take();
                     mergedData.reset();
                     do {
-                        for (int i = 0; i < minMergeCount / DefaultMessageQueueImpl.WRITE_THREAD_COUNT; i++) {
+                        for (int i = 0; i < minMergeCount; i++) {
                             wrappedData = wrappedDataQueue.poll(DefaultMessageQueueImpl.WAITE_DATA_TIMEOUT,
                                     TimeUnit.MICROSECONDS);
                             if (wrappedData != null) {
@@ -57,7 +58,7 @@ public class DataWriter {
                                 break;
                             }
                         }
-                    } while (mergedData.getCount() == 0);
+                    } while (mergedData.getCount() < minMergeCount);
                     mergedDataQueue.offer(mergedData);
                 }
             } catch (InterruptedException e) {
