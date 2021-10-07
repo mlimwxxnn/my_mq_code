@@ -103,24 +103,30 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         Heap h = initialized ? Heap.openHeap(PMEM_ROOT + "/persistent_heap") : Heap.createHeap(PMEM_ROOT + "/persistent_heap", 60*1024*1024*1024L);
 
-        byte[] data = "hello world".getBytes();
+        byte[] data = "hello".getBytes();
         int size = data.length;
-
         // block allocation (transactional allocation)
         MemoryBlock newBlock = h.allocateMemoryBlock(size, false);
-
         //Attached the newBllock to the root address
         h.setRoot(newBlock.handle());
-
         // Write byte array (input) to newBlock @ offset 0 (on both) for 26 bytes
         newBlock.copyFromArray(data, 0, 0, size);
-
         //Ensure that the array (input) is in persistent memory
         newBlock.flush();
-
         //Convert byte array (input) to String format and write to console
         System.out.printf("\nWrite the (%s) string to persistent-memory.\n",new String(data));
 
+
+        data = "world".getBytes();
+        size = data.length;
+        newBlock.copyFromArray(data, 0, 5, size);
+        newBlock.flush();
+        System.out.printf("\nWrite the (%s) string to persistent-memory.\n",new String(data));
+
+
+        data = new byte[128];
+        newBlock.copyToArray(1, data, 0, 19);
+        System.out.printf("\nRead the (%s) string from persistent-memory.\n",new String(data, 0, 9));
         System.exit(0);
 
     }
@@ -145,7 +151,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         init();
         killSelf(KILL_SELF_TIMEOUT);
 
-        logThreadCount();
+//        logThreadCount();
         // 阻止数据恢复，不知道为什么不起作用
         if(getTotalFileSize()>0){
             System.exit(0);
