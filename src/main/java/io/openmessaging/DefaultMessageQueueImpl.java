@@ -106,7 +106,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         byte[] data = "hello".getBytes();
         int size = data.length;
         // block allocation (transactional allocation)
-        MemoryBlock newBlock = h.allocateMemoryBlock(size, false);
+        MemoryBlock newBlock = h.allocateMemoryBlock(60*1024*1024*1024L, false);
         //Attached the newBllock to the root address
         h.setRoot(newBlock.handle());
         // Write byte array (input) to newBlock @ offset 0 (on both) for 26 bytes
@@ -200,7 +200,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     AtomicInteger getRangeCount = new AtomicInteger();
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
-        appendCount.getAndIncrement();
+//        appendCount.getAndIncrement();
 
         Byte topicId = getTopicId(topic, true);
 
@@ -215,7 +215,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        appendCount.getAndDecrement();
+//        appendCount.getAndDecrement();
         return offset;
     }
 
@@ -257,7 +257,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     @Override
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
 
-        getRangeCount.getAndIncrement();
+//        getRangeCount.getAndIncrement();
 
 //        // todo 这一段代码是用来debug
 //        if(theThread == null) {
@@ -293,7 +293,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        getRangeCount.getAndDecrement();
+//        getRangeCount.getAndDecrement();
 
         return task.getResult();
     }
