@@ -38,7 +38,7 @@ class GetRangeTask {
                 return;
             }
 
-            HashMap<Integer, long[]> queueInfo = DefaultMessageQueueImpl.metaInfo.get(topicId).get((short)queueId);
+            QueueInfo queueInfo = DefaultMessageQueueImpl.metaInfo.get(topicId).get((short)queueId);
             if(queueInfo == null){
                 return ;
             }

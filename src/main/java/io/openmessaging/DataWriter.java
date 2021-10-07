@@ -44,10 +44,12 @@ public class DataWriter {
             try {
                 WrappedData wrappedData;
                 MergedData mergedData;
+                int loopCount = 0;
                 while (true) {
                     mergedData = freeMergedDataQueue.take();
                     mergedData.reset();
                     do {
+                        loopCount ++;
                         for (int i = 0; i < minMergeCount; i++) {
                             wrappedData = wrappedDataQueue.poll(DefaultMessageQueueImpl.WAITE_DATA_TIMEOUT,
                                     TimeUnit.MICROSECONDS);
@@ -57,7 +59,8 @@ public class DataWriter {
                                 break;
                             }
                         }
-                    } while (mergedData.getCount() < 3);
+                    } while (mergedData.getCount() < 3 && loopCount < 5);
+                    loopCount = 0;
                     mergedDataQueue.offer(mergedData);
                 }
             } catch (InterruptedException e) {
@@ -87,9 +90,9 @@ public class DataWriter {
 
                         // 在内存中创建索引，并唤醒append的线程
                         metaList.forEach(metaData -> {
-                            metaData.getQueueInfo().put(metaData.getOffset(),
-                                    new long[]{metaData.getOffsetInMergedBuffer() + pos,
-                                            (writeThreadId << 32) | metaData.getDataLen()});
+                            metaData.getQueueInfo().set(metaData.getOffset(),
+                                    metaData.getOffsetInMergedBuffer() + pos,
+                                    (writeThreadId << 32) | metaData.getDataLen());
                             metaData.countDownLatch.countDown();
                         });
                         freeMergedDataQueue.offer(mergedData);

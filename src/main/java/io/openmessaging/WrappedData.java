@@ -8,7 +8,7 @@ public class WrappedData {
 
     private final ByteBuffer data;
 
-    public WrappedData(byte topicId, short queueId, ByteBuffer data, int offset, HashMap<Integer, long[]> queueInfo) {
+    public WrappedData(byte topicId, short queueId, ByteBuffer data, int offset, QueueInfo queueInfo) {
         this.meta = new MetaData(topicId, queueId, (short)data.remaining(), offset, queueInfo);
         this.data = data;
 

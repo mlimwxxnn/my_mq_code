@@ -9,10 +9,10 @@ public class MetaData {
     private final int offset;
     private long offsetInMergedBuffer;
     private final short dataLen;
-    private final HashMap<Integer, long[]> queueInfo;
+    private final QueueInfo queueInfo;
     public final CountDownLatch countDownLatch = new CountDownLatch(1);
 
-    public MetaData(byte topicId, short queueId, short dataLen, int offset, HashMap<Integer, long[]> queueInfo) {
+    public MetaData(byte topicId, short queueId, short dataLen, int offset, QueueInfo queueInfo) {
         this.topicId = topicId;
         this.queueId = queueId;
         this.dataLen = dataLen;
@@ -45,7 +45,7 @@ public class MetaData {
         return offset;
     }
 
-    public HashMap<Integer, long[]> getQueueInfo() {
+    public QueueInfo getQueueInfo() {
         return queueInfo;
     }
 }

@@ -27,7 +27,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static AtomicInteger topicCount = new AtomicInteger();
     static ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
-    public static volatile ConcurrentHashMap<Byte, HashMap<Short, HashMap<Integer, long[]>>> metaInfo;
+//    public static volatile ConcurrentHashMap<Byte, HashMap<Short, HashMap<Integer, long[]>>> metaInfo;
+    public static volatile ConcurrentHashMap<Byte, HashMap<Short, QueueInfo>> metaInfo;
     public static volatile Map<Thread, GetRangeTask> getRangeTaskMap = new ConcurrentHashMap<>();
     public static final FileChannel[] dataWriteChannels = new FileChannel[WRITE_THREAD_COUNT];
     public static DataWriter dataWriter;
@@ -180,7 +181,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         log.info("DefaultMessageQueueImpl 构造函数执行完成");
     }
 
-    public void powerFailureRecovery(ConcurrentHashMap<Byte, HashMap<Short, HashMap<Integer, long[]>>> metaInfo) {
+    public void powerFailureRecovery(ConcurrentHashMap<Byte, HashMap<Short, QueueInfo>> metaInfo) {
         for (int id = 0; id < dataWriteChannels.length; id++) {
             FileChannel channel = dataWriteChannels[id];
             ByteBuffer readBuffer = ByteBuffer.allocate(DATA_INFORMATION_LENGTH);
@@ -189,8 +190,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             short dataLen = 0;
             int offset;
             try {
-                HashMap<Short, HashMap<Integer, long[]>> topicInfo;
-                HashMap<Integer, long[]> queueInfo;
+                HashMap<Short, QueueInfo> topicInfo;
+                QueueInfo queueInfo;
                 long dataFilesize = channel.size();
                 while (channel.position() + dataLen < dataFilesize) {
                     channel.position(channel.position() + dataLen); // 跳过数据部分只读取数据头部的索引信息
@@ -204,9 +205,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     offset = readBuffer.getInt();
 
                     topicInfo = metaInfo.computeIfAbsent(topicId, k -> new HashMap<>(2000));
-                    queueInfo = topicInfo.computeIfAbsent(queueId, k -> new HashMap<>(80));
+                    queueInfo = topicInfo.computeIfAbsent(queueId, k -> new QueueInfo());
                     long groupIdAndDataLength = (((long) id) << 32) | dataLen;
-                    queueInfo.put(offset, new long[]{channel.position(), groupIdAndDataLength});
+                    queueInfo.set(offset, channel.position(), groupIdAndDataLength);
                 }
             } catch (Exception e) {
                 System.out.println("ignore exception while rectory");
@@ -224,8 +225,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         haveAppended = true;
         Byte topicId = getTopicId(topic, true);
 
-        HashMap<Short, HashMap<Integer, long[]>> topicInfo = metaInfo.computeIfAbsent(topicId, k -> new HashMap<>(2000));
-        HashMap<Integer, long[]> queueInfo = topicInfo.computeIfAbsent((short) queueId, k -> new HashMap<>(80));
+        HashMap<Short, QueueInfo> topicInfo = metaInfo.computeIfAbsent(topicId, k -> new HashMap<>(2000));
+        QueueInfo queueInfo = topicInfo.computeIfAbsent((short) queueId, k -> new QueueInfo());
         int offset = queueInfo.size();
 
         WrappedData wrappedData = new WrappedData(topicId, (short) queueId, data, offset, queueInfo);

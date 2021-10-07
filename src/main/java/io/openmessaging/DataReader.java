@@ -15,8 +15,9 @@ public class DataReader {
         for (int i = 0; i < DefaultMessageQueueImpl.READ_THREAD_COUNT; i++) {
             new Thread(()->{
                 try {
+                    GetRangeTask task;
                     while (true) {
-                        GetRangeTask task = getRangeTaskQueue.take();
+                        task = getRangeTaskQueue.take();
                         task.queryData();
                         task.countDownLatch.countDown();
                     }
