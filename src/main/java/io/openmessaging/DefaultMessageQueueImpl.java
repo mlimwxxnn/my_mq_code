@@ -107,7 +107,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         byte[] data = "hello".getBytes();
         int size = data.length;
         // block allocation (transactional allocation)
-        MemoryBlock newBlock = h.allocateMemoryBlock(17*1024*1024*1024L, false);
+        MemoryBlock newBlock = h.allocateMemoryBlock(16*1024*1024*1024L, false);
         //Attached the newBllock to the root address
         h.setRoot(newBlock.handle());
         // Write byte array (input) to newBlock @ offset 0 (on both) for 26 bytes
