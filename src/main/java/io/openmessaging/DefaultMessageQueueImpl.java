@@ -37,7 +37,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static void init() {
         try {
-            metaInfo = new ConcurrentHashMap<>();
+            metaInfo = new ConcurrentHashMap<>(100);
             dataReader = new DataReader();
             for (int i = 0; i < WRITE_THREAD_COUNT; i++) {
                 File file = new File(DISC_ROOT, "data-" + i);
@@ -102,7 +102,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         log.debug("开始");
         boolean initialized = Heap.exists(PMEM_ROOT + "/persistent_heap");
 
-        Heap h = initialized ? Heap.openHeap(PMEM_ROOT + "/persistent_heap") : Heap.createHeap(PMEM_ROOT + "/persistent_heap", 59*1024*1024*1024L);
+        Heap h = initialized ? Heap.openHeap(PMEM_ROOT + "/persistent_heap") : Heap.createHeap(PMEM_ROOT + "/persistent_heap", 60*1024*1024*1024L);
 
         byte[] data = "hello".getBytes();
         int size = data.length;
@@ -150,6 +150,18 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }).start();
     }
 
+    void showQueueLength(){
+        new Thread(()->{
+            while(true){
+                try {
+                    Thread.sleep(100);
+                    System.out.printf("%d,%d,%d\n", dataWriter.wrappedDataQueue.size(), dataWriter.freeMergeBufferQueue.size(), dataWriter.mergedDataQueue.size());
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        }).start();
+    }
     public DefaultMessageQueueImpl() {
         log.info("DefaultMessageQueueImpl 开始执行构造函数");
         DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./essd") : new File("/essd");
@@ -157,7 +169,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         init();
         killSelf(KILL_SELF_TIMEOUT);
 
-        test_llpl();
+        showQueueLength();
 
 //        logThreadCount();
         // 阻止数据恢复，不知道为什么不起作用
@@ -192,8 +204,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     dataLen = readBuffer.getShort();
                     offset = readBuffer.getInt();
 
-                    topicInfo = metaInfo.computeIfAbsent(topicId, k -> new HashMap<>(5000));
-                    queueInfo = topicInfo.computeIfAbsent(queueId, k -> new HashMap<>(64));
+                    topicInfo = metaInfo.computeIfAbsent(topicId, k -> new HashMap<>(2000));
+                    queueInfo = topicInfo.computeIfAbsent(queueId, k -> new HashMap<>(80));
                     long groupIdAndDataLength = (((long) id) << 32) | dataLen;
                     queueInfo.put(offset, new long[]{channel.position(), groupIdAndDataLength});
                 }
@@ -210,10 +222,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public long append(String topic, int queueId, ByteBuffer data) {
 //        appendCount.getAndIncrement();
 
+        haveAppended = true;
         Byte topicId = getTopicId(topic, true);
 
-        HashMap<Short, HashMap<Integer, long[]>> topicInfo = metaInfo.computeIfAbsent(topicId, k -> new HashMap<>());
-        HashMap<Integer, long[]> queueInfo = topicInfo.computeIfAbsent((short) queueId, k -> new HashMap<>(1000));
+        HashMap<Short, HashMap<Integer, long[]>> topicInfo = metaInfo.computeIfAbsent(topicId, k -> new HashMap<>(2000));
+        HashMap<Integer, long[]> queueInfo = topicInfo.computeIfAbsent((short) queueId, k -> new HashMap<>(80));
         int offset = queueInfo.size();
 
         WrappedData wrappedData = new WrappedData(topicId, (short) queueId, data, offset, queueInfo);
@@ -262,9 +275,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 //    final Object o = new Object();
 //    Thread theThread = null;
+    boolean haveAppended = false;
     @Override
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
 
+        if(!haveAppended){
+            System.exit(-1);
+        }
 //        getRangeCount.getAndIncrement();
 
 //        // todo 这一段代码是用来debug
