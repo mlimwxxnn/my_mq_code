@@ -106,7 +106,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         byte[] data = "hello".getBytes();
         int size = data.length;
         // block allocation (transactional allocation)
-        MemoryBlock newBlock = h.allocateMemoryBlock(50*1024*1024*1024L, false);
+        MemoryBlock newBlock = h.allocateMemoryBlock(30*1024*1024*1024L, false);
         //Attached the newBllock to the root address
         h.setRoot(newBlock.handle());
         // Write byte array (input) to newBlock @ offset 0 (on both) for 26 bytes
@@ -145,7 +145,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
     public DefaultMessageQueueImpl() {
-        log.info("DefaultMessageQueueImpl 开始构造");
+        log.info("DefaultMessageQueueImpl 开始执行构造函数");
         DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./essd") : new File("/essd");
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
         init();
@@ -158,7 +158,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }
         powerFailureRecovery(metaInfo);
         initThreadCount = Thread.activeCount();
-        log.info("DefaultMessageQueueImpl 构造完成");
+        log.info("DefaultMessageQueueImpl 构造函数执行完成");
     }
 
     public void powerFailureRecovery(ConcurrentHashMap<Byte, HashMap<Short, HashMap<Integer, long[]>>> metaInfo) {
