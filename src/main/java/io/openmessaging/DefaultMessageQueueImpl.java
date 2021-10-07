@@ -102,7 +102,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         log.debug("开始");
         boolean initialized = Heap.exists(PMEM_ROOT + "/persistent_heap");
 
-        Heap h = initialized ? Heap.openHeap(PMEM_ROOT + "/persistent_heap") : Heap.createHeap(PMEM_ROOT + "/persistent_heap", 600*1024*1024*1024L);
+        Heap h = initialized ? Heap.openHeap(PMEM_ROOT + "/persistent_heap") : Heap.createHeap(PMEM_ROOT + "/persistent_heap", 59*1024*1024*1024L);
 
         byte[] data = "hello".getBytes();
         int size = data.length;
