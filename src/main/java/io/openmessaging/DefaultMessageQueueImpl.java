@@ -102,7 +102,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         log.debug("开始");
         boolean initialized = Heap.exists(PMEM_ROOT + "/persistent_heap");
 
-        Heap h = initialized ? Heap.openHeap(PMEM_ROOT + "/persistent_heap") : Heap.createHeap(PMEM_ROOT + "/persistent_heap", 60*1024*1024*1024L);
+        Heap h = initialized ? Heap.openHeap(PMEM_ROOT + "/persistent_heap") : Heap.createHeap(PMEM_ROOT + "/persistent_heap", 600*1024*1024*1024L);
 
         byte[] data = "hello".getBytes();
         int size = data.length;
@@ -110,7 +110,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         MemoryBlock newBlock = h.allocateMemoryBlock(15*1024*1024*1024L, false);
         MemoryBlock newBlock2 = h.allocateMemoryBlock(15*1024*1024*1024L, false);
         MemoryBlock newBlock3 = h.allocateMemoryBlock(15*1024*1024*1024L, false);
-        MemoryBlock newBlock4 = h.allocateMemoryBlock(13*1024*1024*1024L, false);
+        MemoryBlock newBlock4 = h.allocateMemoryBlock(12*1024*1024*1024L, false);
 
         //Attached the newBllock to the root address
         h.setRoot(newBlock.handle());
