@@ -109,6 +109,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         // block allocation (transactional allocation)
         MemoryBlock newBlock = h.allocateMemoryBlock(15*1024*1024*1024L, false);
         MemoryBlock newBlock2 = h.allocateMemoryBlock(15*1024*1024*1024L, false);
+        MemoryBlock newBlock3 = h.allocateMemoryBlock(15*1024*1024*1024L, false);
+        MemoryBlock newBlock4 = h.allocateMemoryBlock(15*1024*1024*1024L, false);
 
         //Attached the newBllock to the root address
         h.setRoot(newBlock.handle());
