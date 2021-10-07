@@ -155,7 +155,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             while(true){
                 try {
                     Thread.sleep(100);
-                    System.out.printf("%d,%d,%d\n", dataWriter.wrappedDataQueue.size(), dataWriter.freeMergeBufferQueue.size(), dataWriter.mergedDataQueue.size());
+                    System.out.printf("%d,%d,%d\n", dataWriter.wrappedDataQueue.size(), dataWriter.freeMergedDataQueue.size(), dataWriter.mergedDataQueue.size());
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -169,7 +169,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         init();
         killSelf(KILL_SELF_TIMEOUT);
 
-        showQueueLength();
 
 //        logThreadCount();
         // 阻止数据恢复，不知道为什么不起作用
@@ -324,10 +323,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
     public static void main(String[] args) throws InterruptedException {
-        final int threadCount = 30;
+        final int threadCount = 5;
         final int topicCountPerThread = 3;  // threadCount * topicCountPerThread <= 100
         final int queueIdCountPerTopic = 5;
-        final int writeTimesPerQueueId = 10;
+        final int writeTimesPerQueueId = 3;
         ByteBuffer[][][] buffers = new ByteBuffer[threadCount][topicCountPerThread][queueIdCountPerTopic];
         DefaultMessageQueueImpl mq = new DefaultMessageQueueImpl();
 

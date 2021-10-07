@@ -5,25 +5,30 @@ import sun.misc.Unsafe;
 import sun.nio.ch.DirectBuffer;
 
 import java.nio.ByteBuffer;
-import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MergedData {
 
     final Unsafe unsafe = UnsafeUtil.unsafe;
-    private final HashSet<MetaData> metaSet = new HashSet<>();  // todo 这里可以设置一个初始容量
+    private final List<MetaData> metaList = new ArrayList<>(50);
     private final ByteBuffer mergedBuffer;
     private int count = 0;
 
+    public void reset(){
+        this.count = 0;
+        this.metaList.clear();
+        this.mergedBuffer.clear();
+    }
 
     public MergedData(ByteBuffer buffer) {
-        buffer.clear();
         this.mergedBuffer = buffer;
     }
 
     public void putData(WrappedData wrappedData) {
         count++;
         MetaData meta = wrappedData.getMeta();
-        metaSet.add(meta);
+        metaList.add(meta);
 
         // 放入数据的元信息，9 字节
         mergedBuffer.put(meta.getTopicId());
@@ -38,6 +43,10 @@ public class MergedData {
         mergedBuffer.position(mergedBuffer.position() + dataLen);
     }
 
+    public void putAllData(List<WrappedData> wrappedDataList) {
+        wrappedDataList.forEach(this::putData);
+    }
+
     public int getCount() {
         return this.count;
     }
@@ -47,7 +56,7 @@ public class MergedData {
         return this.mergedBuffer;
     }
 
-    public HashSet<MetaData> getMetaSet() {
-        return metaSet;
+    public List<MetaData> getMetaSet() {
+        return metaList;
     }
 }
