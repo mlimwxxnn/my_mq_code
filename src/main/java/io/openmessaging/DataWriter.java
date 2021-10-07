@@ -18,7 +18,8 @@ public class DataWriter {
 
     public DataWriter() {
         for (int i = 0; i < 50; i++) {
-            freeMergedDataQueue.offer(new MergedData(ByteBuffer.allocateDirect(50 * 18 * 1024))); // todo 这里也是先随便设置的，后面再调整
+            freeMergedDataQueue.offer(new MergedData(ByteBuffer.allocateDirect(50 * 18 * 1024))); // todo
+            // 这里也是先随便设置的，后面再调整
         }
         mergeData();
         writeData();
@@ -38,29 +39,23 @@ public class DataWriter {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            List<WrappedData> wrappedDataList = new ArrayList<>(50);
 
 
             try {
+                WrappedData wrappedData;
+                MergedData mergedData;
                 while (true) {
-                    MergedData mergedData = freeMergedDataQueue.take();
+                    mergedData = freeMergedDataQueue.take();
                     mergedData.reset();
                     do {
-//                        for (int i = 0; i < minMergeCount / DefaultMessageQueueImpl.WRITE_THREAD_COUNT; i++) {
-//                            WrappedData wrappedData = wrappedDataQueue.poll(DefaultMessageQueueImpl
-//                            .WAITE_DATA_TIMEOUT,
-//                                    TimeUnit.MICROSECONDS);
-//                            if (wrappedData != null) {
-//                                mergedData.putData(wrappedData);
-//                            } else {
-//                                break;
-//                            }
-//                        }
-                        wrappedDataQueue.drainTo(wrappedDataList);
-                        mergedData.putAllData(wrappedDataList);
-                        wrappedDataList.clear();
-                        if (mergedData.getCount() == 0) {
-                            Thread.sleep(1);
+                        for (int i = 0; i < minMergeCount / DefaultMessageQueueImpl.WRITE_THREAD_COUNT; i++) {
+                            wrappedData = wrappedDataQueue.poll(DefaultMessageQueueImpl.WAITE_DATA_TIMEOUT,
+                                    TimeUnit.MICROSECONDS);
+                            if (wrappedData != null) {
+                                mergedData.putData(wrappedData);
+                            } else {
+                                break;
+                            }
                         }
                     } while (mergedData.getCount() == 0);
                     mergedDataQueue.offer(mergedData);
