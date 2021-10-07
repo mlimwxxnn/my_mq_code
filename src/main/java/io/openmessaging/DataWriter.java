@@ -18,8 +18,7 @@ public class DataWriter {
 
     public DataWriter() {
         for (int i = 0; i < 50; i++) {
-            freeMergedDataQueue.offer(new MergedData(ByteBuffer.allocateDirect(50 * 18 * 1024))); // todo
-            // 这里也是先随便设置的，后面再调整
+            freeMergedDataQueue.offer(new MergedData(ByteBuffer.allocateDirect(50 * 18 * 1024)));
         }
         mergeData();
         writeData();
@@ -75,25 +74,25 @@ public class DataWriter {
                     FileChannel dataWriteChannel = DefaultMessageQueueImpl.dataWriteChannels[(int) writeThreadId];
                     MergedData mergedData;
                     ByteBuffer mergedBuffer;
-                    List<MetaData> metaSet;
+                    List<MetaData> metaList;
                     while (true) {
                         mergedData = mergedDataQueue.take();
                         mergedBuffer = mergedData.getMergedBuffer();
-                        metaSet = mergedData.getMetaSet();
+                        metaList = mergedData.getMetaSet();
 
                         // 数据写入文件
                         long pos = dataWriteChannel.position();
                         dataWriteChannel.write(mergedBuffer);
                         dataWriteChannel.force(true);
-                        freeMergedDataQueue.offer(mergedData);
 
                         // 在内存中创建索引，并唤醒append的线程
-                        metaSet.forEach(metaData -> {
+                        metaList.forEach(metaData -> {
                             metaData.getQueueInfo().put(metaData.getOffset(),
                                     new long[]{metaData.getOffsetInMergedBuffer() + pos,
                                             (writeThreadId << 32) | metaData.getDataLen()});
                             metaData.countDownLatch.countDown();
                         });
+                        freeMergedDataQueue.offer(mergedData);
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
