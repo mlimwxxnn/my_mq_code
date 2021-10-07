@@ -107,7 +107,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         byte[] data = "hello".getBytes();
         int size = data.length;
         // block allocation (transactional allocation)
-        MemoryBlock newBlock = h.allocateMemoryBlock(16*1024*1024*1024L, false);
+        MemoryBlock newBlock = h.allocateMemoryBlock(15*1024*1024*1024L, false);
+        MemoryBlock newBlock2 = h.allocateMemoryBlock(15*1024*1024*1024L, false);
+
         //Attached the newBllock to the root address
         h.setRoot(newBlock.handle());
         // Write byte array (input) to newBlock @ offset 0 (on both) for 26 bytes
@@ -120,13 +122,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         data = "world".getBytes();
         size = data.length;
-        newBlock.copyFromArray(data, 0, 5, size);
-        newBlock.flush();
+        newBlock2.copyFromArray(data, 0, 5, size);
+        newBlock2.flush();
         System.out.printf("\nWrite the (%s) string to persistent-memory.\n",new String(data));
 
 
         data = new byte[128];
-        newBlock.copyToArray(1, data, 0, 19);
+        newBlock2.copyToArray(1, data, 0, 19);
         System.out.printf("\nRead the (%s) string from persistent-memory.\n",new String(data, 0, 9));
         log.debug("结束");
         System.exit(-1);
