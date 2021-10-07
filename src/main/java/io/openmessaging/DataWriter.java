@@ -11,9 +11,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 public class DataWriter {
-    public final LinkedBlockingQueue<WrappedData> wrappedDataQueue = new LinkedBlockingQueue<>();
-    public final LinkedBlockingQueue<MergedData> mergedDataQueue = new LinkedBlockingQueue<>();
-    public final LinkedBlockingQueue<MergedData> freeMergedDataQueue = new LinkedBlockingQueue<>();
+    public final BlockingQueue<WrappedData> wrappedDataQueue = new ArrayBlockingQueue<>(50);
+    public final BlockingQueue<MergedData> mergedDataQueue = new ArrayBlockingQueue<>(50);
+    public final BlockingQueue<MergedData> freeMergedDataQueue = new ArrayBlockingQueue<>(50);
     final Unsafe unsafe = UnsafeUtil.unsafe;
 
     public DataWriter() {
