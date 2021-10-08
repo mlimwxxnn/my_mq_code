@@ -54,9 +54,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 }
                 dataWriteChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
             }
-            init_pmem();
             dataWriter = new DataWriter();
             pmemDataWriter = new PmemDataWriter();
+            init_pmem();
         }catch(IOException e){
             e.printStackTrace();
         }
