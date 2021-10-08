@@ -8,17 +8,26 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.Semaphore;
+
+import static io.openmessaging.DefaultMessageQueueImpl.PMEM_ROOT;
 
 
 public class Test {
 
+    static void f(int a, int b){
+        System.out.println(a);
+        System.out.println(b);
+    }
+
     public static void main(String args[]) throws InterruptedException, IOException {
-        QueueInfo qi = new QueueInfo();
-        qi.set(499, 34, 56);
-        qi.set(500, 33, 56);
-        qi.set(1000, 3, 8);
-        System.out.println(qi.size());
-        System.out.println(Arrays.toString(qi.get(499)));
-        System.out.println(Arrays.toString(qi.get(500)));
+        Semaphore a = new Semaphore(0);
+        a.release(10);
+        a.acquire();
+        a.acquire();
+        System.out.println(a.tryAcquire(8));
+        a.acquire();
+        System.out.println("hello world");
+
     }
 }

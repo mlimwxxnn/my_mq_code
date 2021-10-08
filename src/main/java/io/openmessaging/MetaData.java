@@ -10,7 +10,7 @@ public class MetaData {
     private long offsetInMergedBuffer;
     private final short dataLen;
     private final QueueInfo queueInfo;
-    public final CountDownLatch countDownLatch = new CountDownLatch(1);
+    private final CountDownLatch countDownLatch = new CountDownLatch(2);
 
     public MetaData(byte topicId, short queueId, short dataLen, int offset, QueueInfo queueInfo) {
         this.topicId = topicId;
@@ -47,5 +47,9 @@ public class MetaData {
 
     public QueueInfo getQueueInfo() {
         return queueInfo;
+    }
+
+    public CountDownLatch getCountDownLatch() {
+        return countDownLatch;
     }
 }

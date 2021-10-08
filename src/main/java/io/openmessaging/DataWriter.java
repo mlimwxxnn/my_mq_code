@@ -86,10 +86,10 @@ public class DataWriter {
 
                         // 在内存中创建索引，并唤醒append的线程
                         metaList.forEach(metaData -> {
-                            metaData.getQueueInfo().set(metaData.getOffset(),
+                            metaData.getQueueInfo().setDataPosInFile(metaData.getOffset(),
                                     metaData.getOffsetInMergedBuffer() + pos,
                                     (writeThreadId << 32) | metaData.getDataLen());
-                            metaData.countDownLatch.countDown();
+                            metaData.getCountDownLatch().countDown();
                         });
                         freeMergedDataQueue.offer(mergedData);
                     }

@@ -24,6 +24,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final long WAITE_DATA_TIMEOUT = 1000;  // 微秒
     public static final int WRITE_THREAD_COUNT = 5;
     public static final int READ_THREAD_COUNT = 20;
+    public static final int PMEM_PAGE_SIZE = 2 * 1024;
+    public static final int PMEM_BLOCK_COUNT = 4;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     static ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
@@ -34,6 +36,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static DataWriter dataWriter;
     public static DataReader dataReader;
     public static int initThreadCount = 0;
+    public static PmemDataWriter pmemDataWriter;
 
 
     public static void init() {
@@ -51,7 +54,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 }
                 dataWriteChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
             }
+            init_pmem();
             dataWriter = new DataWriter();
+            pmemDataWriter = new PmemDataWriter();
         }catch(IOException e){
             e.printStackTrace();
         }
@@ -70,13 +75,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
     public static GetRangeTask getTask(Thread thread) {
-        GetRangeTask context = getRangeTaskMap.get(thread);
-        if (context != null) {
-            return context;
+        GetRangeTask task = getRangeTaskMap.get(thread);
+        if (task != null) {
+            return task;
         }
-        context = new GetRangeTask();
-        getRangeTaskMap.put(thread, context);
-        return context;
+        task = new GetRangeTask();
+        getRangeTaskMap.put(thread, task);
+        return task;
     }
 
     public static void killSelf(long timeout) {
@@ -99,70 +104,20 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }).start();
     }
 
-    void test_llpl(){
-        log.debug("开始");
+
+    private static void init_pmem(){
         boolean initialized = Heap.exists(PMEM_ROOT + "/persistent_heap");
-
         Heap h = initialized ? Heap.openHeap(PMEM_ROOT + "/persistent_heap") : Heap.createHeap(PMEM_ROOT + "/persistent_heap", 60*1024*1024*1024L);
-
-        byte[] data = "hello".getBytes();
-        int size = data.length;
-        // block allocation (transactional allocation)
-        MemoryBlock newBlock = h.allocateMemoryBlock(15*1024*1024*1024L, false);
-        MemoryBlock newBlock2 = h.allocateMemoryBlock(15*1024*1024*1024L, false);
-        MemoryBlock newBlock3 = h.allocateMemoryBlock(15*1024*1024*1024L, false);
-        MemoryBlock newBlock4 = h.allocateMemoryBlock(12*1024*1024*1024L, false);
-
-        //Attached the newBllock to the root address
-        h.setRoot(newBlock.handle());
-        // Write byte array (input) to newBlock @ offset 0 (on both) for 26 bytes
-        newBlock.copyFromArray(data, 0, 0, size);
-        //Ensure that the array (input) is in persistent memory
-        newBlock.flush();
-        //Convert byte array (input) to String format and write to console
-        System.out.printf("\nWrite the (%s) string to persistent-memory.\n",new String(data));
-
-
-        data = "world".getBytes();
-        size = data.length;
-        newBlock2.copyFromArray(data, 0, 5, size);
-        newBlock2.flush();
-        System.out.printf("\nWrite the (%s) string to persistent-memory.\n",new String(data));
-
-
-        data = new byte[128];
-        newBlock2.copyToArray(1, data, 0, 19);
-        System.out.printf("\nRead the (%s) string from persistent-memory.\n",new String(data, 0, 9));
-        log.debug("结束");
-        System.exit(-1);
-
-    }
-
-    void logThreadCount(){
-        new Thread(()->{
-            while(true){
-                try {
-                    Thread.sleep(10);
-                    System.out.printf("%d,%d\n", appendCount.get(), getRangeCount.get());
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+        MemoryBlock newBlock;
+        for (int i = 0; i < PMEM_BLOCK_COUNT; i++) {  // 创建pmem存储块
+            newBlock = h.allocateMemoryBlock(57*1024*1024*1024L / PMEM_BLOCK_COUNT, false);  // todo 就当总内存是57G吧
+            pmemDataWriter.memoryBlocks[i] = newBlock;
+            for (int j = 0; j < 57*1024*1024*1024L / PMEM_BLOCK_COUNT / PMEM_PAGE_SIZE; j++) {
+                pmemDataWriter.offerFreePage(new PmemPageInfo((byte)i, j)); // 对创建的内存块进行划分
             }
-        }).start();
+        }
     }
 
-    void showQueueLength(){
-        new Thread(()->{
-            while(true){
-                try {
-                    Thread.sleep(100);
-                    System.out.printf("%d,%d,%d\n", dataWriter.wrappedDataQueue.size(), dataWriter.freeMergedDataQueue.size(), dataWriter.mergedDataQueue.size());
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-        }).start();
-    }
     public DefaultMessageQueueImpl() {
         log.info("DefaultMessageQueueImpl 开始执行构造函数");
         DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./essd") : new File("/essd");
@@ -207,7 +162,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     topicInfo = metaInfo.computeIfAbsent(topicId, k -> new HashMap<>(2000));
                     queueInfo = topicInfo.computeIfAbsent(queueId, k -> new QueueInfo());
                     long groupIdAndDataLength = (((long) id) << 32) | dataLen;
-                    queueInfo.set(offset, channel.position(), groupIdAndDataLength);
+                    queueInfo.setDataPosInFile(offset, channel.position(), groupIdAndDataLength);
                 }
             } catch (Exception e) {
                 System.out.println("ignore exception while rectory");
@@ -216,11 +171,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
 
-    AtomicInteger appendCount = new AtomicInteger();
-    AtomicInteger getRangeCount = new AtomicInteger();
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
-//        appendCount.getAndIncrement();
 
         haveAppended = true;
         System.out.println(data.remaining());
@@ -232,12 +184,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         WrappedData wrappedData = new WrappedData(topicId, (short) queueId, data, offset, queueInfo);
         dataWriter.pushWrappedData(wrappedData);
+        pmemDataWriter.pushWrappedData(wrappedData);
         try {
-            wrappedData.getMeta().countDownLatch.await();
+            wrappedData.getMeta().getCountDownLatch().await();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-//        appendCount.getAndDecrement();
         return offset;
     }
 
@@ -274,8 +226,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         return topicId;
     }
 
-//    final Object o = new Object();
-//    Thread theThread = null;
+
     boolean haveAppended = false;
     @Override
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
@@ -283,43 +234,16 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         if(!haveAppended){
             System.exit(-1);
         }
-//        getRangeCount.getAndIncrement();
-
-//        // todo 这一段代码是用来debug
-//        if(theThread == null) {
-//            synchronized (o) {
-//                if (theThread == null) {
-//                    theThread = Thread.currentThread();
-//                    log.debug("topic,queueId,offset,fetchNum,queueLen");
-//                }
-//            }
-//        }
-
-
-//        if(Thread.currentThread() == theThread) {
-//            try {
-//                log.debug("{}\t{}\t{}\t{}\t{}", topic, queueId, offset, fetchNum, metaInfo.get(getTopicId(topic, false)).get((short)queueId).size());
-//            }catch (Exception e){
-//                e.printStackTrace();
-//            }
-//        }
-
-//        try {
-//            System.out.printf("%s,%d,%d\n", topic, queueId, metaInfo.get(getTopicId(topic, false)).get((short) queueId).size());
-//        }catch (Exception e) {
-//            System.out.println("--");
-//        }
 
 
         GetRangeTask task = getTask(Thread.currentThread());
         task.setGetRangeParameter(topic, queueId, offset, fetchNum);
         dataReader.pushTask(task);
         try {
-            task.countDownLatch.await();
+            task.getCountDownLatch().await();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-//        getRangeCount.getAndDecrement();
 
         return task.getResult();
     }

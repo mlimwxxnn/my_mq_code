@@ -19,7 +19,7 @@ public class DataReader {
                     while (true) {
                         task = getRangeTaskQueue.take();
                         task.queryData();
-                        task.countDownLatch.countDown();
+                        task.getCountDownLatch().countDown();
                     }
                 }catch (InterruptedException e){
                     e.printStackTrace();
