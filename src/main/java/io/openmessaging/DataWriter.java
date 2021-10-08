@@ -1,21 +1,16 @@
 package io.openmessaging;
 
-import sun.misc.Unsafe;
-
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 public class DataWriter {
-    public final BlockingQueue<WrappedData> wrappedDataQueue = new ArrayBlockingQueue<>(50);
-    public final BlockingQueue<MergedData> mergedDataQueue = new ArrayBlockingQueue<>(50);
-    public final BlockingQueue<MergedData> freeMergedDataQueue = new ArrayBlockingQueue<>(50);
-    final Unsafe unsafe = UnsafeUtil.unsafe;
+    public final BlockingQueue<WrappedData> wrappedDataQueue = new LinkedBlockingQueue<>(50);
+    public final BlockingQueue<MergedData> mergedDataQueue = new LinkedBlockingQueue<>(50);
+    public final BlockingQueue<MergedData> freeMergedDataQueue = new LinkedBlockingQueue<>(50);
 
     public DataWriter() {
         for (int i = 0; i < 50; i++) {

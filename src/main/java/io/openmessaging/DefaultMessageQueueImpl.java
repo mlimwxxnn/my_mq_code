@@ -223,6 +223,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //        appendCount.getAndIncrement();
 
         haveAppended = true;
+        System.out.println(data.remaining());
         Byte topicId = getTopicId(topic, true);
 
         HashMap<Short, QueueInfo> topicInfo = metaInfo.computeIfAbsent(topicId, k -> new HashMap<>(2000));
