@@ -117,9 +117,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         Heap h = initialized ? Heap.openHeap(PMEM_ROOT + "/persistent_heap") : Heap.createHeap(PMEM_ROOT + "/persistent_heap", 60*1024*1024*1024L);
         MemoryBlock newBlock;
         for (int i = 0; i < PMEM_BLOCK_COUNT; i++) {  // 创建pmem存储块
-            newBlock = h.allocateMemoryBlock(54*1024*1024*1024L / PMEM_BLOCK_COUNT, false);
+            newBlock = h.allocateMemoryBlock(40*1024*1024*1024L / PMEM_BLOCK_COUNT, false);
             PmemDataWriter.memoryBlocks[i] = newBlock;
-            for (int j = 0; j < 54*1024*1024*1024L / PMEM_BLOCK_COUNT / PMEM_PAGE_SIZE; j++) {
+            for (int j = 0; j < 40*1024*1024*1024L / PMEM_BLOCK_COUNT / PMEM_PAGE_SIZE; j++) {
                 pmemDataWriter.offerFreePage(new PmemPageInfo((byte)i, j)); // 对创建的内存块进行划分
             }
         }
