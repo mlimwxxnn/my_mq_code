@@ -1,6 +1,7 @@
 package io.openmessaging;
 
 import com.intel.pmem.llpl.Heap;
+import io.openmessaging.info.QueueInfo;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -21,6 +22,8 @@ public class Test {
     }
 
     public static void main(String args[]) throws InterruptedException, IOException {
-
+        QueueInfo queueInfo = new QueueInfo();
+        queueInfo.setDataPosInFile(200, 3, 2);
+        System.out.println("hel");
     }
 }

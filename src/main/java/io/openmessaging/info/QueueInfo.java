@@ -26,23 +26,30 @@ public class QueueInfo {
 
     private void ensureCapacity(int index){ // todo 这里后面还要给其他数组扩容
         if(index >= capacity){
-            capacity = index * 2;
-            long[][] newDataInfo = new long[capacity][2];
-            boolean[] newIsInPmem = new boolean[capacity];
-            PmemPageInfo[][] newPmemPageInfos = new PmemPageInfo[capacity][];
+            synchronized (this) {
+                if (index >= capacity) {
+                    capacity = index * 2;
+                    long[][] newDataInfo = new long[capacity][2];
+                    boolean[] newIsInPmem = new boolean[capacity];
+                    PmemPageInfo[][] newPmemPageInfos = new PmemPageInfo[capacity][];
 
-            arraycopy(dataInfo, 0, newDataInfo, 0, maxIndex + 1);
-            arraycopy(isInPmem, 0, newIsInPmem, 0, maxIndex + 1);
-            arraycopy(pmemPageInfos, 0, newPmemPageInfos, 0, maxIndex + 1);
+                    arraycopy(dataInfo, 0, newDataInfo, 0, maxIndex + 1);
+                    arraycopy(isInPmem, 0, newIsInPmem, 0, maxIndex + 1);
+                    arraycopy(pmemPageInfos, 0, newPmemPageInfos, 0, maxIndex + 1);
 
-            this.dataInfo = newDataInfo;
-            this.isInPmem = newIsInPmem;
-            this.pmemPageInfos = newPmemPageInfos;
+                    this.dataInfo = newDataInfo;
+                    this.isInPmem = newIsInPmem;
+                    this.pmemPageInfos = newPmemPageInfos;
+                }
+            }
         }
     }
 
     public void setDataPosInPmem(int i, PmemPageInfo[] pmemPageInfo){
         ensureCapacity(i);
+        if(i > maxIndex){
+            maxIndex = i;
+        }
         pmemPageInfos[i] = pmemPageInfo;
         isInPmem[i] = true;
     }
