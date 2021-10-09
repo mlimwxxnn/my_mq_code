@@ -28,7 +28,7 @@ public class PmemDataWriter {
     }
 
     private void writeDataToPmem() {
-        for (int i = 0; i < PMEM_WRITE_THREAD_COUNT; i++) {
+        for (int t = 0; t < PMEM_WRITE_THREAD_COUNT; t++) {
             new Thread(() -> {
                 try {
                     WrappedData wrappedData;
