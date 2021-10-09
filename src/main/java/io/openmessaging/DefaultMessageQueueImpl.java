@@ -11,6 +11,7 @@ import io.openmessaging.writer.PmemDataWriter;
 import io.openmessaging.writer.SsdDataWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sun.security.provider.PolicySpiFile;
 
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -34,6 +35,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int PMEM_WRITE_THREAD_COUNT = 4;
     public static final int PMEM_PAGE_SIZE = 2 * 1024;
     public static final int PMEM_BLOCK_COUNT = 8;
+    public static final long PMEM_HEAP_SIZE = 59 * 1024 * 1024 * 1024L;
+    public static final long PMEM_TOTAL_BLOCK_SIZE = 45 * 1024 * 1024 * 1024L;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     static ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
@@ -115,12 +118,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     private static void initPmem(){
         boolean initialized = Heap.exists(PMEM_ROOT + "/persistent_heap");
-        Heap h = initialized ? Heap.openHeap(PMEM_ROOT + "/persistent_heap") : Heap.createHeap(PMEM_ROOT + "/persistent_heap", 59*1024*1024*1024L);
+        Heap h = initialized ? Heap.openHeap(PMEM_ROOT + "/persistent_heap") : Heap.createHeap(PMEM_ROOT + "/persistent_heap", PMEM_HEAP_SIZE);
         MemoryBlock newBlock;
         for (int i = 0; i < PMEM_BLOCK_COUNT; i++) {  // 创建pmem存储块
-            newBlock = h.allocateMemoryBlock(50*1024*1024*1024L / PMEM_BLOCK_COUNT, false);
+            newBlock = h.allocateMemoryBlock(PMEM_TOTAL_BLOCK_SIZE / PMEM_BLOCK_COUNT, false);
             PmemDataWriter.memoryBlocks[i] = newBlock;
-            for (int j = 0; j < 50*1024*1024*1024L / PMEM_BLOCK_COUNT / PMEM_PAGE_SIZE; j++) {
+            for (int j = 0; j < PMEM_TOTAL_BLOCK_SIZE / PMEM_BLOCK_COUNT / PMEM_PAGE_SIZE; j++) {
                 pmemDataWriter.offerFreePage(new PmemPageInfo((byte)i, j)); // 对创建的内存块进行划分
             }
         }
