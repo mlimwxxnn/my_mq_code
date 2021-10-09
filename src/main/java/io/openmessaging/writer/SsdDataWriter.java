@@ -95,6 +95,7 @@ public class SsdDataWriter {
                                     metaData.getOffsetInMergedBuffer() + pos,
                                     (writeThreadId << 32) | metaData.getDataLen());
                             metaData.getCountDownLatch().countDown();
+                            System.out.println("写入文件处的countdown");
                         });
                         freeMergedDataQueue.offer(mergedData);
                     }

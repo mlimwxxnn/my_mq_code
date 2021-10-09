@@ -60,6 +60,7 @@ public class PmemDataWriter {
                         queueInfo.setDataPosInPmem(meta.getOffset(), pmemPageInfos);
                     }
                     meta.getCountDownLatch().countDown();
+                    System.out.println("pmem处的countdown");
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();
