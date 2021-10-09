@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class DefaultMessageQueueImpl extends MessageQueue {
 
-    private static final Logger log = LoggerFactory.getLogger("myLogger");
+    public static final Logger log = LoggerFactory.getLogger("myLogger");
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
     public static final int DATA_INFORMATION_LENGTH = 9;

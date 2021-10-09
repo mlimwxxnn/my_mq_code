@@ -11,8 +11,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 
-import static io.openmessaging.DefaultMessageQueueImpl.PMEM_BLOCK_COUNT;
-import static io.openmessaging.DefaultMessageQueueImpl.PMEM_PAGE_SIZE;
+import static io.openmessaging.DefaultMessageQueueImpl.*;
 
 public class PmemDataWriter {
     public static MemoryBlock[] memoryBlocks = new MemoryBlock[PMEM_BLOCK_COUNT];
@@ -40,6 +39,7 @@ public class PmemDataWriter {
                 int requiredPageCount;
                 while (true) {
                     wrappedData = pmemWrappedDataQueue.take();
+                    log.debug("pmem拿到数据");
                     meta = wrappedData.getMeta();
                     requiredPageCount = (meta.getDataLen() + PMEM_PAGE_SIZE - 1) / PMEM_PAGE_SIZE; // 向上取整
                     if (freePageCount.tryAcquire(requiredPageCount)) {
@@ -61,6 +61,7 @@ public class PmemDataWriter {
                         queueInfo.setDataPosInPmem(meta.getOffset(), pmemPageInfos);
                     }
                     meta.getCountDownLatch().countDown();
+                    log.debug("pmem处理完数据");
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();
