@@ -117,9 +117,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 //        logThreadCount();
         // 阻止数据恢复，不知道为什么不起作用
-        if(getTotalFileSize()>0){
-            System.exit(-1);
-        }
+//        if(getTotalFileSize()>0){
+//            System.exit(-1);
+//        }
         powerFailureRecovery(metaInfo);
         initThreadCount = Thread.activeCount();
         log.info("DefaultMessageQueueImpl 构造函数执行完成");
