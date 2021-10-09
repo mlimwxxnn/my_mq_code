@@ -25,7 +25,7 @@ public class GetRangeTaskData {
 
     public GetRangeTaskData() {
         for (int i = 0; i < buffers.length; i++) {
-            buffers[i] = ByteBuffer.allocateDirect(17 * 1024);
+            buffers[i] = ByteBuffer.allocate(17 * 1024);
         }
     }
 
@@ -73,15 +73,14 @@ public class GetRangeTaskData {
                     DefaultMessageQueueImpl.dataWriteChannels[id].read(buf, p[0]);
                     buf.flip();
                 } else {
-                    int pageCount = (dataLen + PMEM_PAGE_SIZE - 1) / PMEM_PAGE_SIZE; // 向上取整
                     PmemPageInfo[] pmemPageInfos = queueInfo.getDataPosInPmem(i + (int) offset);
                     byte[] bufArray = buf.array();
                     for (int j = 0; j < pmemPageInfos.length - 1; j++) {
-                        memoryBlocks[pmemPageInfos[j].getBlockId()].copyToArray(pmemPageInfos[j].getPageIndex() * PMEM_PAGE_SIZE, bufArray, j * PMEM_PAGE_SIZE, PMEM_PAGE_SIZE);
+                        memoryBlocks[pmemPageInfos[j].getBlockId()].copyToArray((long)pmemPageInfos[j].getPageIndex() * PMEM_PAGE_SIZE, bufArray, j * PMEM_PAGE_SIZE, PMEM_PAGE_SIZE);
                         pmemDataWriter.offerFreePage(pmemPageInfos[j]);
                     }
                     int j = pmemPageInfos.length - 1;
-                    memoryBlocks[pmemPageInfos[j].getBlockId()].copyToArray(pmemPageInfos[j].getPageIndex() * PMEM_PAGE_SIZE, bufArray, j * PMEM_PAGE_SIZE, dataLen - PMEM_PAGE_SIZE * (pmemPageInfos.length - 1));
+                    memoryBlocks[pmemPageInfos[j].getBlockId()].copyToArray((long)pmemPageInfos[j].getPageIndex() * PMEM_PAGE_SIZE, bufArray, j * PMEM_PAGE_SIZE, dataLen - PMEM_PAGE_SIZE * (pmemPageInfos.length - 1));
                     pmemDataWriter.offerFreePage(pmemPageInfos[j]);
                 }
                 result.put(i, buf);

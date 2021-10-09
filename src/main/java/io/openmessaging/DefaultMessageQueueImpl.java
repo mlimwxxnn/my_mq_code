@@ -85,13 +85,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
     public static GetRangeTaskData getTask(Thread thread) {
-        GetRangeTaskData task = getRangeTaskMap.get(thread);
-        if (task != null) {
-            return task;
-        }
-        task = new GetRangeTaskData();
-        getRangeTaskMap.put(thread, task);
-        return task;
+        return getRangeTaskMap.computeIfAbsent(thread, k -> new GetRangeTaskData());
     }
 
     public static void killSelf(long timeout) {
