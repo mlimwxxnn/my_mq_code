@@ -117,9 +117,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         Heap h = initialized ? Heap.openHeap(PMEM_ROOT + "/persistent_heap") : Heap.createHeap(PMEM_ROOT + "/persistent_heap", 60*1024*1024*1024L);
         MemoryBlock newBlock;
         for (int i = 0; i < PMEM_BLOCK_COUNT; i++) {  // 创建pmem存储块
-            newBlock = h.allocateMemoryBlock(57*1024*1024*1024L / PMEM_BLOCK_COUNT, false);  // todo 就当总内存是57G吧
+            newBlock = h.allocateMemoryBlock(56*1024*1024*1024L / PMEM_BLOCK_COUNT, false);
             PmemDataWriter.memoryBlocks[i] = newBlock;
-            for (int j = 0; j < 57*1024*1024*1024L / PMEM_BLOCK_COUNT / PMEM_PAGE_SIZE; j++) {
+            for (int j = 0; j < 56*1024*1024*1024L / PMEM_BLOCK_COUNT / PMEM_PAGE_SIZE; j++) {
                 pmemDataWriter.offerFreePage(new PmemPageInfo((byte)i, j)); // 对创建的内存块进行划分
             }
         }
@@ -129,9 +129,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         log.info("DefaultMessageQueueImpl 开始执行构造函数");
         DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./essd") : new File("/essd");
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
-        init();
         killSelf(KILL_SELF_TIMEOUT);
-
+        init();
 
 //        logThreadCount();
         // 阻止数据恢复，不知道为什么不起作用
