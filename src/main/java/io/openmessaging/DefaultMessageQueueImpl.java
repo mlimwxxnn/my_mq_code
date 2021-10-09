@@ -36,7 +36,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int PMEM_PAGE_SIZE = 2 * 1024;
     public static final int PMEM_BLOCK_COUNT = 8;
     public static final long PMEM_HEAP_SIZE = 59 * 1024 * 1024 * 1024L;
-    public static final long PMEM_TOTAL_BLOCK_SIZE = 45 * 1024 * 1024 * 1024L;
+    public static final long PMEM_TOTAL_BLOCK_SIZE = 40 * 1024 * 1024 * 1024L;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     static ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
