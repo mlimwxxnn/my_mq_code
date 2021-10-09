@@ -1,6 +1,7 @@
-package io.openmessaging;
+package io.openmessaging.data;
 
 
+import io.openmessaging.util.UnsafeUtil;
 import sun.misc.Unsafe;
 import sun.nio.ch.DirectBuffer;
 

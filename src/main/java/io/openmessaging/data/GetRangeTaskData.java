@@ -1,4 +1,8 @@
-package io.openmessaging;
+package io.openmessaging.data;
+
+import io.openmessaging.DefaultMessageQueueImpl;
+import io.openmessaging.info.PmemPageInfo;
+import io.openmessaging.info.QueueInfo;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;
@@ -7,10 +11,10 @@ import java.util.concurrent.CountDownLatch;
 
 import static io.openmessaging.DefaultMessageQueueImpl.PMEM_PAGE_SIZE;
 import static io.openmessaging.DefaultMessageQueueImpl.pmemDataWriter;
-import static io.openmessaging.PmemDataWriter.memoryBlocks;
+import static io.openmessaging.writer.PmemDataWriter.memoryBlocks;
 
 
-class GetRangeTask {
+public class GetRangeTaskData {
     public final ByteBuffer[] buffers = new ByteBuffer[100]; // 用来响应查询的buffer
     private Map<Integer, ByteBuffer> result = new HashMap<>();
     String topic;
@@ -19,20 +23,20 @@ class GetRangeTask {
     int fetchNum;
     private CountDownLatch countDownLatch = new CountDownLatch(1);
 
-    public GetRangeTask() {
+    public GetRangeTaskData() {
         for (int i = 0; i < buffers.length; i++) {
             buffers[i] = ByteBuffer.allocateDirect(17 * 1024);
         }
     }
 
-    void setGetRangeParameter(String topic, int queueId, long offset, int fetchNum) {
+    public void setGetRangeParameter(String topic, int queueId, long offset, int fetchNum) {
         this.topic = topic;
         this.queueId = queueId;
         this.offset = offset;
         this.fetchNum = fetchNum;
     }
 
-    Map<Integer, ByteBuffer> getResult() {
+    public Map<Integer, ByteBuffer> getResult() {
         countDownLatch = new CountDownLatch(1);
         return result;
     }

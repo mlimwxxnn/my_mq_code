@@ -1,23 +1,26 @@
-package io.openmessaging;
+package io.openmessaging.reader;
+
+import io.openmessaging.DefaultMessageQueueImpl;
+import io.openmessaging.data.GetRangeTaskData;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class DataReader {
-    private static final BlockingQueue<GetRangeTask> getRangeTaskQueue = new LinkedBlockingQueue<>();
+    private static final BlockingQueue<GetRangeTaskData> getRangeTaskDataQueue = new LinkedBlockingQueue<>();
     public DataReader(){
         readData();
     }
-    public void pushTask(GetRangeTask task){
-        getRangeTaskQueue.offer(task);
+    public void pushTask(GetRangeTaskData task){
+        getRangeTaskDataQueue.offer(task);
     }
     private void readData(){
         for (int i = 0; i < DefaultMessageQueueImpl.READ_THREAD_COUNT; i++) {
             new Thread(()->{
                 try {
-                    GetRangeTask task;
+                    GetRangeTaskData task;
                     while (true) {
-                        task = getRangeTaskQueue.take();
+                        task = getRangeTaskDataQueue.take();
                         task.queryData();
                         task.getCountDownLatch().countDown();
                     }

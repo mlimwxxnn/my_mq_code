@@ -1,4 +1,9 @@
-package io.openmessaging;
+package io.openmessaging.writer;
+
+import io.openmessaging.DefaultMessageQueueImpl;
+import io.openmessaging.data.MergedData;
+import io.openmessaging.data.MetaData;
+import io.openmessaging.data.WrappedData;
 
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -7,12 +12,12 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-public class DataWriter {
-    public final BlockingQueue<WrappedData> wrappedDataQueue = new LinkedBlockingQueue<>(50);
+public class SsdDataWriter {
+    public final BlockingQueue<WrappedData> ssdWrappedDataQueue = new LinkedBlockingQueue<>(50);
     public final BlockingQueue<MergedData> mergedDataQueue = new LinkedBlockingQueue<>(50);
     public final BlockingQueue<MergedData> freeMergedDataQueue = new LinkedBlockingQueue<>(50);
 
-    public DataWriter() {
+    public SsdDataWriter() {
         for (int i = 0; i < 50; i++) {
             freeMergedDataQueue.offer(new MergedData(ByteBuffer.allocateDirect(50 * 18 * 1024)));
         }
@@ -21,7 +26,7 @@ public class DataWriter {
     }
 
     public void pushWrappedData(WrappedData data) {
-        wrappedDataQueue.offer(data);
+        ssdWrappedDataQueue.offer(data);
     }
 
     void mergeData() {
@@ -47,7 +52,7 @@ public class DataWriter {
                     do {
                         loopCount ++;
                         for (int i = 0; i < minMergeCount; i++) {
-                            wrappedData = wrappedDataQueue.poll(DefaultMessageQueueImpl.WAITE_DATA_TIMEOUT,
+                            wrappedData = ssdWrappedDataQueue.poll(DefaultMessageQueueImpl.WAITE_DATA_TIMEOUT,
                                     TimeUnit.MICROSECONDS);
                             if (wrappedData != null) {
                                 mergedData.putData(wrappedData);

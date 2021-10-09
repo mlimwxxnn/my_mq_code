@@ -1,6 +1,7 @@
-package io.openmessaging;
+package io.openmessaging.data;
 
-import java.util.HashMap;
+import io.openmessaging.info.QueueInfo;
+
 import java.util.concurrent.CountDownLatch;
 
 public class MetaData {

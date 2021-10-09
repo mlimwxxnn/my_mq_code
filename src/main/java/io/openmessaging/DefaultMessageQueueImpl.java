@@ -2,6 +2,13 @@ package io.openmessaging;
 
 import com.intel.pmem.llpl.Heap;
 import com.intel.pmem.llpl.MemoryBlock;
+import io.openmessaging.data.GetRangeTaskData;
+import io.openmessaging.data.WrappedData;
+import io.openmessaging.info.PmemPageInfo;
+import io.openmessaging.info.QueueInfo;
+import io.openmessaging.reader.DataReader;
+import io.openmessaging.writer.PmemDataWriter;
+import io.openmessaging.writer.SsdDataWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,9 +38,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     static ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
 //    public static volatile ConcurrentHashMap<Byte, HashMap<Short, HashMap<Integer, long[]>>> metaInfo;
     public static volatile ConcurrentHashMap<Byte, HashMap<Short, QueueInfo>> metaInfo;
-    public static volatile Map<Thread, GetRangeTask> getRangeTaskMap = new ConcurrentHashMap<>();
+    public static volatile Map<Thread, GetRangeTaskData> getRangeTaskMap = new ConcurrentHashMap<>();
     public static final FileChannel[] dataWriteChannels = new FileChannel[WRITE_THREAD_COUNT];
-    public static DataWriter dataWriter;
+    public static SsdDataWriter ssdDataWriter;
     public static DataReader dataReader;
     public static int initThreadCount = 0;
     public static PmemDataWriter pmemDataWriter;
@@ -54,9 +61,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 }
                 dataWriteChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
             }
-            dataWriter = new DataWriter();
+            ssdDataWriter = new SsdDataWriter();
             pmemDataWriter = new PmemDataWriter();
-            init_pmem();
+            initPmem();
         }catch(IOException e){
             e.printStackTrace();
         }
@@ -74,12 +81,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         return fileSize;
     }
 
-    public static GetRangeTask getTask(Thread thread) {
-        GetRangeTask task = getRangeTaskMap.get(thread);
+    public static GetRangeTaskData getTask(Thread thread) {
+        GetRangeTaskData task = getRangeTaskMap.get(thread);
         if (task != null) {
             return task;
         }
-        task = new GetRangeTask();
+        task = new GetRangeTaskData();
         getRangeTaskMap.put(thread, task);
         return task;
     }
@@ -105,13 +112,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
 
-    private static void init_pmem(){
+    private static void initPmem(){
         boolean initialized = Heap.exists(PMEM_ROOT + "/persistent_heap");
         Heap h = initialized ? Heap.openHeap(PMEM_ROOT + "/persistent_heap") : Heap.createHeap(PMEM_ROOT + "/persistent_heap", 60*1024*1024*1024L);
         MemoryBlock newBlock;
         for (int i = 0; i < PMEM_BLOCK_COUNT; i++) {  // 创建pmem存储块
             newBlock = h.allocateMemoryBlock(57*1024*1024*1024L / PMEM_BLOCK_COUNT, false);  // todo 就当总内存是57G吧
-            pmemDataWriter.memoryBlocks[i] = newBlock;
+            PmemDataWriter.memoryBlocks[i] = newBlock;
             for (int j = 0; j < 57*1024*1024*1024L / PMEM_BLOCK_COUNT / PMEM_PAGE_SIZE; j++) {
                 pmemDataWriter.offerFreePage(new PmemPageInfo((byte)i, j)); // 对创建的内存块进行划分
             }
@@ -183,7 +190,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         int offset = queueInfo.size();
 
         WrappedData wrappedData = new WrappedData(topicId, (short) queueId, data, offset, queueInfo);
-        dataWriter.pushWrappedData(wrappedData);
+        ssdDataWriter.pushWrappedData(wrappedData);
         pmemDataWriter.pushWrappedData(wrappedData);
         try {
             wrappedData.getMeta().getCountDownLatch().await();
@@ -236,7 +243,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }
 
 
-        GetRangeTask task = getTask(Thread.currentThread());
+        GetRangeTaskData task = getTask(Thread.currentThread());
         task.setGetRangeParameter(topic, queueId, offset, fetchNum);
         dataReader.pushTask(task);
         try {

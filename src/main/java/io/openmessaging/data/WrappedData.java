@@ -1,7 +1,8 @@
-package io.openmessaging;
+package io.openmessaging.data;
+
+import io.openmessaging.info.QueueInfo;
 
 import java.nio.ByteBuffer;
-import java.util.HashMap;
 
 public class WrappedData {
     private final MetaData meta;

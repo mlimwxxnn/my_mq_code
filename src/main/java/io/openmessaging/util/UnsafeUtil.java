@@ -1,4 +1,4 @@
-package io.openmessaging;
+package io.openmessaging.util;
 
 import sun.misc.Unsafe;
 

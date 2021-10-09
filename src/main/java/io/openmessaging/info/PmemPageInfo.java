@@ -1,4 +1,4 @@
-package io.openmessaging;
+package io.openmessaging.info;
 
 public class PmemPageInfo {
     private byte blockId;

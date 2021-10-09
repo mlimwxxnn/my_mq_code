@@ -1,4 +1,4 @@
-package io.openmessaging;
+package io.openmessaging.info;
 
 import static java.lang.System.arraycopy;
 

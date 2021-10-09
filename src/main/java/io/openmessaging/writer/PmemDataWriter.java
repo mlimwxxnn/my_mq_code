@@ -1,6 +1,10 @@
-package io.openmessaging;
+package io.openmessaging.writer;
 
 import com.intel.pmem.llpl.MemoryBlock;
+import io.openmessaging.info.PmemPageInfo;
+import io.openmessaging.info.QueueInfo;
+import io.openmessaging.data.MetaData;
+import io.openmessaging.data.WrappedData;
 
 import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
