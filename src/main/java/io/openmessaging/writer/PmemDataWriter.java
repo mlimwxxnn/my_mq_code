@@ -54,10 +54,16 @@ public class PmemDataWriter {
                                     pmemPageInfos[i].getPageIndex() * PMEM_PAGE_SIZE, PMEM_PAGE_SIZE);
                         }
                         pmemPageInfos[requiredPageCount - 1] = freePmemPageQueue.poll();
-                        memoryBlocks[pmemPageInfos[requiredPageCount - 1].getBlockId()].copyFromArray(data,
-                                buf.position() + (requiredPageCount - 1) * PMEM_PAGE_SIZE,
-                                pmemPageInfos[requiredPageCount - 1].getPageIndex() * PMEM_PAGE_SIZE,
-                                buf.remaining() - PMEM_PAGE_SIZE * (requiredPageCount - 1));
+                        try {
+                            memoryBlocks[pmemPageInfos[requiredPageCount - 1].getBlockId()].copyFromArray(data,
+                                    buf.position() + (requiredPageCount - 1) * PMEM_PAGE_SIZE,
+                                    pmemPageInfos[requiredPageCount - 1].getPageIndex() * PMEM_PAGE_SIZE,
+                                    buf.remaining() - PMEM_PAGE_SIZE * (requiredPageCount - 1));
+                        }catch (Exception e){
+                            System.out.printf("出错了requiredPageCount：%d，buf.position() + (requiredPageCount - 1) * PMEM_PAGE_SIZE：%d，buf.remaining() - PMEM_PAGE_SIZE * (requiredPageCount - 1)：",
+                                    requiredPageCount, buf.position() + (requiredPageCount - 1) * PMEM_PAGE_SIZE, buf.remaining() - PMEM_PAGE_SIZE * (requiredPageCount - 1));
+                            System.exit(-1);
+                        }
                         queueInfo.setDataPosInPmem(meta.getOffset(), pmemPageInfos);
                     }
                     meta.getCountDownLatch().countDown();
