@@ -191,6 +191,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         WrappedData wrappedData = new WrappedData(topicId, (short) queueId, data, offset, queueInfo);
         ssdDataWriter.pushWrappedData(wrappedData);
         pmemDataWriter.pushWrappedData(wrappedData);
+        System.out.println("hello");
         try {
             wrappedData.getMeta().getCountDownLatch().await();
         } catch (InterruptedException e) {
