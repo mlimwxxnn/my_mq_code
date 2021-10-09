@@ -32,7 +32,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int WRITE_THREAD_COUNT = 5;
     public static final int READ_THREAD_COUNT = 20;
     public static final int PMEM_PAGE_SIZE = 2 * 1024;
-    public static final int PMEM_BLOCK_COUNT = 4;
+    public static final int PMEM_BLOCK_COUNT = 8;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     static ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
