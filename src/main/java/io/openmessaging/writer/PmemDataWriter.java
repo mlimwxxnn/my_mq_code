@@ -40,7 +40,6 @@ public class PmemDataWriter {
                 int requiredPageCount;
                 while (true) {
                     wrappedData = pmemWrappedDataQueue.take();
-                    System.out.println("获取到一个pmemWrappedData");
                     meta = wrappedData.getMeta();
                     requiredPageCount = (meta.getDataLen() + PMEM_PAGE_SIZE - 1) / PMEM_PAGE_SIZE; // 向上取整
                     if (freePageCount.tryAcquire(requiredPageCount)) {
@@ -54,6 +53,7 @@ public class PmemDataWriter {
                                     buf.position() + i * PMEM_PAGE_SIZE,
                                     pmemPageInfos[i].getPageIndex() * PMEM_PAGE_SIZE, PMEM_PAGE_SIZE);
                         }
+                        pmemPageInfos[requiredPageCount - 1] = freePmemPageQueue.poll();
                         memoryBlocks[pmemPageInfos[requiredPageCount - 1].getBlockId()].copyFromArray(data,
                                 buf.position() + (requiredPageCount - 1) * PMEM_PAGE_SIZE,
                                 pmemPageInfos[requiredPageCount - 1].getPageIndex() * PMEM_PAGE_SIZE,
@@ -61,7 +61,6 @@ public class PmemDataWriter {
                         queueInfo.setDataPosInPmem(meta.getOffset(), pmemPageInfos);
                     }
                     meta.getCountDownLatch().countDown();
-                    System.out.println("pmem处的countdown");
                 }
             } catch (InterruptedException e) {
                 e.printStackTrace();

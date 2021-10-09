@@ -181,7 +181,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public long append(String topic, int queueId, ByteBuffer data) {
 
         haveAppended = true;
-        System.out.println(data.remaining());
         Byte topicId = getTopicId(topic, true);
 
         HashMap<Short, QueueInfo> topicInfo = metaInfo.computeIfAbsent(topicId, k -> new HashMap<>(2000));
@@ -191,7 +190,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         WrappedData wrappedData = new WrappedData(topicId, (short) queueId, data, offset, queueInfo);
         ssdDataWriter.pushWrappedData(wrappedData);
         pmemDataWriter.pushWrappedData(wrappedData);
-        System.out.println("hello");
         try {
             wrappedData.getMeta().getCountDownLatch().await();
         } catch (InterruptedException e) {
