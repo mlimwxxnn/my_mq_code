@@ -40,6 +40,7 @@ public class PmemDataWriter {
                 int requiredPageCount;
                 while (true) {
                     wrappedData = pmemWrappedDataQueue.take();
+                    System.out.println("获取到一个pmemWrappedData");
                     meta = wrappedData.getMeta();
                     requiredPageCount = (meta.getDataLen() + PMEM_PAGE_SIZE - 1) / PMEM_PAGE_SIZE; // 向上取整
                     if (freePageCount.tryAcquire(requiredPageCount)) {
