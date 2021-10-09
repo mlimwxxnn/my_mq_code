@@ -21,13 +21,6 @@ public class Test {
     }
 
     public static void main(String args[]) throws InterruptedException, IOException {
-        Semaphore a = new Semaphore(0);
-        a.release(10);
-        a.acquire();
-        a.acquire();
-        System.out.println(a.tryAcquire(8));
-        a.acquire();
-        System.out.println("hello world");
-
+        System.out.println(true || false && false);
     }
 }
