@@ -28,45 +28,45 @@ public class PmemDataWriter {
     }
 
     private void writeDataToPmem() {
-        new Thread(() -> {
-            try {
-                WrappedData wrappedData;
-                PmemPageInfo[] pmemPageInfos;
-                ByteBuffer buf;
-                QueueInfo queueInfo;
-                MetaData meta;
-                byte[] data;
-                int requiredPageCount;
-                while (true) {
-                    wrappedData = pmemWrappedDataQueue.take();
-                    log.debug("pmem拿到数据");
-                    meta = wrappedData.getMeta();
-                    requiredPageCount = (meta.getDataLen() + PMEM_PAGE_SIZE - 1) / PMEM_PAGE_SIZE; // 向上取整
-                    if (freePageCount.tryAcquire(requiredPageCount)) {
-                        buf = wrappedData.getData();
-                        data = buf.array();
-                        queueInfo = meta.getQueueInfo();
-                        pmemPageInfos = new PmemPageInfo[requiredPageCount];
-                        for (int i = 0; i < requiredPageCount - 1; i++) {
-                            pmemPageInfos[i] = freePmemPageQueue.poll();
-                            memoryBlocks[pmemPageInfos[i].getBlockId()].copyFromArray(data,
-                                    buf.position() + i * PMEM_PAGE_SIZE,
-                                    (long)pmemPageInfos[i].getPageIndex() * PMEM_PAGE_SIZE, PMEM_PAGE_SIZE);
+        for (int i = 0; i < PMEM_WRITE_THREAD_COUNT; i++) {
+            new Thread(() -> {
+                try {
+                    WrappedData wrappedData;
+                    PmemPageInfo[] pmemPageInfos;
+                    ByteBuffer buf;
+                    QueueInfo queueInfo;
+                    MetaData meta;
+                    byte[] data;
+                    int requiredPageCount;
+                    while (true) {
+                        wrappedData = pmemWrappedDataQueue.take();
+                        meta = wrappedData.getMeta();
+                        requiredPageCount = (meta.getDataLen() + PMEM_PAGE_SIZE - 1) / PMEM_PAGE_SIZE; // 向上取整
+                        if (freePageCount.tryAcquire(requiredPageCount)) {
+                            buf = wrappedData.getData();
+                            data = buf.array();
+                            queueInfo = meta.getQueueInfo();
+                            pmemPageInfos = new PmemPageInfo[requiredPageCount];
+                            for (int i = 0; i < requiredPageCount - 1; i++) {
+                                pmemPageInfos[i] = freePmemPageQueue.poll();
+                                memoryBlocks[pmemPageInfos[i].getBlockId()].copyFromArray(data,
+                                        buf.position() + i * PMEM_PAGE_SIZE,
+                                        (long)pmemPageInfos[i].getPageIndex() * PMEM_PAGE_SIZE, PMEM_PAGE_SIZE);
+                            }
+                            pmemPageInfos[requiredPageCount - 1] = freePmemPageQueue.poll();
+                            memoryBlocks[pmemPageInfos[requiredPageCount - 1].getBlockId()].copyFromArray(data,
+                                    buf.position() + (requiredPageCount - 1) * PMEM_PAGE_SIZE,
+                                    (long)pmemPageInfos[requiredPageCount - 1].getPageIndex() * PMEM_PAGE_SIZE,
+                                    buf.remaining() - PMEM_PAGE_SIZE * (requiredPageCount - 1));
+                            queueInfo.setDataPosInPmem(meta.getOffset(), pmemPageInfos);
                         }
-                        pmemPageInfos[requiredPageCount - 1] = freePmemPageQueue.poll();
-                        memoryBlocks[pmemPageInfos[requiredPageCount - 1].getBlockId()].copyFromArray(data,
-                                buf.position() + (requiredPageCount - 1) * PMEM_PAGE_SIZE,
-                                (long)pmemPageInfos[requiredPageCount - 1].getPageIndex() * PMEM_PAGE_SIZE,
-                                buf.remaining() - PMEM_PAGE_SIZE * (requiredPageCount - 1));
-                        queueInfo.setDataPosInPmem(meta.getOffset(), pmemPageInfos);
+                        meta.getCountDownLatch().countDown();
                     }
-                    meta.getCountDownLatch().countDown();
-                    log.debug("pmem处理完数据");
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }).start();
+            }).start();
+        }
     }
 
     public void offerFreePage(PmemPageInfo pmemPageInfo) {
