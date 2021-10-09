@@ -81,6 +81,7 @@ public class SsdDataWriter {
                     List<MetaData> metaList;
                     while (true) {
                         mergedData = mergedDataQueue.take();
+                        long start = System.nanoTime();
                         mergedBuffer = mergedData.getMergedBuffer();
                         metaList = mergedData.getMetaSet();
 
@@ -97,6 +98,8 @@ public class SsdDataWriter {
                             metaData.getCountDownLatch().countDown();
                         });
                         freeMergedDataQueue.offer(mergedData);
+                        long end = System.nanoTime();
+                        System.out.printf("ssd写入%d个耗时：%d\n", mergedData.getCount(), end - start);
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
