@@ -55,7 +55,7 @@ public class GetRangeTaskData {
             if(!queueInfo.haveQueried()){
                 PmemPageInfo[][] allPmemPageInfos = queueInfo.getAllPmemPageInfos();
                 for (int j = 0; j < offset - 1; j++) {
-                    for (int k = 0; k < allPmemPageInfos[j].length; k++) {
+                    for (int k = 0; allPmemPageInfos[j] != null && k < allPmemPageInfos[j].length; k++) {
                         pmemDataWriter.offerFreePage(allPmemPageInfos[j][k]); // 将当前查询的队列前面的数据占用的pmem回收
                     }
                 }

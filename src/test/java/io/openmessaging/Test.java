@@ -21,6 +21,6 @@ public class Test {
     }
 
     public static void main(String args[]) throws InterruptedException, IOException {
-        System.out.println(true || false && false);
+
     }
 }

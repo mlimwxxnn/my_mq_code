@@ -73,6 +73,9 @@ public class QueueInfo {
     }
 
     public PmemPageInfo[] getDataPosInPmem(int i) {
+        if(i > maxIndex){
+            throw new IndexOutOfBoundsException("索引越界");
+        }
         return pmemPageInfos[i];
     }
 
