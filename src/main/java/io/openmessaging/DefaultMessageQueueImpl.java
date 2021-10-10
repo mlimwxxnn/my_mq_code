@@ -35,8 +35,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int PMEM_WRITE_THREAD_COUNT = 4;
     public static final int PMEM_PAGE_SIZE = 2 * 1024;
     public static final int PMEM_BLOCK_COUNT = 112;
-    public static final long PMEM_HEAP_SIZE = 59 * 1024 * 1024 * 1024L;
-    public static final long PMEM_TOTAL_BLOCK_SIZE = 55 * 1024 * 1024 * 1024L;
+    public static final long PMEM_HEAP_SIZE = 5 * 1024 * 1024 * 1024L;
+    public static final long PMEM_TOTAL_BLOCK_SIZE = 5 * 1024 * 1024 * 1024L;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     static private final ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
@@ -157,7 +157,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
 
-        haveAppended = true;
+//        haveAppended = true;
         Byte topicId = getTopicId(topic, true);
 
         HashMap<Short, QueueInfo> topicInfo = metaInfo.computeIfAbsent(topicId, k -> new HashMap<>(2000));
@@ -223,9 +223,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
         }
 
-        if(!haveAppended){
-            System.exit(-1);
-        }
+//        if(!haveAppended){
+//            System.exit(-1);
+//        }
 
 
         GetRangeTaskData task = getTask(Thread.currentThread());
