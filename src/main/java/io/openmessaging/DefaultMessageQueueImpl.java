@@ -36,7 +36,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int PMEM_PAGE_SIZE = 2 * 1024;
     public static final int PMEM_BLOCK_COUNT = 64;
     public static final long PMEM_HEAP_SIZE = 59 * 1024 * 1024 * 1024L;
-    public static final long PMEM_TOTAL_BLOCK_SIZE = 40 * 1024 * 1024 * 1024L;
+    public static final long PMEM_TOTAL_BLOCK_SIZE = 50 * 1024 * 1024 * 1024L;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     static ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
@@ -115,11 +115,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         killSelf(KILL_SELF_TIMEOUT);
         init();
 
-//        logThreadCount();
-        // 阻止数据恢复，不知道为什么不起作用
-//        if(getTotalFileSize()>0){
-//            System.exit(-1);
-//        }
         powerFailureRecovery(metaInfo);
         initThreadCount = Thread.activeCount();
         log.info("DefaultMessageQueueImpl 构造函数执行完成");
@@ -163,7 +158,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
 
-//        haveAppended = true;
+        haveAppended = true;
         Byte topicId = getTopicId(topic, true);
 
         HashMap<Short, QueueInfo> topicInfo = metaInfo.computeIfAbsent(topicId, k -> new HashMap<>(2000));
@@ -215,13 +210,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
 
-//    boolean haveAppended = false;
+    boolean haveAppended = false;
     @Override
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
 
-//        if(!haveAppended){
-//            System.exit(-1);
-//        }
+        if(!haveAppended){
+            System.exit(-1);
+        }
 
 
         GetRangeTaskData task = getTask(Thread.currentThread());
