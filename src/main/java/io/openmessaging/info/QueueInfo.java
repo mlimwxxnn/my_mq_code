@@ -28,7 +28,7 @@ public class QueueInfo {
         if(index >= capacity){
             synchronized (this) {
                 if (index >= capacity) {
-                    capacity = index * 2;
+                    int newCapacity = index * 2;
                     long[][] newDataInfo = new long[capacity][2];
                     boolean[] newIsInPmem = new boolean[capacity];
                     PmemPageInfo[][] newPmemPageInfos = new PmemPageInfo[capacity][];
@@ -40,6 +40,7 @@ public class QueueInfo {
                     this.dataInfo = newDataInfo;
                     this.isInPmem = newIsInPmem;
                     this.pmemPageInfos = newPmemPageInfos;
+                    capacity = newCapacity;
                 }
             }
         }
