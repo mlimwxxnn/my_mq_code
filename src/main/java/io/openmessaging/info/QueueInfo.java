@@ -7,7 +7,7 @@ public class QueueInfo {
     private int maxIndex;
     private volatile long[][] dataInfo;
     private volatile int capacity;
-    private volatile boolean isInPmem[];
+    private volatile boolean[] isInPmem;
     private volatile PmemPageInfo[][] pmemPageInfos;
     private boolean haveQueried;
     private static final int DEFAULT_CAPACITY = 100;
@@ -24,7 +24,7 @@ public class QueueInfo {
         capacity = initialCapacity;
     }
 
-    private void ensureCapacity(int index){ // todo 这里后面还要给其他数组扩容
+    private void ensureCapacity(int index){
         if(index >= capacity){
             synchronized (this) {
                 if (index >= capacity) {

@@ -34,12 +34,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int READ_THREAD_COUNT = 20;
     public static final int PMEM_WRITE_THREAD_COUNT = 4;
     public static final int PMEM_PAGE_SIZE = 2 * 1024;
-    public static final int PMEM_BLOCK_COUNT = 64;
+    public static final int PMEM_BLOCK_COUNT = 112;
     public static final long PMEM_HEAP_SIZE = 59 * 1024 * 1024 * 1024L;
     public static final long PMEM_TOTAL_BLOCK_SIZE = 55 * 1024 * 1024 * 1024L;
 
     public static AtomicInteger topicCount = new AtomicInteger();
-    static ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
+    static private final ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
     public static volatile ConcurrentHashMap<Byte, HashMap<Short, QueueInfo>> metaInfo;
     public static volatile Map<Thread, GetRangeTaskData> getRangeTaskMap = new ConcurrentHashMap<>();
     public static final FileChannel[] dataWriteChannels = new FileChannel[WRITE_THREAD_COUNT];
@@ -210,8 +210,18 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 
     boolean haveAppended = false;
+    volatile boolean b = true;
     @Override
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
+
+        if (b) {
+            synchronized (this) {
+                if(b){
+                    b = false;
+                    log.info("第一阶段结束");
+                }
+            }
+        }
 
         if(!haveAppended){
             System.exit(-1);
