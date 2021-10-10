@@ -12,6 +12,10 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
+import static io.openmessaging.DefaultMessageQueueImpl.DATA_INFORMATION_LENGTH;
+import static io.openmessaging.DefaultMessageQueueImpl.writtenDataSize;
+
+@SuppressWarnings("ResultOfMethodCallIgnored")
 public class SsdDataWriter {
     public final BlockingQueue<WrappedData> ssdWrappedDataQueue = new LinkedBlockingQueue<>(50);
     public final BlockingQueue<MergedData> mergedDataQueue = new LinkedBlockingQueue<>(50);
@@ -31,15 +35,15 @@ public class SsdDataWriter {
 
     void mergeData() {
         new Thread(() -> {
-            int minMergeCount = 20;
-            try {
-                Thread.sleep(400);
-                minMergeCount = Math.max(Thread.activeCount() - DefaultMessageQueueImpl.initThreadCount - 5,
-                        minMergeCount);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            minMergeCount /= DefaultMessageQueueImpl.WRITE_THREAD_COUNT;
+//            int minMergeCount = 20;
+//            try {
+//                Thread.sleep(400);
+//                minMergeCount = Math.max(Thread.activeCount() - DefaultMessageQueueImpl.initThreadCount - 5,
+//                        minMergeCount);
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
+//            minMergeCount /= DefaultMessageQueueImpl.WRITE_THREAD_COUNT;
 
 
             try {
@@ -81,9 +85,9 @@ public class SsdDataWriter {
                     List<MetaData> metaList;
                     while (true) {
                         mergedData = mergedDataQueue.take();
-                        long start = System.nanoTime();
+//                        long start = System.nanoTime();
                         mergedBuffer = mergedData.getMergedBuffer();
-                        metaList = mergedData.getMetaSet();
+                        metaList = mergedData.getMetaList();
 
                         // 数据写入文件
                         long pos = dataWriteChannel.position();
@@ -97,9 +101,11 @@ public class SsdDataWriter {
                                     (writeThreadId << 32) | metaData.getDataLen());
                             metaData.getCountDownLatch().countDown();
                         });
+                        writtenDataSize.getAndAdd(mergedBuffer.limit() - (long) DATA_INFORMATION_LENGTH * mergedData.getCount());
+
                         freeMergedDataQueue.offer(mergedData);
-                        long end = System.nanoTime();
-                        System.out.printf("ssd写入%d个耗时：%d\n", mergedData.getCount(), end - start);
+//                        long end = System.nanoTime();
+//                        System.out.printf("ssd写入%d个耗时：%d\n", mergedData.getCount(), end - start);
                     }
                 } catch (Exception e) {
                     e.printStackTrace();

@@ -57,7 +57,7 @@ public class MergedData {
         return this.mergedBuffer;
     }
 
-    public List<MetaData> getMetaSet() {
+    public List<MetaData> getMetaList() {
         return metaList;
     }
 }

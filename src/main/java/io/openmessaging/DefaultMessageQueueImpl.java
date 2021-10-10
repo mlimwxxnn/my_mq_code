@@ -1,27 +1,29 @@
 package io.openmessaging;
 
-import com.intel.pmem.llpl.Heap;
-import com.intel.pmem.llpl.MemoryBlock;
 import io.openmessaging.data.GetRangeTaskData;
 import io.openmessaging.data.WrappedData;
-import io.openmessaging.info.PmemPageInfo;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.reader.DataReader;
 import io.openmessaging.writer.PmemDataWriter;
 import io.openmessaging.writer.SsdDataWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.security.provider.PolicySpiFile;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
-import java.util.*;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 
+@SuppressWarnings("ResultOfMethodCallIgnored")
 public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static final Logger log = LoggerFactory.getLogger("myLogger");
@@ -35,10 +37,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int WRITE_THREAD_COUNT = 5;
     public static final int READ_THREAD_COUNT = 20;
     public static final int PMEM_WRITE_THREAD_COUNT = 4;
-    public static final int PMEM_PAGE_SIZE = 4 * 1024;
+    public static final int PMEM_PAGE_SIZE = 8 * 1024;
     public static final int PMEM_BLOCK_COUNT = 112;
     public static final long PMEM_HEAP_SIZE = 59 * GB;
     public static final long PMEM_TOTAL_BLOCK_SIZE = 55 * GB;
+    public static AtomicLong writtenDataSize = new AtomicLong();
 
     public static AtomicInteger topicCount = new AtomicInteger();
     static private final ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
@@ -101,7 +104,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     writtenSize += dataWriteChannel.position();  // M
                 }
                 writtenSize /= (1024 * 1024);
-                System.out.println(String.format("kill self(written: %d M)", writtenSize));
+                System.out.printf("kill self(written: %d M)%n", writtenSize);
                 System.exit(-1);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -156,6 +159,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
 
+    @SuppressWarnings("ConstantConditions")
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
 
@@ -168,8 +172,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         WrappedData wrappedData = new WrappedData(topicId, (short) queueId, data, offset, queueInfo);
         ssdDataWriter.pushWrappedData(wrappedData);
-        pmemDataWriter.pushWrappedData(wrappedData);
+
         try {
+            if(writtenDataSize.get() > 21 * GB){
+                pmemDataWriter.pushWrappedData(wrappedData);
+            } else {
+                wrappedData.getMeta().getCountDownLatch().countDown();
+            }
             wrappedData.getMeta().getCountDownLatch().await();
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -180,6 +189,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     /**
      * 创建或并返回topic对应的topicId
      */
+    @SuppressWarnings("ResultOfMethodCallIgnored")
     public static Byte getTopicId(String topic, boolean isCreateNew) {
         Byte topicId = topicNameToTopicId.get(topic);
         if (topicId == null) {

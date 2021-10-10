@@ -57,7 +57,7 @@ public class PmemDataWriter {
                     int requiredPageCount;
                     while (true) {
                         wrappedData = pmemWrappedDataQueue.take();
-                        long start = System.nanoTime();
+//                        long start = System.nanoTime();
                         meta = wrappedData.getMeta();
                         requiredPageCount = (meta.getDataLen() + PMEM_PAGE_SIZE - 1) / PMEM_PAGE_SIZE; // 向上取整
                         if (freePageCount.tryAcquire(requiredPageCount)) {
@@ -77,8 +77,8 @@ public class PmemDataWriter {
                                     (long)pmemPageInfos[requiredPageCount - 1].getPageIndex() * PMEM_PAGE_SIZE,
                                     buf.remaining() - PMEM_PAGE_SIZE * (requiredPageCount - 1));
                             queueInfo.setDataPosInPmem(meta.getOffset(), pmemPageInfos);
-                            long end = System.nanoTime();
-                            System.out.printf("pmem耗时：%d", end -start);
+//                            long end = System.nanoTime();
+//                            System.out.printf("pmem耗时：%d", end -start);
                         }
                         meta.getCountDownLatch().countDown();
 
