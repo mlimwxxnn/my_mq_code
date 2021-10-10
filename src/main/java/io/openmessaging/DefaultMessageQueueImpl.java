@@ -36,11 +36,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int PMEM_PAGE_SIZE = 2 * 1024;
     public static final int PMEM_BLOCK_COUNT = 64;
     public static final long PMEM_HEAP_SIZE = 59 * 1024 * 1024 * 1024L;
-    public static final long PMEM_TOTAL_BLOCK_SIZE = 50 * 1024 * 1024 * 1024L;
+    public static final long PMEM_TOTAL_BLOCK_SIZE = 55 * 1024 * 1024 * 1024L;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     static ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
-//    public static volatile ConcurrentHashMap<Byte, HashMap<Short, HashMap<Integer, long[]>>> metaInfo;
     public static volatile ConcurrentHashMap<Byte, HashMap<Short, QueueInfo>> metaInfo;
     public static volatile Map<Thread, GetRangeTaskData> getRangeTaskMap = new ConcurrentHashMap<>();
     public static final FileChannel[] dataWriteChannels = new FileChannel[WRITE_THREAD_COUNT];
