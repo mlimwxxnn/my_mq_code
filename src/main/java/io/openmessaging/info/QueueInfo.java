@@ -3,12 +3,12 @@ package io.openmessaging.info;
 import static java.lang.System.arraycopy;
 
 public class QueueInfo {
-    private long[][] dataInfo;
 //    private PageNode[]; //
     private int maxIndex;
-    private int capacity;
-    private boolean isInPmem[];
-    private PmemPageInfo[][] pmemPageInfos;
+    private volatile long[][] dataInfo;
+    private volatile int capacity;
+    private volatile boolean isInPmem[];
+    private volatile PmemPageInfo[][] pmemPageInfos;
     private boolean haveQueried;
     private static final int DEFAULT_CAPACITY = 100;
 

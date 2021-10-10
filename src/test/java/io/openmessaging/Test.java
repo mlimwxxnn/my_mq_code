@@ -1,6 +1,7 @@
 package io.openmessaging;
 
 import com.intel.pmem.llpl.Heap;
+import io.openmessaging.info.PmemPageInfo;
 import io.openmessaging.info.QueueInfo;
 
 import java.io.IOException;
@@ -23,7 +24,12 @@ public class Test {
 
     public static void main(String args[]) throws InterruptedException, IOException {
         QueueInfo queueInfo = new QueueInfo();
-        queueInfo.setDataPosInFile(200, 3, 2);
+        new Thread(()->{
+            queueInfo.setDataPosInFile(200, 3, 2);
+        }).start();
+        new Thread(()->{
+            queueInfo.setDataPosInPmem(200, new PmemPageInfo[]{new PmemPageInfo((byte) 5, 2)});
+        }).start();
         System.out.println("hel");
     }
 }

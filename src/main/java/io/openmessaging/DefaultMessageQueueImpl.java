@@ -100,7 +100,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     writtenSize += dataWriteChannel.position();  // M
                 }
                 writtenSize /= (1024 * 1024);
-                System.out.println(String.format("kill self(written: %d)", writtenSize));
+                System.out.println(String.format("kill self(written: %d M)", writtenSize));
                 System.exit(-1);
             } catch (Exception e) {
                 e.printStackTrace();
