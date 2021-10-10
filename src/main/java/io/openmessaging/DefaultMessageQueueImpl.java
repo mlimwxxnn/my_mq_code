@@ -25,6 +25,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static final Logger log = LoggerFactory.getLogger("myLogger");
+    public static final long GB = 1024L * 1024L * 1024L;
+    public static final long MB = 1024L * 1024L;
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
     public static final int DATA_INFORMATION_LENGTH = 9;
@@ -35,8 +37,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int PMEM_WRITE_THREAD_COUNT = 4;
     public static final int PMEM_PAGE_SIZE = 2 * 1024;
     public static final int PMEM_BLOCK_COUNT = 112;
-    public static final long PMEM_HEAP_SIZE = 5 * 1024 * 1024 * 1024L;
-    public static final long PMEM_TOTAL_BLOCK_SIZE = 5 * 1024 * 1024 * 1024L;
+    public static final long PMEM_HEAP_SIZE = 59 * GB;
+    public static final long PMEM_TOTAL_BLOCK_SIZE = 55 * GB;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     static private final ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
