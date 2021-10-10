@@ -29,9 +29,9 @@ public class QueueInfo {
             synchronized (this) {
                 if (index >= capacity) {
                     int newCapacity = index * 2;
-                    long[][] newDataInfo = new long[capacity][2];
-                    boolean[] newIsInPmem = new boolean[capacity];
-                    PmemPageInfo[][] newPmemPageInfos = new PmemPageInfo[capacity][];
+                    long[][] newDataInfo = new long[newCapacity][2];
+                    boolean[] newIsInPmem = new boolean[newCapacity];
+                    PmemPageInfo[][] newPmemPageInfos = new PmemPageInfo[newCapacity][];
 
                     arraycopy(dataInfo, 0, newDataInfo, 0, maxIndex + 1);
                     arraycopy(isInPmem, 0, newIsInPmem, 0, maxIndex + 1);
