@@ -36,8 +36,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int PMEM_WRITE_THREAD_COUNT = 4;
     public static final int PMEM_PAGE_SIZE = 2 * 1024;
     public static final int PMEM_BLOCK_COUNT = 112;
-    public static final long PMEM_HEAP_SIZE = 5 * GB;
-    public static final long PMEM_TOTAL_BLOCK_SIZE = 4 * GB;
+    public static final long PMEM_HEAP_SIZE = 59 * GB;
+    public static final long PMEM_TOTAL_BLOCK_SIZE = 55 * GB;
     public static AtomicLong writtenDataSize = new AtomicLong();
 
     public static AtomicInteger topicCount = new AtomicInteger();
