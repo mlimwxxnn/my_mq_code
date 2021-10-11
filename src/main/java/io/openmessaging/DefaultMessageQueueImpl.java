@@ -9,10 +9,7 @@ import io.openmessaging.writer.SsdDataWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
@@ -37,7 +34,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int WRITE_THREAD_COUNT = 5;
     public static final int READ_THREAD_COUNT = 20;
     public static final int PMEM_WRITE_THREAD_COUNT = 20;
-    public static final int PMEM_PAGE_SIZE = 8 * 1024;
+    public static final int PMEM_PAGE_SIZE = 2 * 1024;
     public static final int PMEM_BLOCK_COUNT = 112;
     public static final long PMEM_HEAP_SIZE = 59 * GB;
     public static final long PMEM_TOTAL_BLOCK_SIZE = 55 * GB;
@@ -53,6 +50,20 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static int initThreadCount = 0;
     public static PmemDataWriter pmemDataWriter;
 
+
+    private void displayConfiguration(int lineFrom, int lineTo){
+        File thisFile = new File("src/main/java/io/openmessaging/DefaultMessageQueueImpl.java");
+        try (BufferedReader br = new BufferedReader(new FileReader(thisFile))) {
+            for (int i = 0; i < lineTo; i++) {
+                String line = br.readLine();
+                if (i + 1 >= lineFrom) {
+                    System.out.println(line);
+                }
+            }
+        } catch (Exception e) {
+            System.out.printf("file:%s read failed!", thisFile.getAbsolutePath());
+        }
+    }
 
     public static void init() {
         try {
@@ -114,6 +125,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public DefaultMessageQueueImpl() {
         log.info("DefaultMessageQueueImpl 开始执行构造函数");
+        displayConfiguration(26, 51);
         DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./essd") : new File("/essd");
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
         killSelf(KILL_SELF_TIMEOUT);
@@ -163,7 +175,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
 
-//        haveAppended = true;
+        haveAppended = true;
         Byte topicId = getTopicId(topic, true);
 
         HashMap<Short, QueueInfo> topicInfo = metaInfo.computeIfAbsent(topicId, k -> new HashMap<>(2000));
@@ -235,9 +247,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
         }
 
-//        if(!haveAppended){
-//            System.exit(-1);
-//        }
+        if(!haveAppended){
+            System.exit(-1);
+        }
 
 
         GetRangeTaskData task = getTask(Thread.currentThread());
