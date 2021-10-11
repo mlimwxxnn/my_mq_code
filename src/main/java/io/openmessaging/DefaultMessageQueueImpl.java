@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicLong;
 @SuppressWarnings("ResultOfMethodCallIgnored")
 public class DefaultMessageQueueImpl extends MessageQueue {
 
+    public static final PMEM
     public static final Logger log = LoggerFactory.getLogger("myLogger");
     public static final long GB = 1024L * 1024L * 1024L;
     public static final long MB = 1024L * 1024L;
