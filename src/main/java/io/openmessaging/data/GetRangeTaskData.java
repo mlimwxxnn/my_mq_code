@@ -9,9 +9,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
-import static io.openmessaging.DefaultMessageQueueImpl.PMEM_PAGE_SIZE;
 import static io.openmessaging.DefaultMessageQueueImpl.pmemDataWriter;
-import static io.openmessaging.writer.PmemDataWriter.memoryBlocks;
+import static io.openmessaging.writer.PmemDataWriterV2.freePmemPageQueues;
+//import static io.openmessaging.writer.PmemDataWriter.memoryBlocks;
 
 
 public class GetRangeTaskData {
@@ -53,11 +53,10 @@ public class GetRangeTaskData {
                 return;
             }
             if(!queueInfo.haveQueried()){
-                PmemPageInfo[][] allPmemPageInfos = queueInfo.getAllPmemPageInfos();
+                PmemPageInfo[] allPmemPageInfos = queueInfo.getAllPmemPageInfos();
                 for (int j = 0; j < offset - 1; j++) {
-                    for (int k = 0; allPmemPageInfos[j] != null && k < allPmemPageInfos[j].length; k++) {
-                        pmemDataWriter.offerFreePage(allPmemPageInfos[j][k]); // 将当前查询的队列前面的数据占用的pmem回收
-                    }
+                    PmemPageInfo pmemPageInfo = allPmemPageInfos[j];
+                    freePmemPageQueues[pmemPageInfo.freePmemPageQueueIndex].offer(pmemPageInfo);
                 }
             }
             int tmp, n = fetchNum < (tmp = queueInfo.size() - (int) offset) ? fetchNum : tmp;
@@ -73,15 +72,12 @@ public class GetRangeTaskData {
                     DefaultMessageQueueImpl.dataWriteChannels[id].read(buf, p[0]);
                     buf.flip();
                 } else {
-                    PmemPageInfo[] pmemPageInfos = queueInfo.getDataPosInPmem(i + (int) offset);
+                    PmemPageInfo pmemPageInfo = queueInfo.getDataPosInPmem(i + (int) offset);
                     byte[] bufArray = buf.array();
-                    for (int j = 0; j < pmemPageInfos.length - 1; j++) {
-                        memoryBlocks[pmemPageInfos[j].getBlockId()].copyToArray((long)pmemPageInfos[j].getPageIndex() * PMEM_PAGE_SIZE, bufArray, j * PMEM_PAGE_SIZE, PMEM_PAGE_SIZE);
-                        pmemDataWriter.offerFreePage(pmemPageInfos[j]);
-                    }
-                    int j = pmemPageInfos.length - 1;
-                    memoryBlocks[pmemPageInfos[j].getBlockId()].copyToArray((long)pmemPageInfos[j].getPageIndex() * PMEM_PAGE_SIZE, bufArray, j * PMEM_PAGE_SIZE, dataLen - PMEM_PAGE_SIZE * (pmemPageInfos.length - 1));
-                    pmemDataWriter.offerFreePage(pmemPageInfos[j]);
+
+                    pmemPageInfo.block.copyToArray(0, bufArray, 0, dataLen);
+
+                    freePmemPageQueues[pmemPageInfo.freePmemPageQueueIndex].offer(pmemPageInfo);
                 }
                 result.put(i, buf);
             }

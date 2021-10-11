@@ -1,5 +1,7 @@
 package io.openmessaging.info;
 
+import com.intel.pmem.llpl.MemoryBlock;
+
 import static java.lang.System.arraycopy;
 
 public class QueueInfo {
@@ -8,7 +10,7 @@ public class QueueInfo {
     private volatile long[][] dataInfo;
     private volatile int capacity;
     private volatile boolean[] isInPmem;
-    private volatile PmemPageInfo[][] pmemPageInfos;
+    private volatile PmemPageInfo[] pmemPageInfos;
     private boolean haveQueried;
     private static final int DEFAULT_CAPACITY = 100;
 
@@ -19,7 +21,7 @@ public class QueueInfo {
     public QueueInfo(int initialCapacity){
         dataInfo = new long[initialCapacity][2];
         isInPmem = new boolean[initialCapacity];
-        pmemPageInfos = new PmemPageInfo[initialCapacity][];
+        pmemPageInfos = new PmemPageInfo[initialCapacity];
         maxIndex = -1;
         capacity = initialCapacity;
     }
@@ -31,7 +33,7 @@ public class QueueInfo {
                     int newCapacity = index * 2;
                     long[][] newDataInfo = new long[newCapacity][2];
                     boolean[] newIsInPmem = new boolean[newCapacity];
-                    PmemPageInfo[][] newPmemPageInfos = new PmemPageInfo[newCapacity][];
+                    PmemPageInfo[] newPmemPageInfos = new PmemPageInfo[newCapacity];
 
                     arraycopy(dataInfo, 0, newDataInfo, 0, maxIndex + 1);
                     arraycopy(isInPmem, 0, newIsInPmem, 0, maxIndex + 1);
@@ -46,7 +48,16 @@ public class QueueInfo {
         }
     }
 
-    public void setDataPosInPmem(int i, PmemPageInfo[] pmemPageInfo){
+//    public void setDataPosInPmem(int i, PmemPageInfo[] pmemPageInfo){
+//        ensureCapacity(i);
+//        if(i > maxIndex){
+//            maxIndex = i;
+//        }
+//        pmemPageInfos[i] = pmemPageInfo;
+//        isInPmem[i] = true;
+//    }
+
+    public void setPmemBlockMemory(int i, PmemPageInfo pmemPageInfo){
         ensureCapacity(i);
         if(i > maxIndex){
             maxIndex = i;
@@ -80,14 +91,14 @@ public class QueueInfo {
         return maxIndex + 1;
     }
 
-    public PmemPageInfo[] getDataPosInPmem(int i) {
+    public PmemPageInfo getDataPosInPmem(int i) {
         if(i > maxIndex){
             throw new IndexOutOfBoundsException("索引越界");
         }
         return pmemPageInfos[i];
     }
 
-    public PmemPageInfo[][] getAllPmemPageInfos() {
+    public PmemPageInfo[] getAllPmemPageInfos() {
         haveQueried = true;
         return pmemPageInfos;
     }

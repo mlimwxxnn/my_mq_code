@@ -4,7 +4,8 @@ import io.openmessaging.data.GetRangeTaskData;
 import io.openmessaging.data.WrappedData;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.reader.DataReader;
-import io.openmessaging.writer.PmemDataWriter;
+//import io.openmessaging.writer.PmemDataWriter;
+import io.openmessaging.writer.PmemDataWriterV2;
 import io.openmessaging.writer.SsdDataWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,22 +24,20 @@ import java.util.concurrent.atomic.AtomicLong;
 @SuppressWarnings("ResultOfMethodCallIgnored")
 public class DefaultMessageQueueImpl extends MessageQueue {
 
-    public static final PMEM
+    public static final int PMEM_BLOCK_GROUP_COUNT = 17;
     public static final Logger log = LoggerFactory.getLogger("myLogger");
     public static final long GB = 1024L * 1024L * 1024L;
     public static final long MB = 1024L * 1024L;
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
     public static final int DATA_INFORMATION_LENGTH = 9;
-    public static final long KILL_SELF_TIMEOUT = 20 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 1 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 1000;  // 微秒
     public static final int WRITE_THREAD_COUNT = 5;
     public static final int READ_THREAD_COUNT = 20;
     public static final int PMEM_WRITE_THREAD_COUNT = 4;
-    public static final int PMEM_PAGE_SIZE = 2 * 1024;
-    public static final int PMEM_BLOCK_COUNT = 112;
-    public static final long PMEM_HEAP_SIZE = 59 * GB;
-    public static final long PMEM_TOTAL_BLOCK_SIZE = 50 * GB;
+//    public static final long PMEM_HEAP_SIZE = 100 * MB;
+    public static final long PMEM_HEAP_SIZE = 60 * GB;
     public static AtomicLong writtenDataSize = new AtomicLong();
 
     public static AtomicInteger topicCount = new AtomicInteger();
@@ -49,7 +48,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static SsdDataWriter ssdDataWriter;
     public static DataReader dataReader;
     public static int initThreadCount = 0;
-    public static PmemDataWriter pmemDataWriter;
+    public static PmemDataWriterV2 pmemDataWriter;
 
 
     private void displayConfiguration(int lineFrom, int lineTo){
@@ -82,7 +81,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 dataWriteChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
             }
             ssdDataWriter = new SsdDataWriter();
-            pmemDataWriter = new PmemDataWriter();
+            pmemDataWriter = new PmemDataWriterV2();
         }catch(IOException e){
             e.printStackTrace();
         }
@@ -129,12 +128,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         displayConfiguration(26, 51);
         DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./essd") : new File("/essd");
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
-        killSelf(KILL_SELF_TIMEOUT);
+
         init();
 
         powerFailureRecovery(metaInfo);
         initThreadCount = Thread.activeCount();
         log.info("DefaultMessageQueueImpl 构造函数执行完成");
+        killSelf(KILL_SELF_TIMEOUT);
     }
 
     public void powerFailureRecovery(ConcurrentHashMap<Byte, HashMap<Short, QueueInfo>> metaInfo) {
@@ -248,9 +248,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
         }
 
-        if(!haveAppended){
-            System.exit(-1);
-        }
+//        if(!haveAppended){
+//            System.exit(-1);
+//        }
 
 
         GetRangeTaskData task = getTask(Thread.currentThread());

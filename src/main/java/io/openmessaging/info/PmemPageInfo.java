@@ -3,6 +3,7 @@ package io.openmessaging.info;
 import com.intel.pmem.llpl.MemoryBlock;
 
 public class PmemPageInfo {
+    public int freePmemPageQueueIndex;
 //    private byte blockId;
 //    private int pageIndex;
 //
