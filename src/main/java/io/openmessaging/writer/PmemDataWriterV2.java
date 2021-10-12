@@ -129,19 +129,19 @@ public class PmemDataWriterV2 {
             new Thread(() -> {
                 try {
                     WrappedData wrappedData;
-                    PmemPageInfo[] pmemPageInfos;
                     ByteBuffer buf;
                     QueueInfo queueInfo;
                     MetaData meta;
                     byte[] data;
+                    MemoryBlock memoryBlock;
+                    PmemPageInfo pmemPageInfo;
 //                    int requiredPageCount;
                     while (true) {
                         wrappedData = pmemWrappedDataQueue.take();
 //                        long start = System.nanoTime();
                         meta = wrappedData.getMeta();
 //                        requiredPageCount = (meta.getDataLen() + PMEM_PAGE_SIZE - 1) / PMEM_PAGE_SIZE; // 向上取整
-                        MemoryBlock memoryBlock;
-                        PmemPageInfo pmemPageInfo;
+
 
                         if ((pmemPageInfo = freePmemPageQueues[getFreePmemPageQueueIndex(meta.getDataLen())].poll()) != null) {
                             memoryBlock = pmemPageInfo.block;
