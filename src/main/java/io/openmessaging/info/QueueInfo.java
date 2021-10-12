@@ -1,6 +1,11 @@
 package io.openmessaging.info;
 
-import com.intel.pmem.llpl.MemoryBlock;
+
+
+
+import io.openmessaging.util.ArrayQueue;
+
+import java.util.Queue;
 
 import static java.lang.System.arraycopy;
 
@@ -9,9 +14,10 @@ public class QueueInfo {
     private int maxIndex;
     private volatile long[][] dataInfo;
     private volatile int capacity;
-    private volatile boolean[] isInPmem;
+    private volatile byte[] status; // 0 表示数据在ssd中 1 表示数据在pmem中 2 表示数据在内存中
     private volatile PmemPageInfo[] pmemPageInfos;
     private boolean haveQueried;
+    private final ArrayQueue<Integer> dataPosInRam = new ArrayQueue<>(2);
     private static final int DEFAULT_CAPACITY = 100;
 
     public QueueInfo(){
@@ -20,7 +26,7 @@ public class QueueInfo {
 
     public QueueInfo(int initialCapacity){
         dataInfo = new long[initialCapacity][2];
-        isInPmem = new boolean[initialCapacity];
+        status = new byte[initialCapacity];
         pmemPageInfos = new PmemPageInfo[initialCapacity];
         maxIndex = -1;
         capacity = initialCapacity;
@@ -32,20 +38,29 @@ public class QueueInfo {
                 if (index >= capacity) {
                     int newCapacity = index * 2;
                     long[][] newDataInfo = new long[newCapacity][2];
-                    boolean[] newIsInPmem = new boolean[newCapacity];
+                    byte[] newStatus = new byte[newCapacity];
                     PmemPageInfo[] newPmemPageInfos = new PmemPageInfo[newCapacity];
 
                     arraycopy(dataInfo, 0, newDataInfo, 0, maxIndex + 1);
-                    arraycopy(isInPmem, 0, newIsInPmem, 0, maxIndex + 1);
+                    arraycopy(status, 0, newStatus, 0, maxIndex + 1);
                     arraycopy(pmemPageInfos, 0, newPmemPageInfos, 0, maxIndex + 1);
 
                     this.dataInfo = newDataInfo;
-                    this.isInPmem = newIsInPmem;
+                    this.status = newStatus;
                     this.pmemPageInfos = newPmemPageInfos;
                     capacity = newCapacity;
                 }
             }
         }
+    }
+
+    public void setDataPosInRam(int i, int address) {
+        ensureCapacity(i);
+        if(i > maxIndex){
+            maxIndex = i;
+        }
+        // todo 这里还要改
+        status[i] |= 2;
     }
 
 //    public void setDataPosInPmem(int i, PmemPageInfo[] pmemPageInfo){
@@ -63,11 +78,11 @@ public class QueueInfo {
             maxIndex = i;
         }
         pmemPageInfos[i] = pmemPageInfo;
-        isInPmem[i] = true;
+        status[i] |= 1;
     }
 
     public boolean isInPmem(int i){
-        return isInPmem[i];
+        return status[i];
     }
 
 
