@@ -64,7 +64,7 @@ public class SsdDataWriter {
                                 break;
                             }
                         }
-                    } while (mergedData.getCount() == 0 || mergedData.getCount() < 3 && loopCount < 10);
+                    } while (mergedData.getCount() == 0 || mergedData.getCount() < 3 && loopCount < 5);
                     loopCount = 0;
                     mergedDataQueue.offer(mergedData);
                 }
