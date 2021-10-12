@@ -32,12 +32,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File PMEM_ROOT;
     public static final int DATA_INFORMATION_LENGTH = 9;
     public static final long KILL_SELF_TIMEOUT = 20 * 60;  // seconds
-    public static final long WAITE_DATA_TIMEOUT = 1000;  // 微秒
+    public static final long WAITE_DATA_TIMEOUT = 500;  // 微秒
     public static final int WRITE_THREAD_COUNT = 5;
     public static final int READ_THREAD_COUNT = 20;
     public static final int PMEM_WRITE_THREAD_COUNT = 8;
-    public static final long PMEM_HEAP_SIZE = 200 * MB;
-//    public static final long PMEM_HEAP_SIZE = 60 * GB;
+//    public static final long PMEM_HEAP_SIZE = 200 * MB;
+    public static final long PMEM_HEAP_SIZE = 60 * GB;
     public static AtomicLong writtenDataSize = new AtomicLong();
 
     public static AtomicInteger topicCount = new AtomicInteger();
@@ -175,7 +175,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         ssdDataWriter.pushWrappedData(wrappedData);
 
         try {
-            if(writtenDataSize.get() > 2000 * GB){
+            if(writtenDataSize.get() > 20 * GB){
                 pmemDataWriter.pushWrappedData(wrappedData);
             } else {
                 wrappedData.getMeta().getCountDownLatch().countDown();
@@ -232,7 +232,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 if(b){
                     b = false;
                     log.info("第一阶段结束");
-                    System.exit(-1);
+//                    System.exit(-1);
                 }
             }
         }
