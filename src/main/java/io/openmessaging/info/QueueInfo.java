@@ -5,7 +5,7 @@ import com.intel.pmem.llpl.MemoryBlock;
 import static java.lang.System.arraycopy;
 
 public class QueueInfo {
-//    private PageNode[]; //
+//    private PageNode[];
     private int maxIndex;
     private volatile long[][] dataInfo;
     private volatile int capacity;
