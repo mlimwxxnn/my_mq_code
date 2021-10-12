@@ -56,7 +56,9 @@ public class GetRangeTaskData {
                 PmemPageInfo[] allPmemPageInfos = queueInfo.getAllPmemPageInfos();
                 for (int j = 0; j < offset - 1; j++) {
                     PmemPageInfo pmemPageInfo = allPmemPageInfos[j];
-                    freePmemPageQueues[pmemPageInfo.freePmemPageQueueIndex].offer(pmemPageInfo);
+                    if(pmemPageInfo != null) {
+                        freePmemPageQueues[pmemPageInfo.freePmemPageQueueIndex].offer(pmemPageInfo);
+                    }
                 }
             }
             int tmp, n = fetchNum < (tmp = queueInfo.size() - (int) offset) ? fetchNum : tmp;
