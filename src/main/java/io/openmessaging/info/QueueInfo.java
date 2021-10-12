@@ -59,8 +59,13 @@ public class QueueInfo {
         if(i > maxIndex){
             maxIndex = i;
         }
-        // todo 这里还要改
-        status[i] |= 2;
+        if(dataPosInRam.put(address)) {
+            status[i] |= 2;
+        }
+    }
+
+    public Integer getDataPosInRam(){
+        return dataPosInRam.get();
     }
 
 //    public void setDataPosInPmem(int i, PmemPageInfo[] pmemPageInfo){
@@ -82,7 +87,7 @@ public class QueueInfo {
     }
 
     public boolean isInPmem(int i){
-        return status[i];
+        return (status[i] & 1) > 0;
     }
 
 

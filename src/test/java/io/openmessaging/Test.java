@@ -3,6 +3,7 @@ package io.openmessaging;
 import com.intel.pmem.llpl.Heap;
 import io.openmessaging.info.PmemPageInfo;
 import io.openmessaging.info.QueueInfo;
+import io.openmessaging.util.ArrayQueue;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -22,27 +23,19 @@ public class Test {
         System.out.println(b);
     }
 
-//    public static void main(String args[]) throws InterruptedException, IOException {
-//        for (int i = 0; i < 10000; i++) {
-//            testQueueInfo();
-//        }
-//    }
+    public static void main(String[] args) {
+        ArrayQueue<Integer> q = new ArrayQueue(2);
+        q.put(3);
+        System.out.println(q.isEmpty());
+        System.out.println(q.isFull());
+        q.put(23);
+        System.out.println(q.isFull());
+        System.out.println(q.put(2));
+        System.out.println(q.get());
+        System.out.println(q.get());
+        q.put(3);
+        System.out.println(q.get());
+        System.out.println(q.size());
+    }
 
-//    public static void testQueueInfo(){
-//        QueueInfo queueInfo = new QueueInfo();
-//        Thread t1 = new Thread(()->{
-//            queueInfo.setDataPosInFile(100, 3, 2);
-//        });
-//        Thread t2 = new Thread(()->{
-//            queueInfo.setDataPosInPmem(100, new PmemPageInfo[]{new PmemPageInfo((byte) 5, 2)});
-//        });
-//        t1.start();
-//        t2.start();
-//        try {
-//            t1.join();
-//            t2.join();
-//        }catch (Exception e){
-//            e.printStackTrace();
-//        }
-//    }
 }
