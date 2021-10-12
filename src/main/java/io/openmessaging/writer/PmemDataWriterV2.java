@@ -120,7 +120,7 @@ public class PmemDataWriterV2 {
         pmemWrappedDataQueue.offer(wrappedData);
     }
 
-    private int getFreePmemPageQueueIndex(short dataLen){
+    public static int getFreePmemPageQueueIndex(short dataLen){
         return (dataLen + 1023) / 1024 - 1;
     }
 

@@ -36,6 +36,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int WRITE_THREAD_COUNT = 5;
     public static final int READ_THREAD_COUNT = 20;
     public static final int PMEM_WRITE_THREAD_COUNT = 8;
+    public static final int RAM_WRITE_THREAD_COUNT = 8;
     public static final long PMEM_HEAP_SIZE = 60 * GB;
     public static AtomicLong writtenDataSize = new AtomicLong();
 

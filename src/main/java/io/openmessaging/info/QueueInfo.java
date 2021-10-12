@@ -59,13 +59,15 @@ public class QueueInfo {
         if(i > maxIndex){
             maxIndex = i;
         }
-        if(dataPosInRam.put(address)) {
-            status[i] |= 2;
-        }
+        status[i] |= 2;
     }
 
     public Integer getDataPosInRam(){
         return dataPosInRam.get();
+    }
+
+    public boolean ramIsFull(){
+        return dataPosInRam.isFull();
     }
 
 //    public void setDataPosInPmem(int i, PmemPageInfo[] pmemPageInfo){
