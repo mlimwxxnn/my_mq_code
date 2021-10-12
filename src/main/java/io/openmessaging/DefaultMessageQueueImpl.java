@@ -35,7 +35,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final long WAITE_DATA_TIMEOUT = 1000;  // 微秒
     public static final int WRITE_THREAD_COUNT = 5;
     public static final int READ_THREAD_COUNT = 20;
-    public static final int PMEM_WRITE_THREAD_COUNT = 4;
+    public static final int PMEM_WRITE_THREAD_COUNT = 8;
 //    public static final long PMEM_HEAP_SIZE = 200 * MB;
     public static final long PMEM_HEAP_SIZE = 60 * GB;
     public static AtomicLong writtenDataSize = new AtomicLong();
@@ -51,19 +51,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static PmemDataWriterV2 pmemDataWriter;
 
 
-    private void displayConfiguration(int lineFrom, int lineTo){
-        File thisFile = new File("src/main/java/io/openmessaging/DefaultMessageQueueImpl.java");
-        try (BufferedReader br = new BufferedReader(new FileReader(thisFile))) {
-            for (int i = 0; i < lineTo; i++) {
-                String line = br.readLine();
-                if (i + 1 >= lineFrom) {
-                    System.out.println(line);
-                }
-            }
-        } catch (Exception e) {
-            System.out.printf("file:%s read failed!", thisFile.getAbsolutePath());
-        }
-    }
+
 
     public static void init() {
         try {

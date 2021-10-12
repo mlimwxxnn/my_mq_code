@@ -23,15 +23,20 @@ public class PmemDataWriterV2 {
 
 
     private void initPmem(){
-        boolean initialized = Heap.exists(PMEM_ROOT + "/persistent_heap");
-        Heap h = initialized ? Heap.openHeap(PMEM_ROOT + "/persistent_heap") : Heap.createHeap(PMEM_ROOT + "/persistent_heap", PMEM_HEAP_SIZE);
-        int nThread = 8;
-        CountDownLatch countDownLatch = new CountDownLatch(nThread);
 
         for (int i = 0; i < PMEM_BLOCK_GROUP_COUNT; i++) {
             freePmemPageQueues[i] = new LinkedBlockingQueue<>();
         }
+        boolean initialized = Heap.exists(PMEM_ROOT + "/persistent_heap");
+        Heap h;
+        try {
+            h = initialized ? Heap.openHeap(PMEM_ROOT + "/persistent_heap") : Heap.createHeap(PMEM_ROOT + "/persistent_heap", PMEM_HEAP_SIZE);
+        }catch (Exception e) {
+            return;
+        }
+        int nThread = 8;
 
+        CountDownLatch countDownLatch = new CountDownLatch(nThread);
         for (int threadId = 0; threadId < nThread; threadId++) {
             final int heapId = threadId;
             new Thread(() -> {
