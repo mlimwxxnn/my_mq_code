@@ -15,27 +15,34 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import static io.openmessaging.DefaultMessageQueueImpl.PMEM_BLOCK_GROUP_COUNT;
 import static io.openmessaging.DefaultMessageQueueImpl.RAM_WRITE_THREAD_COUNT;
+import static io.openmessaging.writer.PmemDataWriterV2.freePmemPageQueues;
 import static io.openmessaging.writer.PmemDataWriterV2.getFreePmemPageQueueIndex;
 import static java.lang.System.arraycopy;
 
 @SuppressWarnings({"ResultOfMethodCallIgnored", "unchecked"})
 public class RamDataWriter {
 
-    public static final ByteBuffer[] ramBuffer = new ByteBuffer[17];
+    public static final ByteBuffer[] ramBuffers = new ByteBuffer[17];
     public static final BlockingQueue<Integer>[] freeRamQueues = new LinkedBlockingQueue[17];
     private static final BlockingQueue<WrappedData> ramWrappedDataQueue = new LinkedBlockingQueue<>();
     private static final Unsafe unsafe = UnsafeUtil.unsafe;
     public RamDataWriter(){
         CountDownLatch countDownLatch = new CountDownLatch(PMEM_BLOCK_GROUP_COUNT);
         for (int i = 0; i < 17; i++) {
-
             int queueIndex = i;
             new Thread(() -> {
-                ramBuffer[queueIndex] = ByteBuffer.allocate(1024 * (queueIndex + 1) * 20560); // set 20560 for allocate 3G RAM
+                ramBuffers[queueIndex] = ByteBuffer.allocate(1024 * (queueIndex + 1) * 560); // set 20560 for allocate 3G RAM todo
+                freeRamQueues[queueIndex] = new LinkedBlockingQueue<>();
                 for (int j = 0; j < 20560; j++) {
                     freeRamQueues[queueIndex].offer(j);
                 }
+                countDownLatch.countDown();
             }).start();
+        }
+        try {
+            countDownLatch.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
     }
 
@@ -69,7 +76,7 @@ public class RamDataWriter {
                             buf = wrappedData.getData();
                             data = buf.array();
 
-                            arraycopy(data, buf.position(), ramBuffer[i].array(), address, buf.remaining());
+                            arraycopy(data, buf.position(), ramBuffers[i].array(), address, buf.remaining());
 
                             queueInfo.setDataPosInRam(meta.getOffset(), address);
 //                            long end = System.nanoTime();

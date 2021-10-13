@@ -128,4 +128,8 @@ public class QueueInfo {
     public boolean haveQueried(){
         return haveQueried;
     }
+
+    public boolean isInRam(int i) {
+        return (status[i] | 2) > 0;
+    }
 }

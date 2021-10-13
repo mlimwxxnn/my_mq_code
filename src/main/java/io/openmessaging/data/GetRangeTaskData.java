@@ -9,8 +9,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
-import static io.openmessaging.DefaultMessageQueueImpl.pmemDataWriter;
 import static io.openmessaging.writer.PmemDataWriterV2.freePmemPageQueues;
+import static io.openmessaging.writer.PmemDataWriterV2.getFreePmemPageQueueIndex;
+import static io.openmessaging.writer.RamDataWriter.freeRamQueues;
+import static io.openmessaging.writer.RamDataWriter.ramBuffers;
+import static java.lang.System.arraycopy;
 //import static io.openmessaging.writer.PmemDataWriter.memoryBlocks;
 
 
@@ -62,24 +65,30 @@ public class GetRangeTaskData {
                 }
             }
             int tmp, n = fetchNum < (tmp = queueInfo.size() - (int) offset) ? fetchNum : tmp;
-            int dataLen;
+            short dataLen;
             for (int i = 0; i < n; i++) {
-                long[] p = queueInfo.getDataPosInFile(i + (int) offset);
-                dataLen = (int) p[1];
+                int currentOffset = i + (int) offset;
+                long[] p = queueInfo.getDataPosInFile(currentOffset);
+                dataLen = (short) p[1];
                 ByteBuffer buf = buffers[i];
                 buf.clear();
                 buf.limit(dataLen);
-                if (!queueInfo.isInPmem(i + (int) offset)) {
-                    int id = (int) (p[1] >> 32);
-                    DefaultMessageQueueImpl.dataWriteChannels[id].read(buf, p[0]);
-                    buf.flip();
-                } else {
+                if(queueInfo.isInRam(currentOffset)){
+                    Integer address = queueInfo.getDataPosInRam();
+                    int ramBufferIndex = getFreePmemPageQueueIndex(dataLen);
+                    arraycopy(ramBuffers[ramBufferIndex].array(), address, buf.array(), 0, dataLen);
+                    freeRamQueues[ramBufferIndex].offer(address);
+                }else if(queueInfo.isInPmem(currentOffset)) {
                     PmemPageInfo pmemPageInfo = queueInfo.getDataPosInPmem(i + (int) offset);
                     byte[] bufArray = buf.array();
 
                     pmemPageInfo.block.copyToArray(0, bufArray, 0, dataLen);
 
                     freePmemPageQueues[pmemPageInfo.freePmemPageQueueIndex].offer(pmemPageInfo);
+                }else {
+                    int id = (int) (p[1] >> 32);
+                    DefaultMessageQueueImpl.dataWriteChannels[id].read(buf, p[0]);
+                    buf.flip();
                 }
                 result.put(i, buf);
             }

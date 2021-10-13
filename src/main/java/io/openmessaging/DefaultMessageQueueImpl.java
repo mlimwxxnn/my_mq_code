@@ -6,6 +6,7 @@ import io.openmessaging.info.QueueInfo;
 import io.openmessaging.reader.DataReader;
 //import io.openmessaging.writer.PmemDataWriter;
 import io.openmessaging.writer.PmemDataWriterV2;
+import io.openmessaging.writer.RamDataWriter;
 import io.openmessaging.writer.SsdDataWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +38,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int READ_THREAD_COUNT = 20;
     public static final int PMEM_WRITE_THREAD_COUNT = 8;
     public static final int RAM_WRITE_THREAD_COUNT = 8;
-    public static final long PMEM_HEAP_SIZE = 60 * GB;
+//    public static final long PMEM_HEAP_SIZE = 60 * GB;
+    public static final long PMEM_HEAP_SIZE = 200 * MB;
     public static AtomicLong writtenDataSize = new AtomicLong();
 
     public static AtomicInteger topicCount = new AtomicInteger();
@@ -49,6 +51,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static DataReader dataReader;
     public static int initThreadCount = 0;
     public static PmemDataWriterV2 pmemDataWriter;
+    public static RamDataWriter ramDataWriter;
 
 
 
@@ -70,6 +73,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
             ssdDataWriter = new SsdDataWriter();
             pmemDataWriter = new PmemDataWriterV2();
+            ramDataWriter = new RamDataWriter();
         }catch(IOException e){
             e.printStackTrace();
         }
@@ -177,7 +181,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         try {
             if(writtenDataSize.get() > 20 * GB){
                 pmemDataWriter.pushWrappedData(wrappedData);
+                ramDataWriter.pushWrappedData(wrappedData);
             } else {
+                wrappedData.getMeta().getCountDownLatch().countDown();
                 wrappedData.getMeta().getCountDownLatch().countDown();
             }
             wrappedData.getMeta().getCountDownLatch().await();
@@ -232,7 +238,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 if(b){
                     b = false;
                     log.info("第一阶段结束");
-                    System.exit(-1);
+//                    System.exit(-1);
                 }
             }
         }
