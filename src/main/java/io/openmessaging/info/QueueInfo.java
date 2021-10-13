@@ -130,6 +130,6 @@ public class QueueInfo {
     }
 
     public boolean isInRam(int i) {
-        return (status[i] | 2) > 0;
+        return (status[i] & 2) > 0;
     }
 }

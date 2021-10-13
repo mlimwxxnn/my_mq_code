@@ -54,7 +54,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static RamDataWriter ramDataWriter;
 
 
-
+    public static final AtomicLong writtenDataCount = new AtomicLong(); // todo 测试
 
     public static void init() {
         try {
