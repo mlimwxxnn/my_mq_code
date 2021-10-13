@@ -74,7 +74,7 @@ public class RamDataWriter {
                         queueInfo = meta.getQueueInfo();
                         dataLen = meta.getDataLen();
                         int i = getFreePmemPageQueueIndex(dataLen);
-                        if (!queueInfo.ramIsFull() && (address = freeRamQueues[i].poll()) != null) {
+                        if (!queueInfo.ramIsFull() && queueInfo.haveQueried() && (address = freeRamQueues[i].poll()) != null) {
                             buf = wrappedData.getData();
                             data = buf.array();
 
