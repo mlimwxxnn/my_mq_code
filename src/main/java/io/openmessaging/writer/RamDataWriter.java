@@ -31,7 +31,7 @@ public class RamDataWriter {
         for (int i = 0; i < 17; i++) {
             int queueIndex = i;
             new Thread(() -> {
-                ramBuffers[queueIndex] = ByteBuffer.allocate(1024 * (queueIndex + 1) * 560); // set 20560 for allocate 3G RAM todo
+                ramBuffers[queueIndex] = ByteBuffer.allocate(1024 * (queueIndex + 1) * 20560); // 1加到17等于153 set 20560 for allocate 3G RAM todo
                 freeRamQueues[queueIndex] = new LinkedBlockingQueue<>();
                 for (int j = 0; j < 20560; j++) {
                     freeRamQueues[queueIndex].offer(j);

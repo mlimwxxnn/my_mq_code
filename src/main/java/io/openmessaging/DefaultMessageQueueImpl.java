@@ -32,14 +32,14 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
     public static final int DATA_INFORMATION_LENGTH = 9;
-    public static final long KILL_SELF_TIMEOUT = 20 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 5 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 300;  // 微秒
     public static final int WRITE_THREAD_COUNT = 5;
     public static final int READ_THREAD_COUNT = 20;
     public static final int PMEM_WRITE_THREAD_COUNT = 8;
     public static final int RAM_WRITE_THREAD_COUNT = 8;
-//    public static final long PMEM_HEAP_SIZE = 60 * GB;
-    public static final long PMEM_HEAP_SIZE = 200 * MB;
+    public static final long PMEM_HEAP_SIZE = 60 * GB;
+//    public static final long PMEM_HEAP_SIZE = 200 * MB;
     public static AtomicLong writtenDataSize = new AtomicLong();
 
     public static AtomicInteger topicCount = new AtomicInteger();
@@ -53,7 +53,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static PmemDataWriterV2 pmemDataWriter;
     public static RamDataWriter ramDataWriter;
 
-    public static final AtomicLong writtenDataCount = new AtomicLong();
 
     public static void init() {
         try {
@@ -179,7 +178,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 
         try {
-            if(writtenDataSize.get() > 20 * GB){
+            if(writtenDataSize.get() > 0 * GB){
                 pmemDataWriter.pushWrappedData(wrappedData);
                 ramDataWriter.pushWrappedData(wrappedData);
             } else {
