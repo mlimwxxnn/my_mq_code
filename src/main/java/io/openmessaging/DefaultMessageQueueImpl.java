@@ -53,8 +53,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static PmemDataWriterV2 pmemDataWriter;
     public static RamDataWriter ramDataWriter;
 
-
-    public static final AtomicLong writtenDataCount = new AtomicLong(); // todo 测试
+    public static final AtomicLong writtenDataCount = new AtomicLong();
 
     public static void init() {
         try {
@@ -177,6 +176,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         WrappedData wrappedData = new WrappedData(topicId, (short) queueId, data, offset, queueInfo);
         ssdDataWriter.pushWrappedData(wrappedData);
+
 
         try {
             if(writtenDataSize.get() > 20 * GB){
