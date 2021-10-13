@@ -65,50 +65,6 @@ public class PmemDataWriterV2 {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-
-
-
-//        int nHeapCount = 8;
-//        Heap[] heaps = new Heap[nHeapCount];
-//        boolean initialized = Heap.exists(PMEM_ROOT + "/persistent_heap-0");
-//        for (int i = 0; i < nHeapCount; i++) {
-//            heaps[i] = initialized ? Heap.openHeap(PMEM_ROOT + "/persistent_heap-" + i) : Heap.createHeap(PMEM_ROOT + "/persistent_heap-" + i, PMEM_HEAP_SIZE / nHeapCount);
-//        }
-//
-//        for (int i = 0; i < PMEM_BLOCK_GROUP_COUNT; i++) {
-//            freePmemPageQueues[i] = new LinkedBlockingQueue<>();
-//        }
-//
-//        CountDownLatch countDownLatch = new CountDownLatch(nHeapCount);
-//
-//        for (int threadId = 0; threadId < nHeapCount; threadId++) {
-//            final int heapId = threadId;
-//            new Thread(() -> {
-//                long start = System.currentTimeMillis();
-//                try {
-//                    while (true){
-//                        for (int i = 1; i <= PMEM_BLOCK_GROUP_COUNT; i++) {
-//                            MemoryBlock memoryBlock = heaps[heapId].allocateMemoryBlock(i * 1024);
-//                            PmemPageInfo pmemPageInfo = new PmemPageInfo();
-//                            pmemPageInfo.block = memoryBlock;
-//                            pmemPageInfo.freePmemPageQueueIndex = i - 1;
-//                            freePmemPageQueues[i - 1].offer(pmemPageInfo);
-//                            if (i == 17){
-//                                int i1 = 1;
-//                            }
-//                        }
-//                    }
-//                }catch (Exception e){
-//                    countDownLatch.countDown();
-//                    System.out.printf("heap is full.(%d)\n", System.currentTimeMillis() - start);
-//                }
-//            }).start();
-//        }
-//        try {
-//            countDownLatch.await();
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
     }
 
     public PmemDataWriterV2() {

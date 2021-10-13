@@ -26,7 +26,7 @@ public class RamDataWriter {
     public static final BlockingQueue<Integer>[] freeRamQueues = new LinkedBlockingQueue[17];
     private static final BlockingQueue<WrappedData> ramWrappedDataQueue = new LinkedBlockingQueue<>();
     private static final Unsafe unsafe = UnsafeUtil.unsafe;
-    public RamDataWriter(){
+    public void init(){
         CountDownLatch countDownLatch = new CountDownLatch(PMEM_BLOCK_GROUP_COUNT);
         for (int i = 0; i < 17; i++) {
             int queueIndex = i;
@@ -46,6 +46,11 @@ public class RamDataWriter {
         }
     }
 
+    public RamDataWriter() {
+        init();
+        writeDataToRam();
+    }
+
     public void pushWrappedData(WrappedData wrappedData){
         ramWrappedDataQueue.offer(wrappedData);
     }
@@ -59,11 +64,8 @@ public class RamDataWriter {
                     QueueInfo queueInfo;
                     MetaData meta;
                     byte[] data;
-                    MemoryBlock memoryBlock;
-                    PmemPageInfo pmemPageInfo;
                     short dataLen;
                     Integer address;
-//                    int requiredPageCount;
                     while (true) {
                         wrappedData = ramWrappedDataQueue.take();
 //                        long start = System.nanoTime();

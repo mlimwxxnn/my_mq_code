@@ -59,6 +59,7 @@ public class QueueInfo {
         if(i > maxIndex){
             maxIndex = i;
         }
+        dataPosInRam.put(address);
         status[i] |= 2;
     }
 
