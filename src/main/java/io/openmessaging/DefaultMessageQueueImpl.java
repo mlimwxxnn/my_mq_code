@@ -37,7 +37,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final long KILL_SELF_TIMEOUT = 1 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 300;  // 微秒
     public static final int SSD_WRITE_THREAD_COUNT = 5;
-    public static final int SSD_MERGE_THREAD_COUNT = 1;
+    public static final int SSD_MERGE_THREAD_COUNT = 2;
     public static final int READ_THREAD_COUNT = 20;
     public static final int PMEM_WRITE_THREAD_COUNT = 8;
     public static final int RAM_WRITE_THREAD_COUNT = 8;
