@@ -76,7 +76,7 @@ public class SsdDataWriter {
                         mergedData.reset();
                         do {
                             loopCount ++;
-                            for (int i = 0; i < 12; i++) {
+                            for (int i = 0; i < 5; i++) {
                                 wrappedData = ssdWrappedDataQueue.poll(DefaultMessageQueueImpl.WAITE_DATA_TIMEOUT,
                                         TimeUnit.MICROSECONDS);
                                 if (wrappedData != null) {
@@ -85,7 +85,7 @@ public class SsdDataWriter {
                                     break;
                                 }
                             }
-                        } while (mergedData.getCount() == 0 || (mergedData.getCount() < 3 && loopCount < 7));
+                        } while (mergedData.getCount() == 0 || (mergedData.getCount() < 3 && loopCount < 10));
                         loopCount = 0;
                         mergedDataQueue.offer(mergedData);
                     }
