@@ -1,9 +1,7 @@
 package io.openmessaging.writer;
 
-import com.intel.pmem.llpl.MemoryBlock;
 import io.openmessaging.data.MetaData;
 import io.openmessaging.data.WrappedData;
-import io.openmessaging.info.PmemPageInfo;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.util.UnsafeUtil;
 import sun.misc.Unsafe;
@@ -14,8 +12,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
-import static io.openmessaging.writer.PmemDataWriterV2.freePmemPageQueues;
-import static io.openmessaging.writer.PmemDataWriterV2.getFreePmemPageQueueIndex;
+import static io.openmessaging.writer.PmemDataWriter.getIndexByDataLength;
 import static java.lang.System.arraycopy;
 
 @SuppressWarnings({"ResultOfMethodCallIgnored", "unchecked"})
@@ -74,7 +71,7 @@ public class RamDataWriter {
 
                         queueInfo = meta.getQueueInfo();
                         dataLen = meta.getDataLen();
-                        int i = getFreePmemPageQueueIndex(dataLen);
+                        int i = getIndexByDataLength(dataLen);
                         if (!queueInfo.ramIsFull() && queueInfo.haveQueried() && (address = freeRamQueues[i].poll()) != null) {
                             buf = wrappedData.getData();
                             data = buf.array();

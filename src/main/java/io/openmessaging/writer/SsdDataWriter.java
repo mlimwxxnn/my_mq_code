@@ -33,46 +33,39 @@ public class SsdDataWriter {
     }
 
     void mergeData() {
-        new Thread(() -> {
-//            int minMergeCount = 20;
-//            try {
-//                Thread.sleep(400);
-//                minMergeCount = Math.max(Thread.activeCount() - DefaultMessageQueueImpl.initThreadCount - 5,
-//                        minMergeCount);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//            minMergeCount /= DefaultMessageQueueImpl.WRITE_THREAD_COUNT;
-            try {
-                WrappedData wrappedData;
-                MergedData mergedData;
-                int loopCount = 0;
-                while (true) {
-                    mergedData = freeMergedDataQueue.take();
-                    mergedData.reset();
-                    do {
-                        loopCount ++;
-                        for (int i = 0; i < 7; i++) {
-                            wrappedData = ssdWrappedDataQueue.poll(DefaultMessageQueueImpl.WAITE_DATA_TIMEOUT,
-                                    TimeUnit.MICROSECONDS);
-                            if (wrappedData != null) {
-                                mergedData.putData(wrappedData);
-                            } else {
-                                break;
+        for (int mergeThreadId = 0; mergeThreadId < SSD_MERGE_THREAD_COUNT; mergeThreadId++) {
+            new Thread(() -> {
+                try {
+                    WrappedData wrappedData;
+                    MergedData mergedData;
+                    int loopCount = 0;
+                    while (true) {
+                        mergedData = freeMergedDataQueue.take();
+                        mergedData.reset();
+                        do {
+                            loopCount ++;
+                            for (int i = 0; i < 7; i++) {
+                                wrappedData = ssdWrappedDataQueue.poll(DefaultMessageQueueImpl.WAITE_DATA_TIMEOUT,
+                                        TimeUnit.MICROSECONDS);
+                                if (wrappedData != null) {
+                                    mergedData.putData(wrappedData);
+                                } else {
+                                    break;
+                                }
                             }
-                        }
-                    } while (mergedData.getCount() == 0 || mergedData.getCount() < 3 && loopCount < 10);
-                    loopCount = 0;
-                    mergedDataQueue.offer(mergedData);
+                        } while (mergedData.getCount() == 0 || (mergedData.getCount() < 3 && loopCount < 10));
+                        loopCount = 0;
+                        mergedDataQueue.offer(mergedData);
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
                 }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }).start();
+            }).start();
+        }
     }
 
     void writeData() {
-        for (int i = 0; i < DefaultMessageQueueImpl.WRITE_THREAD_COUNT; i++) {
+        for (int i = 0; i < DefaultMessageQueueImpl.SSD_WRITE_THREAD_COUNT; i++) {
             final long writeThreadId = i;
             new Thread(() -> {
                 try {

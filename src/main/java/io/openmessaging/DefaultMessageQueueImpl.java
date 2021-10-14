@@ -6,7 +6,7 @@ import io.openmessaging.data.WrappedData;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.reader.DataReader;
 //import io.openmessaging.writer.PmemDataWriter;
-import io.openmessaging.writer.PmemDataWriterV2;
+import io.openmessaging.writer.PmemDataWriter;
 import io.openmessaging.writer.RamDataWriter;
 import io.openmessaging.writer.SsdDataWriter;
 import org.slf4j.Logger;
@@ -34,9 +34,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
     public static final int DATA_INFORMATION_LENGTH = 9;
-    public static final long KILL_SELF_TIMEOUT = 20 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 1 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 300;  // 微秒
-    public static final int WRITE_THREAD_COUNT = 5;
+    public static final int SSD_WRITE_THREAD_COUNT = 5;
+    public static final int SSD_MERGE_THREAD_COUNT = 2;
     public static final int READ_THREAD_COUNT = 20;
     public static final int PMEM_WRITE_THREAD_COUNT = 8;
     public static final int RAM_WRITE_THREAD_COUNT = 8;
@@ -49,11 +50,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     static private final ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
     public static volatile ConcurrentHashMap<Byte, HashMap<Short, QueueInfo>> metaInfo;
     public static volatile Map<Thread, GetRangeTaskData> getRangeTaskMap = new ConcurrentHashMap<>();
-    public static final FileChannel[] dataWriteChannels = new FileChannel[WRITE_THREAD_COUNT];
+    public static final FileChannel[] dataWriteChannels = new FileChannel[SSD_WRITE_THREAD_COUNT];
     public static SsdDataWriter ssdDataWriter;
     public static DataReader dataReader;
     public static int initThreadCount = 0;
-    public static PmemDataWriterV2 pmemDataWriter;
+    public static PmemDataWriter pmemDataWriter;
     public static RamDataWriter ramDataWriter;
 
     public static CacheHitCountData hitCountData;
@@ -63,7 +64,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         try {
             metaInfo = new ConcurrentHashMap<>(100);
             dataReader = new DataReader();
-            for (int i = 0; i < WRITE_THREAD_COUNT; i++) {
+            for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
                 File file = new File(DISC_ROOT, "data-" + i);
                 File parentFile = file.getParentFile();
                 if (!parentFile.exists()) {
@@ -75,7 +76,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 dataWriteChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
             }
             ssdDataWriter = new SsdDataWriter();
-            pmemDataWriter = new PmemDataWriterV2();
+            pmemDataWriter = new PmemDataWriter();
             ramDataWriter = new RamDataWriter();
             if (GET_CACHE_HIT_INFO){
                 hitCountData = new CacheHitCountData();

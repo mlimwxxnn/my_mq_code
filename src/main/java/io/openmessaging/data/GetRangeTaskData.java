@@ -10,8 +10,8 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
-import static io.openmessaging.writer.PmemDataWriterV2.freePmemPageQueues;
-import static io.openmessaging.writer.PmemDataWriterV2.getFreePmemPageQueueIndex;
+import static io.openmessaging.writer.PmemDataWriter.freePmemPageQueues;
+import static io.openmessaging.writer.PmemDataWriter.getIndexByDataLength;
 import static io.openmessaging.writer.RamDataWriter.freeRamQueues;
 import static io.openmessaging.writer.RamDataWriter.ramBuffers;
 import static java.lang.System.arraycopy;
@@ -76,7 +76,7 @@ public class GetRangeTaskData {
                 buf.limit(dataLen);
                 if(queueInfo.isInRam(currentOffset)){
                     Integer address = queueInfo.getDataPosInRam();
-                    int ramBufferIndex = getFreePmemPageQueueIndex(dataLen);
+                    int ramBufferIndex = getIndexByDataLength(dataLen);
                     try {
                         arraycopy(ramBuffers[ramBufferIndex].array(), address, buf.array(), 0, dataLen);
                     }catch (ArrayIndexOutOfBoundsException e){
