@@ -78,8 +78,14 @@ public class GetRangeTaskData {
                     int ramBufferIndex = getFreePmemPageQueueIndex(dataLen);
                     arraycopy(ramBuffers[ramBufferIndex].array(), address, buf.array(), 0, dataLen);
                     freeRamQueues[ramBufferIndex].offer(address);
+
+                    // 查完Ram，如果本条存在与PMEM中，则回收
+                    if (queueInfo.isInPmem(currentOffset)){
+                        PmemPageInfo pmemPageInfo = queueInfo.getDataPosInPmem(currentOffset);
+                        freePmemPageQueues[pmemPageInfo.freePmemPageQueueIndex].offer(pmemPageInfo);
+                    }
                 }else if(queueInfo.isInPmem(currentOffset)) {
-                    PmemPageInfo pmemPageInfo = queueInfo.getDataPosInPmem(i + (int) offset);
+                    PmemPageInfo pmemPageInfo = queueInfo.getDataPosInPmem(currentOffset);
                     byte[] bufArray = buf.array();
 
                     pmemPageInfo.block.copyToArray(0, bufArray, 0, dataLen);
@@ -90,6 +96,7 @@ public class GetRangeTaskData {
                     DefaultMessageQueueImpl.dataWriteChannels[id].read(buf, p[0]);
                     buf.flip();
                 }
+
                 result.put(i, buf);
             }
         } catch (Exception e) {

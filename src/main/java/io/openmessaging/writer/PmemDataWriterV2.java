@@ -23,7 +23,6 @@ public class PmemDataWriterV2 {
 
 
     private void initPmem(){
-
         for (int i = 0; i < PMEM_BLOCK_GROUP_COUNT; i++) {
             freePmemPageQueues[i] = new LinkedBlockingQueue<>();
         }

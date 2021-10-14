@@ -13,8 +13,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 
-import static io.openmessaging.DefaultMessageQueueImpl.PMEM_BLOCK_GROUP_COUNT;
-import static io.openmessaging.DefaultMessageQueueImpl.RAM_WRITE_THREAD_COUNT;
+import static io.openmessaging.DefaultMessageQueueImpl.*;
 import static io.openmessaging.writer.PmemDataWriterV2.freePmemPageQueues;
 import static io.openmessaging.writer.PmemDataWriterV2.getFreePmemPageQueueIndex;
 import static java.lang.System.arraycopy;
@@ -26,15 +25,17 @@ public class RamDataWriter {
     public static final BlockingQueue<Integer>[] freeRamQueues = new LinkedBlockingQueue[17];
     private static final BlockingQueue<WrappedData> ramWrappedDataQueue = new LinkedBlockingQueue<>();
     private static final Unsafe unsafe = UnsafeUtil.unsafe;
+
     public void init(){
+        int blockNumsPerCache = (int)(RAM_CACHE_SIZE / (1024 * 153));  // 1 + 2 + 3 + ... + 17 = 153
         CountDownLatch countDownLatch = new CountDownLatch(PMEM_BLOCK_GROUP_COUNT);
         for (int i = 0; i < 17; i++) {
             int queueIndex = i;
             new Thread(() -> {
-                ramBuffers[queueIndex] = ByteBuffer.allocate(1024 * (queueIndex + 1) * 6853); // 1加到17等于153, set 6853 for allocate 1G RAM
+                ramBuffers[queueIndex] = ByteBuffer.allocate(1024 * (queueIndex + 1) * blockNumsPerCache); // 1加到17等于153, set 6853 for allocate 1G RAM
                 freeRamQueues[queueIndex] = new LinkedBlockingQueue<>();
-                for (int j = 0; j < 20560; j++) {
-                    freeRamQueues[queueIndex].offer(j);
+                for (int j = 0; j < blockNumsPerCache; j++) {
+                    freeRamQueues[queueIndex].offer(j * (queueIndex + 1) * 1024);
                 }
                 countDownLatch.countDown();
             }).start();
