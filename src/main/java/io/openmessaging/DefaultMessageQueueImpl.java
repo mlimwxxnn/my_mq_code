@@ -5,7 +5,6 @@ import io.openmessaging.data.GetRangeTaskData;
 import io.openmessaging.data.WrappedData;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.reader.DataReader;
-//import io.openmessaging.writer.PmemDataWriter;
 import io.openmessaging.writer.PmemDataWriter;
 import io.openmessaging.writer.RamDataWriter;
 import io.openmessaging.writer.SsdDataWriter;
@@ -20,7 +19,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 
 @SuppressWarnings("ResultOfMethodCallIgnored")
@@ -30,7 +28,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final Logger log = LoggerFactory.getLogger("myLogger");
     public static final long GB = 1024L * 1024L * 1024L;
     public static final long MB = 1024L * 1024L;
-    public static final boolean GET_CACHE_HIT_INFO = true;
+    public static final boolean GET_CACHE_HIT_INFO = false;
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
     public static final int DATA_INFORMATION_LENGTH = 9;
@@ -44,7 +42,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final long RAM_CACHE_SIZE = 2 * GB;
     public static final long PMEM_HEAP_SIZE = 60 * GB;
     // public static final long PMEM_HEAP_SIZE = 20 * MB;
-    public static AtomicLong writtenDataSize = new AtomicLong();
+    public static long roughWrittenDataSize = 0;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     static private final ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
@@ -78,13 +76,23 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             ssdDataWriter = new SsdDataWriter();
             pmemDataWriter = new PmemDataWriter();
             ramDataWriter = new RamDataWriter();
+            new Thread(() -> {
+                try {
+                    while (roughWrittenDataSize < 75 * GB){
+                        Thread.sleep(10 * 1000);
+                        roughWrittenDataSize = getTotalFileSizeByPosition();
+                    }
+                }catch (Exception e){
+                    e.printStackTrace();
+                }
+            }).start();
             if (GET_CACHE_HIT_INFO){
                 hitCountData = new CacheHitCountData();
                 new Thread(() -> {
                     try {
                         // 有查询后再打印
-                        while (writtenDataSize.get() < 75 * GB){
-                            Thread.sleep(1000);
+                        while (roughWrittenDataSize < 75 * GB){
+                            Thread.sleep(10 * 1000);
                         }
                         while (true){
                             // 每10s打印一次
@@ -113,6 +121,18 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         return fileSize;
     }
 
+    public static long getTotalFileSizeByPosition() {
+        long fileSize = 0;
+        for (FileChannel dataWriteChannel : dataWriteChannels) {
+            try {
+                fileSize += dataWriteChannel.position();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return fileSize;
+    }
+
     public static GetRangeTaskData getTask(Thread thread) {
         return getRangeTaskMap.computeIfAbsent(thread, k -> new GetRangeTaskData());
     }
@@ -124,11 +144,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         new Thread(() -> {
             try {
                 Thread.sleep(timeout * 1000);
-                long writtenSize = 0;
-                for (FileChannel dataWriteChannel : dataWriteChannels) {
-                    writtenSize += dataWriteChannel.position();  // M
-                }
-                writtenSize /= (1024 * 1024);
+                long writtenSize = getTotalFileSizeByPosition() / (1024 * 1024);
                 System.out.printf("kill self(written: %d M)%n", writtenSize);
                 System.exit(-1);
             } catch (Exception e) {
@@ -200,9 +216,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         WrappedData wrappedData = new WrappedData(topicId, (short) queueId, data, offset, queueInfo);
         ssdDataWriter.pushWrappedData(wrappedData);
 
-
         try {
-            if(writtenDataSize.get() > 20 * GB){
+            if(roughWrittenDataSize > 15 * GB){
                 ramDataWriter.pushWrappedData(wrappedData);
             } else {
                 wrappedData.getMeta().getCountDownLatch().countDown();
@@ -264,9 +279,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
         }
 
-        if(!haveAppended){
-            System.exit(-1);
-        }
+//        if(!haveAppended){
+//            System.exit(-1);
+//        }
 
 
         GetRangeTaskData task = getTask(Thread.currentThread());

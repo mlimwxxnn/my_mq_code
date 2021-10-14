@@ -92,10 +92,7 @@ public class SsdDataWriter {
                             metaData.getCountDownLatch().countDown();
 
                         });
-                        writtenDataSize.getAndAdd(mergedBuffer.limit() - (long) DATA_INFORMATION_LENGTH * mergedData.getCount());
                         freeMergedDataQueue.offer(mergedData);
-//                        long end = System.nanoTime();
-//                        System.out.printf("ssd写入%d个耗时：%d\n", mergedData.getCount(), end - start);
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
