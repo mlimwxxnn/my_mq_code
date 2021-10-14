@@ -82,10 +82,6 @@ public class RamDataWriter {
                             arraycopy(data, buf.position(), ramBuffers[i].array(), address, buf.remaining());
 
                             queueInfo.setDataPosInRam(meta.getOffset(), address);
-
-                            if (GET_CACHE_HIT_INFO){
-                                hitCountData.increaseRamHitCount();
-                            }
 //                            long end = System.nanoTime();
 //                            System.out.printf("ram耗时：%d", end -start);
                         }

@@ -35,7 +35,7 @@ public class CacheHitCountData {
 
     public static void main(String[] args) {
         CacheHitCountData cacheHitCount = new CacheHitCountData();
-        cacheHitCount.addTotalQueryCount(3);
+        cacheHitCount.addTotalQueryCount(4);
         cacheHitCount.increasePmemHitCount();
         cacheHitCount.increasePmemHitCount();
         cacheHitCount.increaseRamHitCount();

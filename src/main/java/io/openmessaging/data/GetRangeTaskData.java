@@ -9,6 +9,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
+import static io.openmessaging.DefaultMessageQueueImpl.GET_CACHE_HIT_INFO;
+import static io.openmessaging.DefaultMessageQueueImpl.hitCountData;
 import static io.openmessaging.writer.PmemDataWriterV2.freePmemPageQueues;
 import static io.openmessaging.writer.PmemDataWriterV2.getFreePmemPageQueueIndex;
 import static io.openmessaging.writer.RamDataWriter.freeRamQueues;
@@ -83,6 +85,14 @@ public class GetRangeTaskData {
                     if (queueInfo.isInPmem(currentOffset)){
                         PmemPageInfo pmemPageInfo = queueInfo.getDataPosInPmem(currentOffset);
                         freePmemPageQueues[pmemPageInfo.freePmemPageQueueIndex].offer(pmemPageInfo);
+                        // 命中pmem
+                        if (GET_CACHE_HIT_INFO){
+                            hitCountData.increasePmemHitCount();
+                        }
+                    }
+                    // 命中ram
+                    if (GET_CACHE_HIT_INFO){
+                        hitCountData.increaseRamHitCount();
                     }
                 }else if(queueInfo.isInPmem(currentOffset)) {
                     PmemPageInfo pmemPageInfo = queueInfo.getDataPosInPmem(currentOffset);
@@ -91,6 +101,10 @@ public class GetRangeTaskData {
                     pmemPageInfo.block.copyToArray(0, bufArray, 0, dataLen);
 
                     freePmemPageQueues[pmemPageInfo.freePmemPageQueueIndex].offer(pmemPageInfo);
+                    // 命中pmem
+                    if (GET_CACHE_HIT_INFO){
+                        hitCountData.increasePmemHitCount();
+                    }
                 }else {
                     int id = (int) (p[1] >> 32);
                     DefaultMessageQueueImpl.dataWriteChannels[id].read(buf, p[0]);
