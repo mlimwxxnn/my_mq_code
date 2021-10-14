@@ -60,7 +60,9 @@ public class QueueInfo {
             maxIndex = i;
         }
         dataPosInRam.put(address);
-        status[i] |= 2;
+        synchronized (this){
+            status[i] |= 2;
+        }
     }
 
     public Integer getDataPosInRam(){
@@ -71,22 +73,15 @@ public class QueueInfo {
         return dataPosInRam.isFull();
     }
 
-//    public void setDataPosInPmem(int i, PmemPageInfo[] pmemPageInfo){
-//        ensureCapacity(i);
-//        if(i > maxIndex){
-//            maxIndex = i;
-//        }
-//        pmemPageInfos[i] = pmemPageInfo;
-//        isInPmem[i] = true;
-//    }
-
-    public void setPmemBlockMemory(int i, PmemPageInfo pmemPageInfo){
+    public void setDataPosInPmem(int i, PmemPageInfo pmemPageInfo){
         ensureCapacity(i);
         if(i > maxIndex){
             maxIndex = i;
         }
         pmemPageInfos[i] = pmemPageInfo;
-        status[i] |= 1;
+        synchronized (this){
+            status[i] |= 1;
+        }
     }
 
     public boolean isInPmem(int i){

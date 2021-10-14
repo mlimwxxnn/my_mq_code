@@ -82,6 +82,7 @@ public class GetRangeTaskData {
                     }catch (ArrayIndexOutOfBoundsException e){
                         log.info("exception: ramBufferIndex: {}, ramBuffers[ramBufferIndex].array().len: {}, buf.array().len: {}, dataLen: {}",
                                 ramBufferIndex, ramBuffers[ramBufferIndex].array().length, buf.array().length, dataLen);
+                        System.exit(-1);
                     }
                     freeRamQueues[ramBufferIndex].offer(address);
 

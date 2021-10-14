@@ -108,7 +108,7 @@ public class PmemDataWriterV2 {
 
 //                            queueInfo.setDataPosInPmem(meta.getOffset(), pmemPageInfos);
 
-                            queueInfo.setPmemBlockMemory(meta.getOffset(), pmemPageInfo);
+                            queueInfo.setDataPosInPmem(meta.getOffset(), pmemPageInfo);
 //                            long end = System.nanoTime();
 //                            System.out.printf("pmem耗时：%d", end -start);
                         }
