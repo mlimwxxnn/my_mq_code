@@ -278,9 +278,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-
-        hitCountData.addTotalQueryCount(task.getResult().size());
-
+        if (GET_CACHE_HIT_INFO){
+            hitCountData.addTotalQueryCount(task.getResult().size());
+        }
         return task.getResult();
     }
 
