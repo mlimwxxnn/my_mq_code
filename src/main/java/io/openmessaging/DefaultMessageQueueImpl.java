@@ -1,5 +1,6 @@
 package io.openmessaging;
 
+import io.openmessaging.data.CacheHitCountData;
 import io.openmessaging.data.GetRangeTaskData;
 import io.openmessaging.data.WrappedData;
 import io.openmessaging.info.QueueInfo;
@@ -29,6 +30,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final Logger log = LoggerFactory.getLogger("myLogger");
     public static final long GB = 1024L * 1024L * 1024L;
     public static final long MB = 1024L * 1024L;
+    public static final boolean GET_CACHE_HIT_INFO = true;
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
     public static final int DATA_INFORMATION_LENGTH = 9;
@@ -54,6 +56,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static PmemDataWriterV2 pmemDataWriter;
     public static RamDataWriter ramDataWriter;
 
+    public static CacheHitCountData hitCountData;
+
 
     public static void init() {
         try {
@@ -73,6 +77,24 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             ssdDataWriter = new SsdDataWriter();
             pmemDataWriter = new PmemDataWriterV2();
             ramDataWriter = new RamDataWriter();
+            if (GET_CACHE_HIT_INFO){
+                hitCountData = new CacheHitCountData();
+                new Thread(() -> {
+                    try {
+                        // 有查询后再打印
+                        while (writtenDataSize.get() < 75 * GB){
+                            Thread.sleep(1000);
+                        }
+                        while (true){
+                            // 每10s打印一次
+                            Thread.sleep(10 * 1000);
+                            log.info(hitCountData.getHitCountInfo());
+                        }
+                    }catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }).start();
+            }
         }catch(IOException e){
             e.printStackTrace();
         }
@@ -256,6 +278,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+
+        hitCountData.addTotalQueryCount(task.getResult().size());
 
         return task.getResult();
     }
