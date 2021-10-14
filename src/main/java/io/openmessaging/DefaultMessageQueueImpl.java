@@ -34,7 +34,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
     public static final int DATA_INFORMATION_LENGTH = 9;
-    public static final long KILL_SELF_TIMEOUT = 1 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 20 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 300;  // 微秒
     public static final int SSD_WRITE_THREAD_COUNT = 5;
     public static final int SSD_MERGE_THREAD_COUNT = 2;
@@ -203,10 +203,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         try {
             if(writtenDataSize.get() > 20 * GB){
-                pmemDataWriter.pushWrappedData(wrappedData);
                 ramDataWriter.pushWrappedData(wrappedData);
             } else {
-                wrappedData.getMeta().getCountDownLatch().countDown();
                 wrappedData.getMeta().getCountDownLatch().countDown();
             }
             wrappedData.getMeta().getCountDownLatch().await();

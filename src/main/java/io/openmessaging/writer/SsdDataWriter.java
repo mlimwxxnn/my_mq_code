@@ -24,7 +24,7 @@ public class SsdDataWriter {
         for (int i = 0; i < 50; i++) {
             freeMergedDataQueue.offer(new MergedData(ByteBuffer.allocateDirect(50 * 18 * 1024)));
         }
-        mergeDataV2();
+        mergeData();
         writeData();
     }
 
@@ -54,38 +54,6 @@ public class SsdDataWriter {
                                 }
                             }
                         } while (mergedData.getCount() == 0 || (mergedData.getCount() < 3 && loopCount < 10));
-                        loopCount = 0;
-                        mergedDataQueue.offer(mergedData);
-                    }
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }).start();
-        }
-    }
-
-    void mergeDataV2() {
-        for (int mergeThreadId = 0; mergeThreadId < SSD_MERGE_THREAD_COUNT; mergeThreadId++) {
-            new Thread(() -> {
-                try {
-                    WrappedData wrappedData;
-                    MergedData mergedData;
-                    int loopCount = 0;
-                    while (true) {
-                        mergedData = freeMergedDataQueue.take();
-                        mergedData.reset();
-                        do {
-                            loopCount ++;
-                            for (int i = 0; i < 7; i++) {
-                                wrappedData = ssdWrappedDataQueue.poll(DefaultMessageQueueImpl.WAITE_DATA_TIMEOUT,
-                                        TimeUnit.MICROSECONDS);
-                                if (wrappedData != null) {
-                                    mergedData.putData(wrappedData);
-                                } else {
-                                    break;
-                                }
-                            }
-                        } while (mergedData.getCount() == 0 || (mergedData.getCount() < 3 && loopCount < 5));
                         loopCount = 0;
                         mergedDataQueue.offer(mergedData);
                     }

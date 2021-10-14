@@ -79,11 +79,10 @@ public class RamDataWriter {
                             arraycopy(data, buf.position(), ramBuffers[i].array(), address, buf.remaining());
 
                             queueInfo.setDataPosInRam(meta.getOffset(), address);
-//                            long end = System.nanoTime();
-//                            System.out.printf("ram耗时：%d", end -start);
+                            meta.getCountDownLatch().countDown();
+                        }else {
+                            pmemDataWriter.pushWrappedData(wrappedData);
                         }
-                        meta.getCountDownLatch().countDown();
-
                     }
                 } catch (InterruptedException e) {
                     e.printStackTrace();
