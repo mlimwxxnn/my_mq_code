@@ -38,7 +38,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int SSD_WRITE_THREAD_COUNT = 5;
     public static final int SSD_MERGE_THREAD_COUNT = 1;
     public static final int READ_THREAD_COUNT = 20;
-    public static final int PMEM_WRITE_THREAD_COUNT = 15;
+    public static final int PMEM_WRITE_THREAD_COUNT = 10;
     public static final int RAM_WRITE_THREAD_COUNT = 10;
     public static final long RAM_CACHE_SIZE = 1500 * MB;
     public static final long PMEM_HEAP_SIZE = 60 * GB;
@@ -277,7 +277,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 if(b){
                     b = false;
                     log.info("第一阶段结束 cost: {}", System.currentTimeMillis() - constructFinishTime);
-                    System.exit(-1);
+//                    System.exit(-1);
                 }
             }
         }
