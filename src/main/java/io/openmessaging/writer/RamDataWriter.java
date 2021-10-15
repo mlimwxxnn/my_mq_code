@@ -78,13 +78,20 @@ public class RamDataWriter {
                         dataLen = meta.getDataLen();
                         int i = getIndexByDataLength(dataLen);
                         if (!queueInfo.ramIsFull() && queueInfo.haveQueried() && (address = freeRamQueues[i].poll()) != null) {
+                            long writeStart = System.nanoTime();
+
                             buf = wrappedData.getData();
                             data = buf.array();
-
                             unsafe.copyMemory(data, 16 + buf.position(), null, address + ((DirectBuffer)ramBuffers[i]).address(), buf.remaining());//directByteBuffer
 //                            arraycopy(data, buf.position(), ramBuffers[i].array(), address, buf.remaining()); //heapByteBuffer
                             queueInfo.setDataPosInRam(meta.getOffset(), address);
                             meta.getCountDownLatch().countDown();
+
+                            // 统计信息
+                            long writeStop = System.nanoTime();
+                            if (GET_WRITE_TIME_COST_INFO){
+                                writeTimeCostCount.addRamTimeCost(writeStop - writeStart);
+                            }
                         }else {
                             pmemDataWriter.pushWrappedData(wrappedData);
                         }

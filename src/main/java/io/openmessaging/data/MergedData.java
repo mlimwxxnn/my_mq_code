@@ -12,7 +12,7 @@ import java.util.List;
 public class MergedData {
 
     final Unsafe unsafe = UnsafeUtil.unsafe;
-    private final List<MetaData> metaList = new ArrayList<>(50);
+    private final List<MetaData> metaList = new ArrayList<>(10);
     private final ByteBuffer mergedBuffer;
     private int count = 0;
 

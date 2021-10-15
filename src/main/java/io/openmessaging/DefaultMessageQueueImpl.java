@@ -2,6 +2,7 @@ package io.openmessaging;
 
 import io.openmessaging.data.CacheHitCountData;
 import io.openmessaging.data.GetRangeTaskData;
+import io.openmessaging.data.TimeCostCountData;
 import io.openmessaging.data.WrappedData;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.reader.DataReader;
@@ -24,16 +25,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 @SuppressWarnings("ResultOfMethodCallIgnored")
 public class DefaultMessageQueueImpl extends MessageQueue {
 
+    public static final boolean GET_CACHE_HIT_INFO = false;
+    public static final boolean GET_WRITE_TIME_COST_INFO = true;
+    public static final boolean GET_READ_TIME_COST_INFO = true;
     public static final int PMEM_BLOCK_GROUP_COUNT = 17;
     public static final Logger log = LoggerFactory.getLogger("myLogger");
     public static final long GB = 1024L * 1024L * 1024L;
     public static final long MB = 1024L * 1024L;
-    public static final boolean GET_CACHE_HIT_INFO = false;
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
 
     public static final int DATA_INFORMATION_LENGTH = 9;
-    public static final long KILL_SELF_TIMEOUT = 20 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 3 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 300;  // 微秒
     public static final int SSD_WRITE_THREAD_COUNT = 5;
     public static final int SSD_MERGE_THREAD_COUNT = 1;
@@ -57,6 +60,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static RamDataWriter ramDataWriter;
 
     public static CacheHitCountData hitCountData;
+    public static TimeCostCountData writeTimeCostCount;
+    public static TimeCostCountData readTimeCostCount;
     private static long constructFinishTime;
 
 
@@ -92,6 +97,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     e.printStackTrace();
                 }
             }).start();
+
+            // 以下为debug或者打印日志信息初始化的区域
+            //***********************************************************************
+            if(GET_WRITE_TIME_COST_INFO){
+                writeTimeCostCount = new TimeCostCountData("write");
+            }
             if (GET_CACHE_HIT_INFO){
                 hitCountData = new CacheHitCountData();
                 new Thread(() -> {
@@ -281,6 +292,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             synchronized (this) {
                 if(isFirstStageGoingOn){
                     isFirstStageGoingOn = false;
+                    if (GET_READ_TIME_COST_INFO){
+                        readTimeCostCount = new TimeCostCountData("read");
+                    }
                     log.info("第一阶段结束 cost: {}", System.currentTimeMillis() - constructFinishTime);
                     System.exit(-1);
                 }

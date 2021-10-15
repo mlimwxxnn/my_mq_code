@@ -75,39 +75,59 @@ public class GetRangeTaskData {
                 buf.clear();
                 buf.limit(dataLen);
                 if(queueInfo.isInRam(currentOffset)){
+                    long queryStart = System.nanoTime();
+
                     Integer address = queueInfo.getDataPosInRam();
                     int ramBufferIndex = getIndexByDataLength(dataLen);
                     unsafe.copyMemory(null, ((DirectBuffer)ramBuffers[ramBufferIndex]).address() + address, buf.array(), 16, dataLen);//direct
 //                    arraycopy(ramBuffers[ramBufferIndex].array(), address, buf.array(), 0, dataLen);//heap
                     freeRamQueues[ramBufferIndex].offer(address);
-                    // 命中ram
+
+                    // 统计信息
+                    long queryStop = System.nanoTime();
+                    if (GET_READ_TIME_COST_INFO){
+                        readTimeCostCount.addRamTimeCost(queryStop - queryStart);
+                    }
                     if (GET_CACHE_HIT_INFO){
                         hitCountData.increaseRamHitCount();
                     }
-                }else
-                    if(queueInfo.isInPmem(currentOffset)) {
+                }else if(queueInfo.isInPmem(currentOffset)) {
+                    long queryStart = System.nanoTime();
+
                     PmemPageInfo pmemPageInfo = queueInfo.getDataPosInPmem(currentOffset);
                     byte[] bufArray = buf.array();
-
                     pmemPageInfo.block.copyToArray(0, bufArray, 0, dataLen);
                     pmemPageInfo.block.free();
 
-                    // 命中pmem
+                    // 统计信息
+                    long queryStop = System.nanoTime();
+                    if (GET_READ_TIME_COST_INFO){
+                        readTimeCostCount.addPmemTimeCost(queryStop - queryStart);
+                    }
                     if (GET_CACHE_HIT_INFO){
                         hitCountData.increasePmemHitCount();
                     }
                 }else {
+                    long queryStart = System.nanoTime();
+
                     int id = (int) (p[1] >> 32);
                     DefaultMessageQueueImpl.dataWriteChannels[id].read(buf, p[0]);
                     buf.flip();
-                }
 
+                    // 统计信息
+                    long queryStop = System.nanoTime();
+                    if (GET_READ_TIME_COST_INFO){
+                        readTimeCostCount.addSsdTimeCost(queryStop - queryStart);
+                    }
+                }
                 result.put(i, buf);
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
+
+
 
     public CountDownLatch getCountDownLatch() {
         return countDownLatch;

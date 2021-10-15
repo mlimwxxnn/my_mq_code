@@ -35,9 +35,18 @@ public class PmemDataWriter {
 
     private TransactionalMemoryBlock getBlockByAllocateAndSetData(ByteBuffer data){
         try {
-            return heap.allocateMemoryBlock(data.remaining(), range -> {
+            long writeStart = System.nanoTime();
+
+            TransactionalMemoryBlock block = heap.allocateMemoryBlock(data.remaining(), range -> {
                 range.copyFromArray(data.array(), data.position(), 0, data.remaining());
             });
+
+            // 统计信息
+            long writeStop = System.nanoTime();
+            if (GET_WRITE_TIME_COST_INFO){
+                writeTimeCostCount.addPmemTimeCost(writeStop - writeStart);
+            }
+            return block;
         }catch (Exception e){
             return null;
         }

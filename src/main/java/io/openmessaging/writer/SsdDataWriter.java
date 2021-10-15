@@ -75,15 +75,14 @@ public class SsdDataWriter {
                     List<MetaData> metaList;
                     while (true) {
                         mergedData = mergedDataQueue.take();
-//                        long start = System.nanoTime();
+                        long writeStart = System.nanoTime();
+
                         mergedBuffer = mergedData.getMergedBuffer();
                         metaList = mergedData.getMetaList();
-
                         // 数据写入文件
                         long pos = dataWriteChannel.position();
                         dataWriteChannel.write(mergedBuffer);
                         dataWriteChannel.force(true);
-
                         // 在内存中创建索引，并唤醒append的线程
                         metaList.forEach(metaData -> {
                             metaData.getQueueInfo().setDataPosInFile(metaData.getOffset(),
@@ -92,6 +91,13 @@ public class SsdDataWriter {
                             metaData.getCountDownLatch().countDown();
 
                         });
+
+                        // 统计信息
+                        long writeStop = System.nanoTime();
+                        if (GET_WRITE_TIME_COST_INFO){
+                            writeTimeCostCount.addSsdTimeCost(writeStop - writeStart, metaList.size());
+                        }
+
                         freeMergedDataQueue.offer(mergedData);
                     }
                 } catch (Exception e) {
