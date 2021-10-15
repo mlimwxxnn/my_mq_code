@@ -12,7 +12,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
-import static io.openmessaging.writer.PmemDataWriter.getIndexByDataLength;
 import static java.lang.System.arraycopy;
 
 @SuppressWarnings({"ResultOfMethodCallIgnored", "unchecked"})
@@ -48,6 +47,10 @@ public class RamDataWriter {
     public RamDataWriter() {
         init();
         writeDataToRam();
+    }
+
+    public static int getIndexByDataLength(short dataLen){
+        return (dataLen + 1023) / 1024 - 1;
     }
 
     public void pushWrappedData(WrappedData wrappedData){

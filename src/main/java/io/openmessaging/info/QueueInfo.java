@@ -4,9 +4,6 @@ package io.openmessaging.info;
 
 
 import io.openmessaging.util.ArrayQueue;
-
-import java.util.Queue;
-
 import static java.lang.System.arraycopy;
 
 public class QueueInfo {
@@ -17,7 +14,7 @@ public class QueueInfo {
     private volatile byte[] status; // 0 表示数据在ssd中 1 表示数据在pmem中 2 表示数据在内存中
     private volatile PmemPageInfo[] pmemPageInfos;
     private boolean haveQueried;
-    private final ArrayQueue<Integer> dataPosInRam = new ArrayQueue<>(2);
+    private final ArrayQueue<Integer> dataPosInRam = new ArrayQueue<>(3);
     private static final int DEFAULT_CAPACITY = 100;
 
     public QueueInfo(){

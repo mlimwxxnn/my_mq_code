@@ -10,10 +10,7 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
-import static io.openmessaging.writer.PmemDataWriter.freePmemPageQueues;
-import static io.openmessaging.writer.PmemDataWriter.getIndexByDataLength;
-import static io.openmessaging.writer.RamDataWriter.freeRamQueues;
-import static io.openmessaging.writer.RamDataWriter.ramBuffers;
+import static io.openmessaging.writer.RamDataWriter.*;
 import static java.lang.System.arraycopy;
 
 
@@ -60,7 +57,7 @@ public class GetRangeTaskData {
                 for (int j = 0; j < offset - 1; j++) {
                     PmemPageInfo pmemPageInfo = allPmemPageInfos[j];
                     if(pmemPageInfo != null) {
-                        freePmemPageQueues[pmemPageInfo.freePmemPageQueueIndex].offer(pmemPageInfo);
+                        pmemPageInfo.block.free();
                     }
                 }
             }
@@ -87,8 +84,8 @@ public class GetRangeTaskData {
                     byte[] bufArray = buf.array();
 
                     pmemPageInfo.block.copyToArray(0, bufArray, 0, dataLen);
+                    pmemPageInfo.block.free();
 
-                    freePmemPageQueues[pmemPageInfo.freePmemPageQueueIndex].offer(pmemPageInfo);
                     // 命中pmem
                     if (GET_CACHE_HIT_INFO){
                         hitCountData.increasePmemHitCount();
