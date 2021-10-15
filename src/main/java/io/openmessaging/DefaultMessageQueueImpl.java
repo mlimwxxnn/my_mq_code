@@ -287,10 +287,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
         }
 
-        if(!haveAppended){
-            System.exit(-1);
-        }
-
+//        if(!haveAppended){
+//            System.exit(-1);
+//        }
 
         GetRangeTaskData task = getTask(Thread.currentThread());
         task.setGetRangeParameter(topic, queueId, offset, fetchNum);
