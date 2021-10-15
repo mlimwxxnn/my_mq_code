@@ -77,13 +77,13 @@ public class GetRangeTaskData {
                 if(queueInfo.isInRam(currentOffset)){
                     Integer address = queueInfo.getDataPosInRam();
                     int ramBufferIndex = getIndexByDataLength(dataLen);
-                    try {
+//                    try {
                         arraycopy(ramBuffers[ramBufferIndex].array(), address, buf.array(), 0, dataLen);
-                    }catch (ArrayIndexOutOfBoundsException e){
-                        log.info("exception: ramBufferIndex: {}, ramBuffers[ramBufferIndex].array().len: {}, address: {}, buf.array().len: {}, dataLen: {}",
-                                ramBufferIndex, ramBuffers[ramBufferIndex].array().length, address, buf.array().length, dataLen);
-                        System.exit(-1);
-                    }
+//                    }catch (ArrayIndexOutOfBoundsException e){
+//                        log.info("exception: ramBufferIndex: {}, ramBuffers[ramBufferIndex].array().len: {}, address: {}, buf.array().len: {}, dataLen: {}",
+//                                ramBufferIndex, ramBuffers[ramBufferIndex].array().length, address, buf.array().length, dataLen);
+//                        System.exit(-1);
+//                    }
                     freeRamQueues[ramBufferIndex].offer(address);
 
 //                    // 查完Ram，如果本条存在与PMEM中，则回收
