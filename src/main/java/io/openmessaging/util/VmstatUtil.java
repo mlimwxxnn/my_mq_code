@@ -15,7 +15,7 @@ public class VmstatUtil {
     static final List<SingleItem> SINGLE_ITEMS = new ArrayList<>();
 
     public static void recordVmstat() {
-        run("vmstat 10 700");
+        run("vmstat 1 700");
     }
 
     public static void run(String cmd) {
