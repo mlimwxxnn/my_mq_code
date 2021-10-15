@@ -5,15 +5,15 @@ public class Test {
         int n = 2 * 10000* 10000;
 
         long start = System.currentTimeMillis();
-        for (int i = 0; i < n; i++) {
-            long res = i / 2;
+        for (int i = 1; i < n; i++) {
+            long res = 1 / ((i % 2) + 1);
         }
         long stop = System.currentTimeMillis();
 
         long l1 = System.currentTimeMillis();
-        for (int i = 0; i < n; i++) {
+        for (int i = 1; i < n; i++) {
             try {
-                long res = 1 / i;
+                long res = 1 / (i % 2);
             }catch (Exception e){
 
             }
