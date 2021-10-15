@@ -81,7 +81,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
             ssdDataWriter = new SsdDataWriter();
             pmemDataWriter = new PmemDataWriter();
-            ramDataWriter = new RamDataWriter();
+//            ramDataWriter = new RamDataWriter();
             new Thread(() -> {
                 try {
                     while (roughWrittenDataSize < 75 * GB){
@@ -226,7 +226,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         try {
             if(roughWrittenDataSize > 20 * GB){
-                ramDataWriter.pushWrappedData(wrappedData);
+                pmemDataWriter.pushWrappedData(wrappedData);
             } else {
                 wrappedData.getMeta().getCountDownLatch().countDown();
             }
@@ -287,9 +287,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
         }
 
-//        if(!haveAppended){
-//            System.exit(-1);
-//        }
+        if(!haveAppended){
+            System.exit(-1);
+        }
 
         GetRangeTaskData task = getTask(Thread.currentThread());
         task.setGetRangeParameter(topic, queueId, offset, fetchNum);

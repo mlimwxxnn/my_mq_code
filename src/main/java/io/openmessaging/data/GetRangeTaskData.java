@@ -70,16 +70,17 @@ public class GetRangeTaskData {
                 ByteBuffer buf = buffers[i];
                 buf.clear();
                 buf.limit(dataLen);
-                if(queueInfo.isInRam(currentOffset)){
-                    Integer address = queueInfo.getDataPosInRam();
-                    int ramBufferIndex = getIndexByDataLength(dataLen);
-                    arraycopy(ramBuffers[ramBufferIndex].array(), address, buf.array(), 0, dataLen);
-                    freeRamQueues[ramBufferIndex].offer(address);
-                    // 命中ram
-                    if (GET_CACHE_HIT_INFO){
-                        hitCountData.increaseRamHitCount();
-                    }
-                }else if(queueInfo.isInPmem(currentOffset)) {
+//                if(queueInfo.isInRam(currentOffset)){
+//                    Integer address = queueInfo.getDataPosInRam();
+//                    int ramBufferIndex = getIndexByDataLength(dataLen);
+//                    arraycopy(ramBuffers[ramBufferIndex].array(), address, buf.array(), 0, dataLen);
+//                    freeRamQueues[ramBufferIndex].offer(address);
+//                    // 命中ram
+//                    if (GET_CACHE_HIT_INFO){
+//                        hitCountData.increaseRamHitCount();
+//                    }
+//                }else
+                    if(queueInfo.isInPmem(currentOffset)) {
                     PmemPageInfo pmemPageInfo = queueInfo.getDataPosInPmem(currentOffset);
                     byte[] bufArray = buf.array();
 

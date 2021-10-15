@@ -2,7 +2,7 @@ package io.openmessaging;
 
 public class Test {
     public static void main(String[] args) {
-        int n = 2 * 10000* 10000;
+        int n = 2_0000_0000;
 
         long start = System.currentTimeMillis();
         for (int i = 1; i < n; i++) {
