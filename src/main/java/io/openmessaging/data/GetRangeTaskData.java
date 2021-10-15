@@ -3,6 +3,9 @@ package io.openmessaging.data;
 import io.openmessaging.DefaultMessageQueueImpl;
 import io.openmessaging.info.PmemPageInfo;
 import io.openmessaging.info.QueueInfo;
+import io.openmessaging.util.UnsafeUtil;
+import sun.misc.Unsafe;
+import sun.nio.ch.DirectBuffer;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;
@@ -17,6 +20,7 @@ import static java.lang.System.arraycopy;
 public class GetRangeTaskData {
     public final ByteBuffer[] buffers = new ByteBuffer[100]; // 用来响应查询的buffer
     private Map<Integer, ByteBuffer> result = new HashMap<>();
+    private Unsafe unsafe = UnsafeUtil.unsafe;
     String topic;
     int queueId;
     long offset;
@@ -70,16 +74,17 @@ public class GetRangeTaskData {
                 ByteBuffer buf = buffers[i];
                 buf.clear();
                 buf.limit(dataLen);
-//                if(queueInfo.isInRam(currentOffset)){
-//                    Integer address = queueInfo.getDataPosInRam();
-//                    int ramBufferIndex = getIndexByDataLength(dataLen);
-//                    arraycopy(ramBuffers[ramBufferIndex].array(), address, buf.array(), 0, dataLen);
-//                    freeRamQueues[ramBufferIndex].offer(address);
-//                    // 命中ram
-//                    if (GET_CACHE_HIT_INFO){
-//                        hitCountData.increaseRamHitCount();
-//                    }
-//                }else
+                if(queueInfo.isInRam(currentOffset)){
+                    Integer address = queueInfo.getDataPosInRam();
+                    int ramBufferIndex = getIndexByDataLength(dataLen);
+                    unsafe.copyMemory(null, ((DirectBuffer)ramBuffers[ramBufferIndex]).address() + address, buf.array(), 16, dataLen);//direct
+//                    arraycopy(ramBuffers[ramBufferIndex].array(), address, buf.array(), 0, dataLen);//heap
+                    freeRamQueues[ramBufferIndex].offer(address);
+                    // 命中ram
+                    if (GET_CACHE_HIT_INFO){
+                        hitCountData.increaseRamHitCount();
+                    }
+                }else
                     if(queueInfo.isInPmem(currentOffset)) {
                     PmemPageInfo pmemPageInfo = queueInfo.getDataPosInPmem(currentOffset);
                     byte[] bufArray = buf.array();

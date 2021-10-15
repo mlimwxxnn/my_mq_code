@@ -5,6 +5,7 @@ import io.openmessaging.data.WrappedData;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.util.UnsafeUtil;
 import sun.misc.Unsafe;
+import sun.nio.ch.DirectBuffer;
 
 import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
@@ -29,7 +30,7 @@ public class RamDataWriter {
         for (int i = 0; i < 17; i++) {
             int queueIndex = i;
             new Thread(() -> {
-                ramBuffers[queueIndex] = ByteBuffer.allocate(1024 * (queueIndex + 1) * blockNumsPerCache); // 1加到17等于153, set 6853 for allocate 1G RAM
+                ramBuffers[queueIndex] = ByteBuffer.allocateDirect(1024 * (queueIndex + 1) * blockNumsPerCache); // 1加到17等于153, set 6853 for allocate 1G RAM
                 freeRamQueues[queueIndex] = new LinkedBlockingQueue<>();
                 for (int j = 0; j < blockNumsPerCache; j++) {
                     freeRamQueues[queueIndex].offer(j * (queueIndex + 1) * 1024);
@@ -80,8 +81,8 @@ public class RamDataWriter {
                             buf = wrappedData.getData();
                             data = buf.array();
 
-                            arraycopy(data, buf.position(), ramBuffers[i].array(), address, buf.remaining());
-
+                            unsafe.copyMemory(data, 16 + buf.position(), null, address + ((DirectBuffer)ramBuffers[i]).address(), buf.remaining());//directByteBuffer
+//                            arraycopy(data, buf.position(), ramBuffers[i].array(), address, buf.remaining()); //heapByteBuffer
                             queueInfo.setDataPosInRam(meta.getOffset(), address);
                             meta.getCountDownLatch().countDown();
                         }else {

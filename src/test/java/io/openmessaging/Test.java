@@ -4,7 +4,10 @@ import com.intel.pmem.llpl.Heap;
 import io.openmessaging.info.PmemPageInfo;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.util.ArrayQueue;
+import io.openmessaging.util.UnsafeUtil;
 import jdk.nashorn.internal.ir.Block;
+import sun.misc.Unsafe;
+import sun.nio.ch.DirectBuffer;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;

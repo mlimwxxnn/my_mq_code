@@ -40,9 +40,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int READ_THREAD_COUNT = 20;
     public static final int PMEM_WRITE_THREAD_COUNT = 8;
     public static final int RAM_WRITE_THREAD_COUNT = 8;
-    public static final long RAM_CACHE_SIZE = 1500 * MB;
-    public static final long PMEM_HEAP_SIZE = 60 * GB;
-    // public static final long PMEM_HEAP_SIZE = 20 * MB;
+    public static final long RAM_CACHE_SIZE = 500 * MB;
+//    public static final long PMEM_HEAP_SIZE = 60 * GB;
+     public static final long PMEM_HEAP_SIZE = 20 * MB;
     public static long roughWrittenDataSize = 0;
 
     public static AtomicInteger topicCount = new AtomicInteger();
@@ -81,7 +81,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
             ssdDataWriter = new SsdDataWriter();
             pmemDataWriter = new PmemDataWriter();
-//            ramDataWriter = new RamDataWriter();
+            ramDataWriter = new RamDataWriter();
             new Thread(() -> {
                 try {
                     while (roughWrittenDataSize < 75 * GB){
@@ -226,7 +226,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         try {
             if(roughWrittenDataSize > 20 * GB){
-                pmemDataWriter.pushWrappedData(wrappedData);
+                ramDataWriter.pushWrappedData(wrappedData);
             } else {
                 wrappedData.getMeta().getCountDownLatch().countDown();
             }
