@@ -27,7 +27,7 @@ public class RamDataWriter {
 
         int blockNumsPerCache = (int)(RAM_CACHE_SIZE / (1024 * 153));  // 1 + 2 + 3 + ... + 17 = 153
         CountDownLatch countDownLatch = new CountDownLatch(PMEM_BLOCK_GROUP_COUNT);
-        for (int i = 0; i < 17; i++) {
+        for (int i = 0; i < PMEM_BLOCK_GROUP_COUNT; i++) {
             int queueIndex = i;
             new Thread(() -> {
                 ramBuffers[queueIndex] = ByteBuffer.allocateDirect(1024 * (queueIndex + 1) * blockNumsPerCache); // 1加到17等于153, set 6853 for allocate 1G RAM
