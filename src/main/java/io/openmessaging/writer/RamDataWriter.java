@@ -24,6 +24,7 @@ public class RamDataWriter {
     private static final Unsafe unsafe = UnsafeUtil.unsafe;
 
     public void init(){
+
         int blockNumsPerCache = (int)(RAM_CACHE_SIZE / (1024 * 153));  // 1 + 2 + 3 + ... + 17 = 153
         CountDownLatch countDownLatch = new CountDownLatch(PMEM_BLOCK_GROUP_COUNT);
         for (int i = 0; i < 17; i++) {

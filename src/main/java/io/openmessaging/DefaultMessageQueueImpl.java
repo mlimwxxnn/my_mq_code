@@ -17,7 +17,10 @@ import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
@@ -160,7 +163,38 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
     public DefaultMessageQueueImpl() {
+        log.info("ceshi kaishi");
+        BlockingQueue<Integer> q = new LinkedBlockingQueue<>();
+        CountDownLatch countDownLatch = new CountDownLatch(100);
+        long start = System.currentTimeMillis();
+        for (int j = 0; j < 50; j++) {
+            new Thread(()->{
+                for (int i = 0; i < 30_0000; i++) {
+                    q.offer(i);
+                }
+                countDownLatch.countDown();
+            }).start();
+            new Thread(()->{
+                for (int i = 0; i < 30_0000; i++) {
+                    try {
+                        q.take();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+                countDownLatch.countDown();
+            }).start();
+        }
+        try {
+            countDownLatch.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        System.out.println(q.size());
+        log.info("ceshi jieshu");
+        System.exit(-1);
         log.info("DefaultMessageQueueImpl 开始执行构造函数");
+
 //        displayConfiguration(26, 51);
         DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./essd") : new File("/essd");
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
