@@ -34,11 +34,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int DATA_INFORMATION_LENGTH = 9;
     public static final long KILL_SELF_TIMEOUT = 20 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 300;  // 微秒
-    public static final int SSD_WRITE_THREAD_COUNT = 5;
+    public static final int SSD_WRITE_THREAD_COUNT = 4;
     public static final int SSD_MERGE_THREAD_COUNT = 1;
     public static final int READ_THREAD_COUNT = 20;
-    public static final int PMEM_WRITE_THREAD_COUNT = 8;
-    public static final int RAM_WRITE_THREAD_COUNT = 8;
+    public static final int PMEM_WRITE_THREAD_COUNT = 4;
+    public static final int RAM_WRITE_THREAD_COUNT = 4;
     public static final long RAM_CACHE_SIZE = 1500 * MB;
     public static final long PMEM_HEAP_SIZE = 60 * GB;
     // public static final long PMEM_HEAP_SIZE = 20 * MB;
@@ -56,6 +56,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static RamDataWriter ramDataWriter;
 
     public static CacheHitCountData hitCountData;
+    private static long constructFinishTime;
 
 
     public static void init() {
@@ -165,6 +166,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         initThreadCount = Thread.activeCount();
         log.info("DefaultMessageQueueImpl 构造函数执行完成");
         killSelf(KILL_SELF_TIMEOUT);
+        constructFinishTime = System.currentTimeMillis();
     }
 
     public void powerFailureRecovery(ConcurrentHashMap<Byte, HashMap<Short, QueueInfo>> metaInfo) {
@@ -217,7 +219,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         ssdDataWriter.pushWrappedData(wrappedData);
 
         try {
-            if(roughWrittenDataSize > 15 * GB){
+            if(roughWrittenDataSize > 20 * GB){
                 ramDataWriter.pushWrappedData(wrappedData);
             } else {
                 wrappedData.getMeta().getCountDownLatch().countDown();
@@ -273,8 +275,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             synchronized (this) {
                 if(b){
                     b = false;
-                    log.info("第一阶段结束");
-//                    System.exit(-1);
+                    log.info("第一阶段结束 cost: {}", System.currentTimeMillis() - constructFinishTime);
+                    System.exit(-1);
                 }
             }
         }
