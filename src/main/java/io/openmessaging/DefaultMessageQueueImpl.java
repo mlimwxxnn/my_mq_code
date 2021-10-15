@@ -86,7 +86,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
             ssdDataWriter = new SsdDataWriter();
             pmemDataWriter = new PmemDataWriter();
-            ramDataWriter = new RamDataWriter();
+//            ramDataWriter = new RamDataWriter();
             new Thread(() -> {
                 try {
                     while (roughWrittenDataSize < 75 * GB){
@@ -172,8 +172,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public DefaultMessageQueueImpl() {
         log.info("DefaultMessageQueueImpl 开始执行构造函数");
-
-//        displayConfiguration(26, 51);
         DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./essd") : new File("/essd");
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
 
@@ -237,7 +235,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         try {
             if(roughWrittenDataSize > 20 * GB){
-                ramDataWriter.pushWrappedData(wrappedData);
+//                ramDataWriter.pushWrappedData(wrappedData);
+                pmemDataWriter.pushWrappedData(wrappedData);
             } else {
                 wrappedData.getMeta().getCountDownLatch().countDown();
             }
