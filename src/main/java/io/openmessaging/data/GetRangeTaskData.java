@@ -15,7 +15,6 @@ import static io.openmessaging.writer.PmemDataWriter.getIndexByDataLength;
 import static io.openmessaging.writer.RamDataWriter.freeRamQueues;
 import static io.openmessaging.writer.RamDataWriter.ramBuffers;
 import static java.lang.System.arraycopy;
-//import static io.openmessaging.writer.PmemDataWriter.memoryBlocks;
 
 
 public class GetRangeTaskData {
@@ -77,20 +76,8 @@ public class GetRangeTaskData {
                 if(queueInfo.isInRam(currentOffset)){
                     Integer address = queueInfo.getDataPosInRam();
                     int ramBufferIndex = getIndexByDataLength(dataLen);
-//                    try {
-                        arraycopy(ramBuffers[ramBufferIndex].array(), address, buf.array(), 0, dataLen);
-//                    }catch (ArrayIndexOutOfBoundsException e){
-//                        log.info("exception: ramBufferIndex: {}, ramBuffers[ramBufferIndex].array().len: {}, address: {}, buf.array().len: {}, dataLen: {}",
-//                                ramBufferIndex, ramBuffers[ramBufferIndex].array().length, address, buf.array().length, dataLen);
-//                        System.exit(-1);
-//                    }
+                    arraycopy(ramBuffers[ramBufferIndex].array(), address, buf.array(), 0, dataLen);
                     freeRamQueues[ramBufferIndex].offer(address);
-
-//                    // 查完Ram，如果本条存在与PMEM中，则回收
-//                    if (queueInfo.isInPmem(currentOffset)){
-//                        PmemPageInfo pmemPageInfo = queueInfo.getDataPosInPmem(currentOffset);
-//                        freePmemPageQueues[pmemPageInfo.freePmemPageQueueIndex].offer(pmemPageInfo);
-//                    }
                     // 命中ram
                     if (GET_CACHE_HIT_INFO){
                         hitCountData.increaseRamHitCount();

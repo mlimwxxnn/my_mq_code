@@ -5,7 +5,6 @@ import io.openmessaging.data.GetRangeTaskData;
 import io.openmessaging.data.WrappedData;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.reader.DataReader;
-import io.openmessaging.util.VmstatUtil;
 import io.openmessaging.writer.PmemDataWriter;
 import io.openmessaging.writer.RamDataWriter;
 import io.openmessaging.writer.SsdDataWriter;
@@ -30,7 +29,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final long GB = 1024L * 1024L * 1024L;
     public static final long MB = 1024L * 1024L;
     public static final boolean GET_CACHE_HIT_INFO = false;
-    public static final boolean GET_VMSTAT_INFO = true;
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
 
@@ -77,7 +75,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 }
                 dataWriteChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
             }
-            VmstatUtil.recordVmstat();
             // 恢复阶段不实例化写
             if (getTotalFileSize() > 0){
                 return;
@@ -284,19 +281,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 if(isFirstStageGoingOn){
                     isFirstStageGoingOn = false;
                     log.info("第一阶段结束 cost: {}", System.currentTimeMillis() - constructFinishTime);
-                    if (GET_VMSTAT_INFO){
-                        log.info("vmstat: \n{}", VmstatUtil.getVmstatMsg());
-                        new Thread(() -> {
-                            try {
-                                while (true){
-                                    Thread.sleep(30 * 1000);
-                                    log.info("vmstat: \n{}", VmstatUtil.getVmstatMsg());
-                                }
-                            }catch (Exception e){
-                                e.printStackTrace();
-                            }
-                        }).start();
-                    }
                     System.exit(-1);
                 }
             }
