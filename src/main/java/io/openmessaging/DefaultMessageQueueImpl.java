@@ -282,7 +282,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 if(isFirstStageGoingOn){
                     isFirstStageGoingOn = false;
                     log.info("第一阶段结束 cost: {}", System.currentTimeMillis() - constructFinishTime);
-//                    System.exit(-1);
+                    System.exit(-1);
                 }
             }
         }
