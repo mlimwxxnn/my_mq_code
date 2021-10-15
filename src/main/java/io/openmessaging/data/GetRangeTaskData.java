@@ -86,11 +86,11 @@ public class GetRangeTaskData {
                     }
                     freeRamQueues[ramBufferIndex].offer(address);
 
-                    // 查完Ram，如果本条存在与PMEM中，则回收
-                    if (queueInfo.isInPmem(currentOffset)){
-                        PmemPageInfo pmemPageInfo = queueInfo.getDataPosInPmem(currentOffset);
-                        freePmemPageQueues[pmemPageInfo.freePmemPageQueueIndex].offer(pmemPageInfo);
-                    }
+//                    // 查完Ram，如果本条存在与PMEM中，则回收
+//                    if (queueInfo.isInPmem(currentOffset)){
+//                        PmemPageInfo pmemPageInfo = queueInfo.getDataPosInPmem(currentOffset);
+//                        freePmemPageQueues[pmemPageInfo.freePmemPageQueueIndex].offer(pmemPageInfo);
+//                    }
                     // 命中ram
                     if (GET_CACHE_HIT_INFO){
                         hitCountData.increaseRamHitCount();

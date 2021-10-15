@@ -75,6 +75,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 }
                 dataWriteChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
             }
+            // 恢复阶段不实例化写
+            if (getTotalFileSize() > 0){
+                return;
+            }
             ssdDataWriter = new SsdDataWriter();
             pmemDataWriter = new PmemDataWriter();
             ramDataWriter = new RamDataWriter();
@@ -268,23 +272,23 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 
     boolean haveAppended = false;
-    volatile boolean b = true;
+    volatile boolean isFirstStageGoingOn = true;
     @Override
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
 
-        if (b) {
+        if (isFirstStageGoingOn) {
             synchronized (this) {
-                if(b){
-                    b = false;
+                if(isFirstStageGoingOn){
+                    isFirstStageGoingOn = false;
                     log.info("第一阶段结束 cost: {}", System.currentTimeMillis() - constructFinishTime);
 //                    System.exit(-1);
                 }
             }
         }
 
-//        if(!haveAppended){
-//            System.exit(-1);
-//        }
+        if(!haveAppended){
+            System.exit(-1);
+        }
 
 
         GetRangeTaskData task = getTask(Thread.currentThread());
