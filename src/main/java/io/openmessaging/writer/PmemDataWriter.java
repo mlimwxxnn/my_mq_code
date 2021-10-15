@@ -38,7 +38,6 @@ public class PmemDataWriter {
         CountDownLatch countDownLatch = new CountDownLatch(nThread);
 
         for (int threadId = 0; threadId < nThread; threadId++) {
-            final int heapId = threadId;
             new Thread(() -> {
                 long start = System.currentTimeMillis();
                 try {
@@ -62,6 +61,7 @@ public class PmemDataWriter {
         }
         try {
             countDownLatch.await();
+
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
