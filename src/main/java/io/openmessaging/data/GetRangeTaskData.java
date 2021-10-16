@@ -29,7 +29,7 @@ public class GetRangeTaskData {
 
     public GetRangeTaskData() {
         for (int i = 0; i < buffers.length; i++) {
-            buffers[i] = ByteBuffer.allocate(17 * 1024);
+            buffers[i] = ByteBuffer.allocateDirect(17 * 1024);
         }
     }
 
@@ -74,25 +74,24 @@ public class GetRangeTaskData {
                 ByteBuffer buf = buffers[i];
                 buf.clear();
                 buf.limit(dataLen);
-//                if(queueInfo.isInRam(currentOffset)){
-//                    long queryStart = System.nanoTime();
-//
-//                    Integer address = queueInfo.getDataPosInRam();
-//                    int ramBufferIndex = getIndexByDataLength(dataLen);
-//                    unsafe.copyMemory(null, ((DirectBuffer)ramBuffers[ramBufferIndex]).address() + address, buf.array(), 16, dataLen);//direct
-////                    arraycopy(ramBuffers[ramBufferIndex].array(), address, buf.array(), 0, dataLen);//heap
-//                    freeRamQueues[ramBufferIndex].offer(address);
-//
-//                    // 统计信息
-//                    long queryStop = System.nanoTime();
-//                    if (GET_READ_TIME_COST_INFO){
-//                        readTimeCostCount.addRamTimeCost(queryStop - queryStart);
-//                    }
-//                    if (GET_CACHE_HIT_INFO){
-//                        hitCountData.increaseRamHitCount();
-//                    }
-//                }else
-                    if(queueInfo.isInPmem(currentOffset)) {
+                if(queueInfo.isInRam(currentOffset)){
+                    long queryStart = System.nanoTime();
+
+                    Integer address = queueInfo.getDataPosInRam();
+                    int ramBufferIndex = getIndexByDataLength(dataLen);
+                    unsafe.copyMemory(null, ((DirectBuffer)ramBuffers[ramBufferIndex]).address() + address, buf.array(), 16, dataLen);//direct
+//                    arraycopy(ramBuffers[ramBufferIndex].array(), address, buf.array(), 0, dataLen);//heap
+                    freeRamQueues[ramBufferIndex].offer(address);
+
+                    // 统计信息
+                    long queryStop = System.nanoTime();
+                    if (GET_READ_TIME_COST_INFO){
+                        readTimeCostCount.addRamTimeCost(queryStop - queryStart);
+                    }
+                    if (GET_CACHE_HIT_INFO){
+                        hitCountData.increaseRamHitCount();
+                    }
+                }else if(queueInfo.isInPmem(currentOffset)) {
                     long queryStart = System.nanoTime();
 
                     PmemPageInfo pmemPageInfo = queueInfo.getDataPosInPmem(currentOffset);
@@ -127,8 +126,6 @@ public class GetRangeTaskData {
             e.printStackTrace();
         }
     }
-
-
 
     public CountDownLatch getCountDownLatch() {
         return countDownLatch;
