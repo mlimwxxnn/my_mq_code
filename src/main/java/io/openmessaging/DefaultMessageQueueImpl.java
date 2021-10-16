@@ -25,9 +25,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 @SuppressWarnings("ResultOfMethodCallIgnored")
 public class DefaultMessageQueueImpl extends MessageQueue {
 
-    public static final boolean GET_CACHE_HIT_INFO = false;
-    public static final boolean GET_WRITE_TIME_COST_INFO = false;
-    public static final boolean GET_READ_TIME_COST_INFO = false;
+    public static final boolean GET_CACHE_HIT_INFO = true;
+    public static final boolean GET_WRITE_TIME_COST_INFO = true;
+    public static final boolean GET_READ_TIME_COST_INFO = true;
     public static final int PMEM_BLOCK_GROUP_COUNT = 17;
     public static final Logger log = LoggerFactory.getLogger("myLogger");
     public static final long GB = 1024L * 1024L * 1024L;
@@ -234,13 +234,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         ssdDataWriter.pushWrappedData(wrappedData);
 
         try {
-//            if(roughWrittenDataSize > 20 * GB){
-////                ramDataWriter.pushWrappedData(wrappedData);
-//                pmemDataWriter.pushWrappedData(wrappedData);
-//            } else {
-//                wrappedData.getMeta().getCountDownLatch().countDown();
-//            }
-            wrappedData.getMeta().getCountDownLatch().countDown();
+            if(roughWrittenDataSize > 20 * GB){
+//                ramDataWriter.pushWrappedData(wrappedData);
+                pmemDataWriter.pushWrappedData(wrappedData);
+            } else {
+                wrappedData.getMeta().getCountDownLatch().countDown();
+            }
             wrappedData.getMeta().getCountDownLatch().await();
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -296,7 +295,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         readTimeCostCount = new TimeCostCountData("read");
                     }
                     log.info("第一阶段结束 cost: {}", System.currentTimeMillis() - constructFinishTime);
-                    System.exit(-1);
+//                    System.exit(-1);
                 }
             }
         }
