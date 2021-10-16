@@ -234,12 +234,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         ssdDataWriter.pushWrappedData(wrappedData);
 
         try {
-            if(roughWrittenDataSize > 20 * GB){
-//                ramDataWriter.pushWrappedData(wrappedData);
-                pmemDataWriter.pushWrappedData(wrappedData);
-            } else {
-                wrappedData.getMeta().getCountDownLatch().countDown();
-            }
+//            if(roughWrittenDataSize > 20 * GB){
+////                ramDataWriter.pushWrappedData(wrappedData);
+//                pmemDataWriter.pushWrappedData(wrappedData);
+//            } else {
+//                wrappedData.getMeta().getCountDownLatch().countDown();
+//            }
+            wrappedData.getMeta().getCountDownLatch().countDown();
             wrappedData.getMeta().getCountDownLatch().await();
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -295,7 +296,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         readTimeCostCount = new TimeCostCountData("read");
                     }
                     log.info("第一阶段结束 cost: {}", System.currentTimeMillis() - constructFinishTime);
-//                    System.exit(-1);
+                    System.exit(-1);
                 }
             }
         }
