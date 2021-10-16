@@ -36,7 +36,10 @@ public class Test {
     public static final Unsafe unsafe = UnsafeUtil.unsafe;
 
     public static void main(String[] args) throws InterruptedException, IOException, NoSuchFieldException {
-        System.out.println(Paths.get("/a", "b"));
+        ByteBuffer buf = ByteBuffer.allocate(8);
+        unsafe.putLong(buf.array(), 16, 1);
+        buf.limit(8);
+        System.out.println(unsafe.getLong(buf.array(), 16));
     }
 
 }
