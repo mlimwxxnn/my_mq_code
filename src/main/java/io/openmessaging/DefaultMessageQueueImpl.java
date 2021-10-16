@@ -176,7 +176,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public void testLlpl(){
         byte[] data = new byte[8 * 1024];
         int count = 0;
-        TransactionalHeap heap = TransactionalHeap.createHeap(PMEM_ROOT + "/persistent_heap", PMEM_HEAP_SIZE);
+        TransactionalHeap heap = TransactionalHeap.createHeap("/pmem" + "/persistent_heap", PMEM_HEAP_SIZE);
         TransactionalMemoryBlock block;
         do {
             try {
