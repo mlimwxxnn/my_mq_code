@@ -1,5 +1,7 @@
 package io.openmessaging;
 
+import com.intel.pmem.llpl.TransactionalHeap;
+import com.intel.pmem.llpl.TransactionalMemoryBlock;
 import io.openmessaging.data.CacheHitCountData;
 import io.openmessaging.data.GetRangeTaskData;
 import io.openmessaging.data.TimeCostCountData;
@@ -14,6 +16,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
@@ -170,7 +173,28 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }).start();
     }
 
+    public void testLlpl(){
+        byte[] data = new byte[8 * 1024];
+        int count = 0;
+        TransactionalHeap heap = TransactionalHeap.createHeap(PMEM_ROOT + "/persistent_heap", PMEM_HEAP_SIZE);
+        TransactionalMemoryBlock block;
+        do {
+            try {
+                block = heap.allocateMemoryBlock(data.length, range -> {
+                    range.copyFromArray(data, 0, 0, data.length);
+                });
+            }catch (Exception e){
+                block = null;
+            }
+            count ++;
+        }while (block != null);
+        System.out.printf("final block count: %d", count);
+        System.exit(-1);
+
+    }
+
     public DefaultMessageQueueImpl() {
+        testLlpl();
         log.info("DefaultMessageQueueImpl 开始执行构造函数");
         DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./essd") : new File("/essd");
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
