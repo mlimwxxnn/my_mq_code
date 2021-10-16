@@ -29,7 +29,8 @@ public class GetRangeTaskData {
 
     public GetRangeTaskData() {
         for (int i = 0; i < buffers.length; i++) {
-            buffers[i] = ByteBuffer.allocateDirect(17 * 1024);
+            // todo 这里改成directByteBuffer能提高ssd的read速度， by wl
+            buffers[i] = ByteBuffer.allocate(17 * 1024);
         }
     }
 
