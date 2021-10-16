@@ -100,9 +100,7 @@ public class QueueInfo {
         if(i > maxIndex){
             throw new IndexOutOfBoundsException("索引越界");
         }
-        synchronized (this) {
-            status[i] |= 4;
-        }
+        setWillNotToQuery(i);
         return dataInfo[i];
     }
 
@@ -114,9 +112,7 @@ public class QueueInfo {
         if(i > maxIndex){
             throw new IndexOutOfBoundsException("索引越界");
         }
-        synchronized (this) {
-            status[i] |= 4;
-        }
+        setWillNotToQuery(i);
         return pmemPageInfos[i];
     }
 
@@ -129,21 +125,18 @@ public class QueueInfo {
     public boolean haveQueried(){
         return haveQueried;
     }
-    public boolean haveQueried(int i) {
-        return (status[i] & 4) > 0;
-    }
 
     public boolean isInRam(int i) {
         return (status[i] & 2) > 0;
     }
 
-    public void setNotToQuery(int i) {
+    public void setWillNotToQuery(int i) {
         synchronized (this) {
-            status[i] |= 8;
+            status[i] |= 4;
         }
     }
 
     public boolean willNotToQuery(int i) {
-        return (status[i] & 8) > 0;
+        return (status[i] & 4) > 0;
     }
 }

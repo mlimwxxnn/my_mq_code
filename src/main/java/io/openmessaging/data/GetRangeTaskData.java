@@ -5,7 +5,6 @@ import io.openmessaging.info.PmemPageInfo;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.util.UnsafeUtil;
 import sun.misc.Unsafe;
-import sun.nio.ch.DirectBuffer;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;
@@ -13,8 +12,6 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
-import static io.openmessaging.writer.RamDataWriter.*;
-import static java.lang.System.arraycopy;
 
 
 public class GetRangeTaskData {
@@ -61,7 +58,7 @@ public class GetRangeTaskData {
                 PmemPageInfo[] allPmemPageInfos = queueInfo.getAllPmemPageInfos();
                 for (int j = 0; j < offset - 1; j++) {
                     PmemPageInfo pmemPageInfo = allPmemPageInfos[j];
-                    queueInfo.setNotToQuery(j);
+                    queueInfo.setWillNotToQuery(j);
                     if (pmemPageInfo != null) {
                         pmemPageInfo.block.free();
                     }
@@ -123,7 +120,7 @@ public class GetRangeTaskData {
                         readTimeCostCount.addSsdTimeCost(queryStop - queryStart);
                     }
                 }
-                queueInfo.setNotToQuery(currentOffset);
+                queueInfo.setWillNotToQuery(currentOffset);
                 result.put(i, buf);
             }
         } catch (Exception e) {

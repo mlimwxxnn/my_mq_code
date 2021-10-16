@@ -1,17 +1,14 @@
 package io.openmessaging.writer;
 
-import com.intel.pmem.llpl.TransactionalCompactMemoryBlock;
 import com.intel.pmem.llpl.TransactionalMemoryBlock;
 import io.openmessaging.info.PmemPageInfo;
 import io.openmessaging.info.QueueInfo;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
-import java.util.concurrent.LinkedBlockingQueue;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
 import static io.openmessaging.writer.PmemDataWriter.getBlockByAllocateAndSetData;
@@ -59,7 +56,7 @@ public class ReloadData {
                     queueInfo = topicInfo.computeIfAbsent(queueId, k -> new QueueInfo());
 
                     TransactionalMemoryBlock block;
-                    if(!queueInfo.haveQueried(offset) && !queueInfo.willNotToQuery(offset)) {
+                    if(!queueInfo.willNotToQuery(offset)) {
                         while ((block = getBlockByAllocateAndSetData(dataBuffer)) == null) {
                             Thread.sleep(1);
                         }
