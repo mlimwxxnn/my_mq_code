@@ -5,7 +5,10 @@ import io.openmessaging.data.MetaData;
 import io.openmessaging.data.WrappedData;
 import io.openmessaging.info.PmemPageInfo;
 import io.openmessaging.info.QueueInfo;
+import io.openmessaging.util.UnsafeUtil;
+import sun.misc.Unsafe;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
@@ -15,8 +18,10 @@ import static io.openmessaging.DefaultMessageQueueImpl.*;
 
 public class PmemDataWriter {
 
+    private final Integer beginPositionRecord = 0;
     public BlockingQueue<WrappedData> pmemWrappedDataQueue = new LinkedBlockingQueue<>();
     private static TransactionalHeap heap;
+    private static final Unsafe unsafe = UnsafeUtil.unsafe;
 
 
     private void initPmem(){
@@ -33,7 +38,7 @@ public class PmemDataWriter {
         pmemWrappedDataQueue.offer(wrappedData);
     }
 
-    private TransactionalMemoryBlock getBlockByAllocateAndSetData(ByteBuffer data){
+    public static TransactionalMemoryBlock getBlockByAllocateAndSetData(ByteBuffer data){
         try {
             long writeStart = System.nanoTime();
 
@@ -68,10 +73,16 @@ public class PmemDataWriter {
                             queueInfo = meta.getQueueInfo();
                             pmemPageInfo = new PmemPageInfo(block);
                             queueInfo.setDataPosInPmem(meta.getOffset(), pmemPageInfo);
+                        } else {
+                            if(unsafe.compareAndSwapInt(beginPositionRecord, 12, 0, 1)) {
+                                for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
+                                    range[i][0] = dataWriteChannels[i].size();
+                                }
+                            }
                         }
                         meta.getCountDownLatch().countDown();
                     }
-                } catch (InterruptedException e) {
+                } catch (InterruptedException | IOException e) {
                     e.printStackTrace();
                 }
             }).start();

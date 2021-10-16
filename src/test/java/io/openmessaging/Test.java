@@ -22,6 +22,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static io.openmessaging.DefaultMessageQueueImpl.PMEM_ROOT;
 
@@ -32,9 +33,10 @@ public class Test {
         System.out.println(a);
         System.out.println(b);
     }
+    public static final Unsafe unsafe = UnsafeUtil.unsafe;
 
-    public static void main(String[] args) throws InterruptedException, IOException {
-
+    public static void main(String[] args) throws InterruptedException, IOException, NoSuchFieldException {
+        System.out.println(Paths.get("/a", "b"));
     }
 
 }

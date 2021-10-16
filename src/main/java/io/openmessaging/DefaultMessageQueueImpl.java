@@ -8,6 +8,7 @@ import io.openmessaging.data.TimeCostCountData;
 import io.openmessaging.data.WrappedData;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.reader.DataReader;
+import io.openmessaging.writer.ReloadData;
 import io.openmessaging.writer.PmemDataWriter;
 import io.openmessaging.writer.RamDataWriter;
 import io.openmessaging.writer.SsdDataWriter;
@@ -16,7 +17,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
@@ -61,6 +61,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static int initThreadCount = 0;
     public static PmemDataWriter pmemDataWriter;
     public static RamDataWriter ramDataWriter;
+    public static final long[][] range = new long[SSD_WRITE_THREAD_COUNT][2];
+
 
     public static CacheHitCountData hitCountData;
     public static TimeCostCountData writeTimeCostCount;
@@ -194,7 +196,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
     public DefaultMessageQueueImpl() {
-        testLlpl();
         log.info("DefaultMessageQueueImpl 开始执行构造函数");
         DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./essd") : new File("/essd");
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
@@ -319,6 +320,15 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         readTimeCostCount = new TimeCostCountData("read");
                     }
                     log.info("第一阶段结束 cost: {}", System.currentTimeMillis() - constructFinishTime);
+
+                    for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
+                        try {
+                            range[i][1] = dataWriteChannels[i].size();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    new ReloadData();
 //                    System.exit(-1);
                 }
             }

@@ -57,11 +57,12 @@ public class GetRangeTaskData {
             if (queueInfo == null) {
                 return;
             }
-            if(!queueInfo.haveQueried()){
+            if (!queueInfo.haveQueried()) {
                 PmemPageInfo[] allPmemPageInfos = queueInfo.getAllPmemPageInfos();
                 for (int j = 0; j < offset - 1; j++) {
                     PmemPageInfo pmemPageInfo = allPmemPageInfos[j];
-                    if(pmemPageInfo != null) {
+                    queueInfo.setNotToQuery(j);
+                    if (pmemPageInfo != null) {
                         pmemPageInfo.block.free();
                     }
                 }
@@ -93,7 +94,7 @@ public class GetRangeTaskData {
 //                        hitCountData.increaseRamHitCount();
 //                    }
 //                }else
-                    if(queueInfo.isInPmem(currentOffset)) {
+                if (queueInfo.isInPmem(currentOffset)) {
                     long queryStart = System.nanoTime();
 
                     PmemPageInfo pmemPageInfo = queueInfo.getDataPosInPmem(currentOffset);
@@ -103,13 +104,13 @@ public class GetRangeTaskData {
 
                     // 统计信息
                     long queryStop = System.nanoTime();
-                    if (GET_READ_TIME_COST_INFO){
+                    if (GET_READ_TIME_COST_INFO) {
                         readTimeCostCount.addPmemTimeCost(queryStop - queryStart);
                     }
-                    if (GET_CACHE_HIT_INFO){
+                    if (GET_CACHE_HIT_INFO) {
                         hitCountData.increasePmemHitCount();
                     }
-                }else {
+                } else {
                     long queryStart = System.nanoTime();
 
                     int id = (int) (p[1] >> 32);
@@ -118,10 +119,11 @@ public class GetRangeTaskData {
 
                     // 统计信息
                     long queryStop = System.nanoTime();
-                    if (GET_READ_TIME_COST_INFO){
+                    if (GET_READ_TIME_COST_INFO) {
                         readTimeCostCount.addSsdTimeCost(queryStop - queryStart);
                     }
                 }
+                queueInfo.setNotToQuery(currentOffset);
                 result.put(i, buf);
             }
         } catch (Exception e) {
