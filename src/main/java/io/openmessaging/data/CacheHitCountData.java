@@ -30,7 +30,7 @@ public class CacheHitCountData {
         double pmemHitPercent = pmemCount * 100.0 / totalCount;
         double ramHitPercent = ramCount * 100.0 / totalCount;
         return String.format("total query count: %d, pmem hit count: %d (%.4f%%), ram hit count: %d (%.4f%%)",
-                totalCount, pmemCount, pmemHitPercent, pmemCount, ramHitPercent);
+                totalCount, pmemCount, pmemHitPercent, ramCount, ramHitPercent);
     }
 
     public static void main(String[] args) {
