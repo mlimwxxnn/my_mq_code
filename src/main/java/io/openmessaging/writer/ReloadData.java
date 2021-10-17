@@ -32,7 +32,7 @@ public class ReloadData {
                     channel = FileChannel.open(Paths.get("/essd", "data-" + id), StandardOpenOption.READ);
                     channel.position(range[id][0]);
 //                    ByteBuffer infoBuffer = ByteBuffer.allocate(DATA_INFORMATION_LENGTH);
-                    int dataBufferSize = 512 * 1024;
+                    int dataBufferSize = 4 * 1024 * 1024;
                     ByteBuffer dataBuffer = ByteBuffer.allocate(dataBufferSize);
                     byte topicId;
                     short queueId;

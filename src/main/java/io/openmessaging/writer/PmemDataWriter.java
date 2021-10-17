@@ -42,7 +42,7 @@ public class PmemDataWriter {
         try {
             long writeStart = System.nanoTime();
 
-            TransactionalMemoryBlock block = heap.allocateMemoryBlock(data.remaining(), range -> {
+            TransactionalMemoryBlock block = heap.allocateMemoryBlock(saveLength, range -> {
                 range.copyFromArray(data.array(), data.position(), 0, saveLength);
             });
 
