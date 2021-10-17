@@ -20,7 +20,8 @@ public class CacheHitCountData {
     }
 
     public void increaseRamHitCount() {
-//        ramHitCount.incrementAndGet();
+        System.out.println("diao yong le increaseRamHitCount fang fa");
+        ramHitCount.incrementAndGet();
     }
 
     public String getHitCountInfo() {
