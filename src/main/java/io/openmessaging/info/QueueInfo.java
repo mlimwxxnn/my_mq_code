@@ -52,12 +52,8 @@ public class QueueInfo {
     }
 
     private void updateMaxIndex(int i) {
-        if(i > maxIndex){
-            synchronized (this) {
-                if(i > maxIndex) {
-                    maxIndex = i;
-                }
-            }
+        if(i > maxIndex) {
+            maxIndex = i;
         }
     }
     public void setDataPosInRam(int i, int address) {

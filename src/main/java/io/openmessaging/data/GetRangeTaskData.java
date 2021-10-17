@@ -22,7 +22,7 @@ public class GetRangeTaskData {
     int queueId;
     long offset;
     int fetchNum;
-    private CountDownLatch countDownLatch = new CountDownLatch(1);
+    private CountDownLatch countDownLatch;
 
     public GetRangeTaskData() {
         for (int i = 0; i < buffers.length; i++) {
@@ -36,10 +36,10 @@ public class GetRangeTaskData {
         this.queueId = queueId;
         this.offset = offset;
         this.fetchNum = fetchNum;
+        this.countDownLatch = new CountDownLatch(1);
     }
 
     public Map<Integer, ByteBuffer> getResult() {
-        countDownLatch = new CountDownLatch(1);
         return result;
     }
 
