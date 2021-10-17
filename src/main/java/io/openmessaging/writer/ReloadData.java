@@ -43,7 +43,7 @@ public class ReloadData {
                     while (channel.position() < range[id][1]) {
                         unsafe.copyMemory(dataBuffer.array(), 16 + dataBuffer.position(), dataBuffer.array(), 16, remaining);
                         dataBuffer.position(remaining);
-                        int readLen = Math.min((int)(range[id][1] - channel.position()), 4 * 1024 * 1024 - remaining);
+                        int readLen = (int) Math.min(range[id][1] - channel.position(), 4 * 1024 * 1024 - remaining);
                         dataBuffer.limit(remaining + readLen);
                         channel.read(dataBuffer);
                         dataBuffer.flip();
