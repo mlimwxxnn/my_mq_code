@@ -68,6 +68,7 @@ public class GetRangeTaskData {
             short dataLen;
             for (int i = 0; i < n; i++) {
                 int currentOffset = i + (int) offset;
+                queueInfo.setWillNotToQuery(currentOffset);
                 long[] p = queueInfo.getDataPosInFile(currentOffset);
                 dataLen = (short) p[1];
                 ByteBuffer buf = buffers[i];
@@ -120,7 +121,6 @@ public class GetRangeTaskData {
                         readTimeCostCount.addSsdTimeCost(queryStop - queryStart);
                     }
                 }
-                queueInfo.setWillNotToQuery(currentOffset);
                 result.put(i, buf);
             }
         } catch (Exception e) {

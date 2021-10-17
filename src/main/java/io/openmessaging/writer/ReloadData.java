@@ -32,37 +32,34 @@ public class ReloadData {
                     channel = FileChannel.open(Paths.get("/essd", "data-" + id), StandardOpenOption.READ);
                     channel.position(range[id][0]);
 //                    ByteBuffer infoBuffer = ByteBuffer.allocate(DATA_INFORMATION_LENGTH);
-                    ByteBuffer dataBuffer = ByteBuffer.allocate(4 * 1024 * 1024);
+                    int dataBufferSize = 4 * 1024 * 1024;
+                    ByteBuffer dataBuffer = ByteBuffer.allocate(dataBufferSize);
                     byte topicId;
                     short queueId;
                     short dataLen;
                     int offset;
                     HashMap<Short, QueueInfo> topicInfo;
                     QueueInfo queueInfo;
-                    int remaining = 0;
-                    while (channel.position() < range[id][1]) {
-                        unsafe.copyMemory(dataBuffer.array(), 16 + dataBuffer.position(), dataBuffer.array(), 16, remaining);
-                        dataBuffer.position(remaining);
-                        int readLen = (int) Math.min(range[id][1] - channel.position(), 4 * 1024 * 1024 - remaining);
-                        dataBuffer.limit(remaining + readLen);
+                    while (channel.position() < range[id][1]){
+                        dataBuffer.clear();
+                        int readLen = (int) Math.min(range[id][1] - channel.position(), dataBufferSize);
+                        dataBuffer.limit(readLen);
                         channel.read(dataBuffer);
                         dataBuffer.flip();
-                        int cur = 0;
-                        while(dataBuffer.position() < dataBuffer.limit()) {
+                        while (dataBuffer.remaining() > DATA_INFORMATION_LENGTH){
                             topicId = dataBuffer.get();
                             queueId = dataBuffer.getShort();
                             dataLen = dataBuffer.getShort();
                             offset = dataBuffer.getInt();
-
+                            if (dataBuffer.remaining() < dataLen){
+                                dataBuffer.position(dataBuffer.position() - DATA_INFORMATION_LENGTH);
+                                break;
+                            }
                             topicInfo = metaInfo.computeIfAbsent(topicId, k -> new HashMap<>(2000));
                             queueInfo = topicInfo.computeIfAbsent(queueId, k -> new QueueInfo());
-
-
-
-
                             TransactionalMemoryBlock block;
                             while (!queueInfo.willNotToQuery(offset)) {
-                                if ((block = getBlockByAllocateAndSetData(ByteBuffer.wrap(dataBuffer.array(), dataBuffer.position(), dataLen))) == null)
+                                if ((block = getBlockByAllocateAndSetData(dataBuffer, dataLen)) == null)
                                     Thread.sleep(1);
                                 else {
                                     queueInfo.setDataPosInPmem(offset, new PmemPageInfo(block));
@@ -70,11 +67,8 @@ public class ReloadData {
                                 }
                             }
                             dataBuffer.position(dataBuffer.position() + dataLen);
-                            remaining = dataBuffer.limit() - dataBuffer.position();
-                            if(remaining < 109 || Short.reverseBytes(unsafe.getShort(dataBuffer.array(), 16 + dataBuffer.position() + 3)) > remaining - DATA_INFORMATION_LENGTH) {
-                                break;
-                            }
                         }
+                        channel.position(channel.position() - dataBuffer.remaining());
                     }
                 } catch (Exception e) {
                     e.printStackTrace();

@@ -38,12 +38,12 @@ public class PmemDataWriter {
         pmemWrappedDataQueue.offer(wrappedData);
     }
 
-    public static TransactionalMemoryBlock getBlockByAllocateAndSetData(ByteBuffer data){
+    public static TransactionalMemoryBlock getBlockByAllocateAndSetData(ByteBuffer data, int saveLength){
         try {
             long writeStart = System.nanoTime();
 
             TransactionalMemoryBlock block = heap.allocateMemoryBlock(data.remaining(), range -> {
-                range.copyFromArray(data.array(), data.position(), 0, data.remaining());
+                range.copyFromArray(data.array(), data.position(), 0, saveLength);
             });
 
             // 统计信息
@@ -69,7 +69,7 @@ public class PmemDataWriter {
                     while (true) {
                         wrappedData = pmemWrappedDataQueue.take();
                         meta = wrappedData.getMeta();
-                        if ((block = getBlockByAllocateAndSetData(wrappedData.getData())) != null) {
+                        if ((block = getBlockByAllocateAndSetData(wrappedData.getData(), meta.getDataLen())) != null) {
                             queueInfo = meta.getQueueInfo();
                             pmemPageInfo = new PmemPageInfo(block);
                             queueInfo.setDataPosInPmem(meta.getOffset(), pmemPageInfo);
