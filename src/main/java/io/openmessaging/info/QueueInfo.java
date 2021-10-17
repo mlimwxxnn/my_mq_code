@@ -51,11 +51,14 @@ public class QueueInfo {
         }
     }
 
-    public void setDataPosInRam(int i, int address) {
-        ensureCapacity(i);
-        if(i > maxIndex){
+    private void updateMaxIndex(int i) {
+        if(i > maxIndex) {
             maxIndex = i;
         }
+    }
+    public void setDataPosInRam(int i, int address) {
+        ensureCapacity(i);
+        updateMaxIndex(i);
         dataPosInRam.put(address);
         synchronized (this){
             status[i] |= 2;
@@ -73,9 +76,7 @@ public class QueueInfo {
 
     public void setDataPosInPmem(int i, PmemPageInfo pmemPageInfo){
         ensureCapacity(i);
-        if(i > maxIndex){
-            maxIndex = i;
-        }
+        updateMaxIndex(i);
         pmemPageInfos[i] = pmemPageInfo;
         synchronized (this){
             status[i] |= 1;
@@ -89,9 +90,7 @@ public class QueueInfo {
 
     public void setDataPosInFile(int i, long fileChannelOffset, long fileIdAndLen){
         ensureCapacity(i);
-        if(i > maxIndex){
-            maxIndex = i;
-        }
+        updateMaxIndex(i);
         dataInfo[i][0] = fileChannelOffset;
         dataInfo[i][1] = fileIdAndLen;
     }
