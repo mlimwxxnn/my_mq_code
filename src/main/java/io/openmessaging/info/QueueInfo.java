@@ -59,7 +59,6 @@ public class QueueInfo {
     }
     public void setDataPosInRam(int i, int address) {
         ensureCapacity(i);
-        updateMaxIndex(i);
         dataPosInRam.put(address);
         synchronized (this){
             status[i] |= 2;
@@ -77,7 +76,6 @@ public class QueueInfo {
 
     public void setDataPosInPmem(int i, PmemPageInfo pmemPageInfo){
         ensureCapacity(i);
-        updateMaxIndex(i);
         pmemPageInfos[i] = pmemPageInfo;
         synchronized (this){
             status[i] |= 1;

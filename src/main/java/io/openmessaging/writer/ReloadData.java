@@ -62,6 +62,7 @@ public class ReloadData {
                             queueInfo = topicInfo.get(queueId);
 
                             TransactionalMemoryBlock block;
+
                             while (!queueInfo.willNotToQuery(offset)) {
                                 if ((block = getBlockByAllocateAndSetData(dataBuffer, dataLen)) == null)
                                     Thread.sleep(1);
@@ -70,6 +71,7 @@ public class ReloadData {
                                     break;
                                 }
                             }
+
                             dataBuffer.position(dataBuffer.position() + dataLen);
                         }
                         channel.position(channel.position() - dataBuffer.remaining());

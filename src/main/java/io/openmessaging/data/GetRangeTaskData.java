@@ -64,7 +64,11 @@ public class GetRangeTaskData {
                     }
                 }
             }
+
+
             int tmp, n = fetchNum < (tmp = queueInfo.size() - (int) offset) ? fetchNum : tmp;
+
+
             short dataLen;
             for (int i = 0; i < n; i++) {
                 int currentOffset = i + (int) offset;
