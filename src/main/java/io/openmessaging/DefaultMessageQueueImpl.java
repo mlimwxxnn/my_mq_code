@@ -8,6 +8,7 @@ import io.openmessaging.data.TimeCostCountData;
 import io.openmessaging.data.WrappedData;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.reader.DataReader;
+import io.openmessaging.fordebug.QueriedInfo;
 import io.openmessaging.writer.ReloadData;
 import io.openmessaging.writer.PmemDataWriter;
 import io.openmessaging.writer.RamDataWriter;
@@ -22,6 +23,8 @@ import java.nio.file.StandardOpenOption;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import static io.openmessaging.data.GetRangeTaskData.queriedInfosPointer;
 
 
 @SuppressWarnings("ResultOfMethodCallIgnored")
@@ -68,6 +71,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static TimeCostCountData readTimeCostCount;
     private static long constructFinishTime;
 
+    public static QueriedInfo[] queriedInfos = new QueriedInfo[40];
 
     public static void init() {
         try {
@@ -125,6 +129,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     }
                 }).start();
             }
+            Runtime.getRuntime().addShutdownHook(new Thread(()->{
+                System.out.printf("queriedInfosPointer: %d\n", queriedInfosPointer.get());
+                for (int i = 0; i < 40; i++) {
+                    System.out.println(queriedInfos[i]);
+                }
+            }));
         }catch(IOException e){
             e.printStackTrace();
         }

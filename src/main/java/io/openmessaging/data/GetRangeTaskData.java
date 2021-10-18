@@ -3,6 +3,7 @@ package io.openmessaging.data;
 import io.openmessaging.DefaultMessageQueueImpl;
 import io.openmessaging.info.PmemPageInfo;
 import io.openmessaging.info.QueueInfo;
+import io.openmessaging.fordebug.QueriedInfo;
 import io.openmessaging.util.UnsafeUtil;
 import sun.misc.Unsafe;
 
@@ -10,6 +11,7 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
 
@@ -23,6 +25,8 @@ public class GetRangeTaskData {
     long offset;
     int fetchNum;
     private CountDownLatch countDownLatch;
+
+    public static AtomicInteger queriedInfosPointer = new AtomicInteger();
 
     public GetRangeTaskData() {
         for (int i = 0; i < buffers.length; i++) {
@@ -44,6 +48,7 @@ public class GetRangeTaskData {
     }
 
     public void queryData() {
+        QueriedInfo queriedInfo = queriedInfos[queriedInfosPointer.getAndIncrement() % 40] = new QueriedInfo(topic, queueId, offset, fetchNum);
         try {
             result.clear();
             Byte topicId = DefaultMessageQueueImpl.getTopicId(topic, false);
@@ -108,6 +113,7 @@ public class GetRangeTaskData {
                     if (GET_CACHE_HIT_INFO) {
                         hitCountData.increasePmemHitCount();
                     }
+                    queriedInfo.setQueryMethod(currentOffset, (byte) 1);
                 } else {
                     long queryStart = System.nanoTime();
 
@@ -120,6 +126,7 @@ public class GetRangeTaskData {
                     if (GET_READ_TIME_COST_INFO) {
                         readTimeCostCount.addSsdTimeCost(queryStop - queryStart);
                     }
+                    queriedInfo.setQueryMethod(currentOffset, (byte) -1);
                 }
                 result.put(i, buf);
             }

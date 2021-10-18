@@ -34,12 +34,12 @@ public class CacheHitCountData {
                 totalCount, pmemCount, pmemHitPercent, ramCount, ramHitPercent);
     }
 
-    public static void main(String[] args) {
-        CacheHitCountData cacheHitCount = new CacheHitCountData();
-        cacheHitCount.addTotalQueryCount(4);
-        cacheHitCount.increasePmemHitCount();
-        cacheHitCount.increasePmemHitCount();
-        cacheHitCount.increaseRamHitCount();
-        System.out.println(cacheHitCount.getHitCountInfo());
-    }
+//    public static void main(String[] args) {
+//        CacheHitCountData cacheHitCount = new CacheHitCountData();
+//        cacheHitCount.addTotalQueryCount(4);
+//        cacheHitCount.increasePmemHitCount();
+//        cacheHitCount.increasePmemHitCount();
+//        cacheHitCount.increaseRamHitCount();
+//        System.out.println(cacheHitCount.getHitCountInfo());
+//    }
 }

@@ -1,8 +1,6 @@
 package io.openmessaging.info;
 
 
-
-
 import io.openmessaging.util.ArrayQueue;
 import static java.lang.System.arraycopy;
 
@@ -76,8 +74,8 @@ public class QueueInfo {
 
     public void setDataPosInPmem(int i, PmemPageInfo pmemPageInfo){
         ensureCapacity(i);
-        pmemPageInfos[i] = pmemPageInfo;
         synchronized (this){
+            pmemPageInfos[i] = pmemPageInfo;
             status[i] |= 1;
         }
     }
