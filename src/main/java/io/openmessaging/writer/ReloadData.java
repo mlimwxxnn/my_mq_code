@@ -10,7 +10,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
@@ -28,12 +27,9 @@ public class ReloadData {
             final int id = i;
             new Thread(() -> {
                 try {
-                    FileChannel channel = null;
-
-                    channel = FileChannel.open(Paths.get("/essd", "data-" + id), StandardOpenOption.READ);
+                    FileChannel channel = FileChannel.open(Paths.get("/essd", "data-" + id), StandardOpenOption.READ);
                     channel.position(range[id][0]);
-//                    ByteBuffer infoBuffer = ByteBuffer.allocate(DATA_INFORMATION_LENGTH);
-                    int dataBufferSize = 4 * 1024 * 1024;
+                    int dataBufferSize = 400 * 1024;
                     ByteBuffer dataBuffer = ByteBuffer.allocate(dataBufferSize);
                     byte topicId;
                     short queueId;
@@ -60,7 +56,6 @@ public class ReloadData {
 
                             topicInfo = metaInfo.get(topicId);
                             queueInfo = topicInfo.get(queueId);
-
                             TransactionalMemoryBlock block;
 
                             while (!queueInfo.willNotToQuery(offset)) {
@@ -74,7 +69,6 @@ public class ReloadData {
                                     break;
                                 }
                             }
-
                             dataBuffer.position(dataBuffer.position() + dataLen);
                         }
                         channel.position(channel.position() - dataBuffer.remaining());

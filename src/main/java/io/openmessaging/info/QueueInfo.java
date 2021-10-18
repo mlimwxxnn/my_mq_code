@@ -98,7 +98,6 @@ public class QueueInfo {
         if(i > maxIndex){
             throw new IndexOutOfBoundsException("索引越界");
         }
-        setWillNotToQuery(i);
         return dataInfo[i];
     }
 
@@ -110,7 +109,6 @@ public class QueueInfo {
         if(i > maxIndex){
             throw new IndexOutOfBoundsException("索引越界");
         }
-        setWillNotToQuery(i);
         return pmemPageInfos[i];
     }
 
