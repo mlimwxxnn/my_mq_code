@@ -66,6 +66,9 @@ public class ReloadData {
                                 if ((block = getBlockByAllocateAndSetData(dataBuffer, dataLen)) == null)
                                     Thread.sleep(1);
                                 else {
+                                    if(offset >= queueInfo.size()){
+                                        System.out.println("错误：重新加载数据使queueInfo扩容了");
+                                    }
                                     queueInfo.setDataPosInPmem(offset, new PmemPageInfo(block));
                                     break;
                                 }
