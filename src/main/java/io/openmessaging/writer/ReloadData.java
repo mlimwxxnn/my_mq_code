@@ -29,13 +29,12 @@ public class ReloadData {
                 try {
                     FileChannel channel = FileChannel.open(Paths.get("/essd", "data-" + id), StandardOpenOption.READ);
                     channel.position(range[id][0]);
-                    int dataBufferSize = 400 * 1024;
+                    int dataBufferSize = 1 * 1024 * 1024;
                     ByteBuffer dataBuffer = ByteBuffer.allocate(dataBufferSize);
                     byte topicId;
                     short queueId;
                     short dataLen;
                     int offset;
-                    ConcurrentHashMap<Short, QueueInfo> topicInfo;
                     QueueInfo queueInfo;
                     while (channel.position() < range[id][1]){
                         dataBuffer.clear();
@@ -54,8 +53,7 @@ public class ReloadData {
                                 break;
                             }
 
-                            topicInfo = metaInfo.get(topicId);
-                            queueInfo = topicInfo.get(queueId);
+                            queueInfo = metaInfo.get(topicId).get(queueId);
                             TransactionalMemoryBlock block;
 
                             while (!queueInfo.willNotToQuery(offset)) {
