@@ -11,6 +11,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
 import static io.openmessaging.writer.PmemDataWriter.getBlockByAllocateAndSetData;
@@ -38,7 +39,7 @@ public class ReloadData {
                     short queueId;
                     short dataLen;
                     int offset;
-                    HashMap<Short, QueueInfo> topicInfo;
+                    ConcurrentHashMap<Short, QueueInfo> topicInfo;
                     QueueInfo queueInfo;
                     while (channel.position() < range[id][1]){
                         dataBuffer.clear();
