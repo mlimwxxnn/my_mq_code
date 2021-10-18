@@ -97,7 +97,6 @@ public class SsdDataWriter {
                         if (GET_WRITE_TIME_COST_INFO){
                             writeTimeCostCount.addSsdTimeCost(writeStop - writeStart, metaList.size());
                         }
-
                         freeMergedDataQueue.offer(mergedData);
                     }
                 } catch (Exception e) {

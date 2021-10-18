@@ -11,7 +11,8 @@ public class QueueInfo {
     private int maxIndex;
     private volatile long[][] dataInfo;
     private volatile int capacity;
-    private volatile byte[] status; // 0 表示数据在ssd中 1 表示数据在pmem中 2 表示数据在内存中
+    // 末位为 1 表示数据在pmem中，倒数第二位为 1 表示数据在内存中，倒数第三位为 1 表示此offset的数据不会再被查
+    private volatile byte[] status;
     private volatile PmemPageInfo[] pmemPageInfos;
     private boolean haveQueried;
     private final ArrayQueue<Integer> dataPosInRam = new ArrayQueue<>(2);
@@ -136,6 +137,10 @@ public class QueueInfo {
     }
 
     public boolean willNotToQuery(int i) {
-        return (status[i] & 4) > 0;
+        boolean b;
+        synchronized (this){
+            b = (status[i] & 4) > 0;
+        }
+        return b;
     }
 }

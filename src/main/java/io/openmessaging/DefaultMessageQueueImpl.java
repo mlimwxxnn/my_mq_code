@@ -328,7 +328,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                             e.printStackTrace();
                         }
                     }
-//                    new ReloadData();
+                    new ReloadData();
 //                    System.exit(-1);
                 }
             }

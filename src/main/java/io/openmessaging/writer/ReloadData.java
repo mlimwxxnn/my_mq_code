@@ -51,12 +51,15 @@ public class ReloadData {
                             queueId = dataBuffer.getShort();
                             dataLen = dataBuffer.getShort();
                             offset = dataBuffer.getInt();
+
                             if (dataBuffer.remaining() < dataLen){
                                 dataBuffer.position(dataBuffer.position() - DATA_INFORMATION_LENGTH);
                                 break;
                             }
-                            topicInfo = metaInfo.computeIfAbsent(topicId, k -> new HashMap<>(2000));
-                            queueInfo = topicInfo.computeIfAbsent(queueId, k -> new QueueInfo());
+
+                            topicInfo = metaInfo.get(topicId);
+                            queueInfo = topicInfo.get(queueId);
+
                             TransactionalMemoryBlock block;
                             while (!queueInfo.willNotToQuery(offset)) {
                                 if ((block = getBlockByAllocateAndSetData(dataBuffer, dataLen)) == null)
