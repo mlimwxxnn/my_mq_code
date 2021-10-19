@@ -1,6 +1,7 @@
 package io.openmessaging.writer;
 
 import com.intel.pmem.llpl.TransactionalMemoryBlock;
+import io.openmessaging.data.WrappedData;
 import io.openmessaging.info.PmemPageInfo;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.util.UnsafeUtil;
@@ -10,16 +11,40 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
 import static io.openmessaging.writer.PmemDataWriter.getBlockByAllocateAndSetData;
 
 public class ReloadData {
     private Unsafe unsafe = UnsafeUtil.unsafe;
+    public final BlockingQueue<WrappedData> reloadWrappedDataQueue = new LinkedBlockingQueue<>(50);
 
     public ReloadData() {
         readData();
+        saveData();
+    }
+
+    public void saveData(){
+//        TransactionalMemoryBlock block;
+//        topicId = dataBuffer.get();
+//        queueId = dataBuffer.getShort();
+//        dataLen = dataBuffer.getShort();
+//        offset = dataBuffer.getInt();
+//        queueInfo = metaInfo.get(topicId).get(queueId);
+        //                            while (!queueInfo.willNotToQuery(offset)) {
+//                                if ((block = getBlockByAllocateAndSetData(dataBuffer, dataLen)) == null)
+//                                    Thread.sleep(1);
+//                                else {
+//                                    if(offset >= queueInfo.size()){
+//                                        System.out.println("错误：重新加载数据使queueInfo扩容了");
+//                                    }
+//                                    queueInfo.setDataPosInPmem(offset, new PmemPageInfo(block));
+//                                    break;
+//                                }
+//                            }
     }
 
     public void readData() {
@@ -31,7 +56,7 @@ public class ReloadData {
                 try {
                     FileChannel channel = FileChannel.open(Paths.get("/essd", "data-" + id), StandardOpenOption.READ);
                     channel.position(range[id][0]);
-                    int dataBufferSize = 1 * 1024 * 1024;
+                    int dataBufferSize = 4 * 1024 * 1024;
                     ByteBuffer dataBuffer = ByteBuffer.allocate(dataBufferSize);
                     byte topicId;
                     short queueId;
@@ -45,33 +70,12 @@ public class ReloadData {
                         channel.read(dataBuffer);
                         dataBuffer.flip();
                         while (dataBuffer.remaining() > DATA_INFORMATION_LENGTH){
-                            topicId = dataBuffer.get();
-                            queueId = dataBuffer.getShort();
-                            dataLen = dataBuffer.getShort();
-                            offset = dataBuffer.getInt();
-
-                            if (dataBuffer.remaining() < dataLen){
-                                dataBuffer.position(dataBuffer.position() - DATA_INFORMATION_LENGTH);
+                            dataLen = dataBuffer.getShort(3);
+                            if (dataBuffer.remaining() < dataLen + DATA_INFORMATION_LENGTH){
                                 break;
                             }
-
-                            queueInfo = metaInfo.get(topicId).get(queueId);
-                            TransactionalMemoryBlock block;
-
-//                            while (!queueInfo.willNotToQuery(offset)) {
-//                                if ((block = getBlockByAllocateAndSetData(dataBuffer, dataLen)) == null)
-//                                    Thread.sleep(1);
-//                                else {
-//                                    if(offset >= queueInfo.size()){
-//                                        System.out.println("错误：重新加载数据使queueInfo扩容了");
-//                                    }
-//                                    queueInfo.setDataPosInPmem(offset, new PmemPageInfo(block));
-//                                    break;
-//                                }
-//                            }
-                            dataBuffer.position(dataBuffer.position() + dataLen);
+                            dataBuffer.position(dataBuffer.position() + dataLen + DATA_INFORMATION_LENGTH);
                         }
-                        System.out.println(offset);
                         channel.position(channel.position() - dataBuffer.remaining());
                     }
                     countDownLatch.countDown();
