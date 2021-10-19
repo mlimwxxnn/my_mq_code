@@ -59,6 +59,7 @@ public class GetRangeTaskData {
             if (queueInfo == null) {
                 return;
             }
+
             if (!queueInfo.haveQueried()) {
                 PmemPageInfo[] allPmemPageInfos = queueInfo.getAllPmemPageInfos();
                 for (int j = 0; j < offset; j++) {
@@ -69,7 +70,9 @@ public class GetRangeTaskData {
                     }
                 }
             }
+
             int n = Math.min(fetchNum, queueInfo.size() - (int) offset);
+
             short dataLen;
             for (int i = 0; i < n; i++) {
                 int currentOffset = i + (int) offset;
