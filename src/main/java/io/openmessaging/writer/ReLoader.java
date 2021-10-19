@@ -36,46 +36,48 @@ public class ReLoader {
     }
 
     public void saveData(){
-        byte topicId;
-        short queueId;
-        short dataLen;
-        int offset;
-        QueueInfo queueInfo;
-        TransactionalMemoryBlock block;
-        try {
-            while (true){
-                ByteBuffer dataBuffer = loadedDataBufferQueue.take();
-                while (dataBuffer.hasRemaining()){
-                    topicId = dataBuffer.get();
-                    queueId = dataBuffer.getShort();
-                    dataLen = dataBuffer.getShort();
-                    offset = dataBuffer.getInt();
+        new Thread(() -> {
+            byte topicId;
+            short queueId;
+            short dataLen;
+            int offset;
+            QueueInfo queueInfo;
+            TransactionalMemoryBlock block;
+            try {
+                while (true){
+                    ByteBuffer dataBuffer = loadedDataBufferQueue.take();
+                    while (dataBuffer.hasRemaining()){
+                        topicId = dataBuffer.get();
+                        queueId = dataBuffer.getShort();
+                        dataLen = dataBuffer.getShort();
+                        offset = dataBuffer.getInt();
 
-                    queueInfo = metaInfo.get(topicId).get(queueId);
-                    while (!queueInfo.willNotToQuery(offset)) {
-                        if ((block = getBlockByAllocateAndSetData(dataBuffer, dataLen)) == null){
-                            Thread.sleep(1);
-                        } else {
-                            queueInfo.setDataPosInPmem(offset, new PmemPageInfo(block));
-                            break;
+                        queueInfo = metaInfo.get(topicId).get(queueId);
+                        while (!queueInfo.willNotToQuery(offset)) {
+                            if ((block = getBlockByAllocateAndSetData(dataBuffer, dataLen)) == null){
+                                Thread.sleep(1);
+                            } else {
+                                queueInfo.setDataPosInPmem(offset, new PmemPageInfo(block));
+                                break;
+                            }
                         }
+                        dataBuffer.position(dataBuffer.position() + dataLen);
                     }
-                    dataBuffer.position(dataBuffer.position() + dataLen);
+                    freeDataBufferQueue.offer(dataBuffer);
                 }
-                freeDataBufferQueue.offer(dataBuffer);
+            }catch (Exception e){
+                e.printStackTrace();
             }
-        }catch (Exception e){
-            e.printStackTrace();
-        }
+        }).start();
     }
 
     public void readData() {
-        log.info("reload start");
-        CountDownLatch countDownLatch = new CountDownLatch(SSD_WRITE_THREAD_COUNT);
+
         for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
             final int id = i;
             new Thread(() -> {
                 try {
+                    log.info("channel-{} read start", id);
                     FileChannel channel = FileChannel.open(Paths.get("/essd", "data-" + id), StandardOpenOption.READ);
                     channel.position(range[id][0]);
                     short dataLen;
@@ -98,18 +100,11 @@ public class ReLoader {
                         dataBuffer.position(0);
                         loadedDataBufferQueue.offer(dataBuffer);
                     }
-                    countDownLatch.countDown();
+                    log.info("channel-{} read finish", id);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             }).start();
-        }
-        try {
-            countDownLatch.await();
-            log.info("reload finish read");
-//            System.exit(-1);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
         }
     }
 }
