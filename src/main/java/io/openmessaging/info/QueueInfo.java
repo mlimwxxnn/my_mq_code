@@ -5,7 +5,6 @@ import io.openmessaging.util.ArrayQueue;
 import static java.lang.System.arraycopy;
 
 public class QueueInfo {
-//    private PageNode[];
     private volatile int maxIndex;
     private volatile long[][] dataInfo;
     private volatile int capacity;

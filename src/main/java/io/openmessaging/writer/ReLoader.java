@@ -72,21 +72,23 @@ public class ReLoader {
     }
 
     public void readData() {
-
         for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
             final int id = i;
             new Thread(() -> {
                 try {
+                    long readPosition = range[id][0];
+
                     log.info("channel-{} read start", id);
-                    FileChannel channel = FileChannel.open(Paths.get("/essd", "data-" + id), StandardOpenOption.READ);
-                    channel.position(range[id][0]);
+//                    FileChannel channel = FileChannel.open(Paths.get("/essd", "data-" + id), StandardOpenOption.READ);
+//                    channel.position(range[id][0]);
+                    FileChannel channel = dataWriteChannels[id];
                     short dataLen;
-                    while (channel.position() < range[id][1]){
+                    while (readPosition < range[id][1]){
                         ByteBuffer dataBuffer = freeDataBufferQueue.take();
                         dataBuffer.clear();
-                        int readLen = (int) Math.min(range[id][1] - channel.position(), RELOAD_BUFFER_SIZE);
+                        int readLen = (int) Math.min(range[id][1] - readPosition, RELOAD_BUFFER_SIZE);
                         dataBuffer.limit(readLen);
-                        channel.read(dataBuffer);
+                        channel.read(dataBuffer, readPosition);
                         dataBuffer.flip();
                         while (dataBuffer.remaining() > DATA_INFORMATION_LENGTH){
                             dataLen = dataBuffer.getShort(dataBuffer.position() + 3);
@@ -95,7 +97,8 @@ public class ReLoader {
                             }
                             dataBuffer.position(dataBuffer.position() + dataLen + DATA_INFORMATION_LENGTH);
                         }
-                        channel.position(channel.position() - dataBuffer.remaining());
+                        readPosition += readLen - dataBuffer.remaining();
+//                        channel.position(channel.position() - dataBuffer.remaining());
                         dataBuffer.limit(dataBuffer.position());
                         dataBuffer.position(0);
                         loadedDataBufferQueue.offer(dataBuffer);
