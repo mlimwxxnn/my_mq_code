@@ -329,7 +329,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                             e.printStackTrace();
                         }
                     }
-                    reLoader.reload();
+//                    reLoader.reload();
 //                    System.exit(-1);
                 }
             }
