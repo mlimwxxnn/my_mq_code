@@ -83,6 +83,7 @@ public class ReloadData {
         try {
             countDownLatch.await();
             log.info("reload finish");
+            System.exit(-1);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
