@@ -8,7 +8,7 @@ import io.openmessaging.data.TimeCostCountData;
 import io.openmessaging.data.WrappedData;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.reader.DataReader;
-import io.openmessaging.writer.ReloadData;
+import io.openmessaging.writer.ReLoader;
 import io.openmessaging.writer.PmemDataWriter;
 import io.openmessaging.writer.RamDataWriter;
 import io.openmessaging.writer.SsdDataWriter;
@@ -22,8 +22,6 @@ import java.nio.file.StandardOpenOption;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static io.openmessaging.data.GetRangeTaskData.queriedInfosPointer;
 
 
 @SuppressWarnings("ResultOfMethodCallIgnored")
@@ -51,6 +49,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final long PMEM_HEAP_SIZE = 60 * GB;
 //     public static final long PMEM_HEAP_SIZE = 20 * MB;
     public static long roughWrittenDataSize = 0;
+    public static final int RELOAD_BUFFER_SIZE = (int) (4 * MB);
+    public static final int RELOAD_BUFFER_COUNT = 100;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     static private final ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
@@ -62,6 +62,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static int initThreadCount = 0;
     public static PmemDataWriter pmemDataWriter;
     public static RamDataWriter ramDataWriter;
+    public static ReLoader reLoader;
     public static final long[][] range = new long[SSD_WRITE_THREAD_COUNT][2];
 
 
@@ -89,6 +90,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             if (getTotalFileSize() > 0){
                 return;
             }
+            reLoader = new ReLoader();
             ssdDataWriter = new SsdDataWriter();
             pmemDataWriter = new PmemDataWriter();
 //            ramDataWriter = new RamDataWriter();
@@ -327,7 +329,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                             e.printStackTrace();
                         }
                     }
-                    new ReloadData();
+                    reLoader.reload();
 //                    System.exit(-1);
                 }
             }
