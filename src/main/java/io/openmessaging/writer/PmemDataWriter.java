@@ -44,7 +44,11 @@ public class PmemDataWriter {
             TransactionalMemoryBlock block = heap.allocateMemoryBlock(saveLength, range -> {
                 range.copyFromArray(data.array(), data.position(), 0, saveLength);
             });
+            long addressOffset = unsafe.objectFieldOffset(block.getClass().getDeclaredField("directAddress"));
+            long directAddress = unsafe.getLong(block, addressOffset);
+            unsafe.copyMemory(data.array(), data.position() + 16, null, directAddress + 8, saveLength);
 
+            block.free();
             // 统计信息
             long writeStop = System.nanoTime();
             if (GET_WRITE_TIME_COST_INFO) {

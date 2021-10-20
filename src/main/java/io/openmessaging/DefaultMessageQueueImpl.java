@@ -106,27 +106,27 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
             // 以下为debug或者打印日志信息初始化的区域
             //***********************************************************************
-            if(GET_WRITE_TIME_COST_INFO){
-                writeTimeCostCount = new TimeCostCountData("write");
-            }
-            if (GET_CACHE_HIT_INFO){
-                hitCountData = new CacheHitCountData();
-                new Thread(() -> {
-                    try {
-                        // 有查询后再打印
-                        while (roughWrittenDataSize < 75 * GB){
-                            Thread.sleep(10 * 1000);
-                        }
-                        while (true){
-                            // 每10s打印一次
-                            Thread.sleep(10 * 1000);
-                            log.info(hitCountData.getHitCountInfo());
-                        }
-                    }catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }).start();
-            }
+            if(GET_WRITE_TIME_COST_INFO){// @
+                writeTimeCostCount = new TimeCostCountData("write");// @
+            }// @
+            if (GET_CACHE_HIT_INFO){// @
+                hitCountData = new CacheHitCountData();// @
+                new Thread(() -> {// @
+                    try {// @
+                        // 有查询后再打印// @
+                        while (roughWrittenDataSize < 75 * GB){// @
+                            Thread.sleep(10 * 1000);// @
+                        }// @
+                        while (true){// @
+                            // 每10s打印一次// @
+                            Thread.sleep(10 * 1000);// @
+                            log.info(hitCountData.getHitCountInfo());// @
+                        }// @
+                    }catch (InterruptedException e) {// @
+                        e.printStackTrace();// @
+                    }// @
+                }).start();// @
+            }// @
         }catch(IOException e){
             e.printStackTrace();
         }

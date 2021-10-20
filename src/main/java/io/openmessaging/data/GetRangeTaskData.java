@@ -1,9 +1,15 @@
 package io.openmessaging.data;
 
+import com.intel.pmem.llpl.MemoryAccessor;
+import com.intel.pmem.llpl.TransactionalMemoryBlock;
 import io.openmessaging.DefaultMessageQueueImpl;
 import io.openmessaging.info.PmemPageInfo;
 import io.openmessaging.info.QueueInfo;
+import io.openmessaging.util.ArrayQueue;
+import io.openmessaging.util.UnsafeUtil;
+import sun.misc.Unsafe;
 
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
@@ -15,19 +21,40 @@ import static io.openmessaging.DefaultMessageQueueImpl.*;
 
 public class GetRangeTaskData {
     public final ByteBuffer[] buffers = new ByteBuffer[100]; // 用来响应查询的buffer
+    public final TransactionalMemoryBlock[] blocks = new TransactionalMemoryBlock[100];
+    int toFreeBlockCount = 0;
     private Map<Integer, ByteBuffer> result = new HashMap<>();
     String topic;
     int queueId;
     long offset;
     int fetchNum;
     private CountDownLatch countDownLatch;
+    Unsafe unsafe = UnsafeUtil.unsafe;
+    long bufferCapacityOffset;
+    long bufferAddressOffset;
+    long blockAddressOffset;
+    ArrayQueue<ByteBuffer> freeDataBuffers = new ArrayQueue<>(100);
+    ArrayQueue<ByteBuffer> toFreeBuffers = new ArrayQueue<>(100);
 
-    public static AtomicInteger queriedInfosPointer = new AtomicInteger();
+
+    {
+        try {
+            bufferCapacityOffset = unsafe.objectFieldOffset(Buffer.class.getDeclaredField("capacity"));
+            bufferAddressOffset = unsafe.objectFieldOffset(Buffer.class.getDeclaredField("address"));
+            blockAddressOffset = unsafe.objectFieldOffset(MemoryAccessor.class.getDeclaredField("directAddress"));
+        } catch (NoSuchFieldException e) {
+            e.printStackTrace();
+        }
+    }
+
 
     public GetRangeTaskData() {
         for (int i = 0; i < buffers.length; i++) {
             // todo 这里改成directByteBuffer能提高ssd的read速度， by wl
-            buffers[i] = ByteBuffer.allocate(17 * 1024);
+            buffers[i] = ByteBuffer.allocateDirect(1);
+            unsafe.freeMemory(unsafe.getLong(buffers[i], bufferAddressOffset));
+            unsafe.putInt(buffers[i], bufferCapacityOffset, 17 * 1024);
+            freeDataBuffers.put(ByteBuffer.allocateDirect(17 * 1024));
         }
     }
 
@@ -46,6 +73,15 @@ public class GetRangeTaskData {
     public void queryData() {
         try {
             result.clear();
+
+            while (toFreeBlockCount > 0){
+                blocks[--toFreeBlockCount].free();
+            }
+            while (toFreeBuffers.size() > 0) {
+                freeDataBuffers.put(toFreeBuffers.get());
+            }
+
+
             Byte topicId = DefaultMessageQueueImpl.getTopicId(topic, false);
             if (topicId == null) {
                 return;
@@ -99,9 +135,11 @@ public class GetRangeTaskData {
                     long queryStart = System.nanoTime();
 
                     PmemPageInfo pmemPageInfo = queueInfo.getDataPosInPmem(currentOffset);
-                    byte[] bufArray = buf.array();
-                    pmemPageInfo.block.copyToArray(0, bufArray, 0, dataLen);
-                    pmemPageInfo.block.free();
+                    TransactionalMemoryBlock block = pmemPageInfo.block;
+                    blocks[toFreeBlockCount++] = block;
+                    long blockDirectAddress = unsafe.getLong(block, blockAddressOffset);
+                    unsafe.putLong(buf, bufferAddressOffset, blockDirectAddress + 8); // 8 是block内部的metaSize大小
+
 
                     // 统计信息
                     long queryStop = System.nanoTime();
@@ -114,6 +152,8 @@ public class GetRangeTaskData {
                 } else {
                     long queryStart = System.nanoTime();
 
+                    buf = freeDataBuffers.get();
+                    buf.clear();
                     int id = (int) (p[1] >> 32);
                     DefaultMessageQueueImpl.dataWriteChannels[id].read(buf, p[0]);
                     buf.flip();
