@@ -55,6 +55,10 @@ public class ReLoader {
 //                                Thread.sleep(1);
 //                            }
 //                        }
+                        // 只存一次
+                        if (!queueInfo.willNotToQuery(offset) && (block = getBlockByAllocateAndSetData(dataBuffer, dataLen)) != null) {
+                            queueInfo.setDataPosInPmem(offset, new PmemPageInfo(block));
+                        }
 
                         dataBuffer.position(dataBuffer.position() + dataLen);
                     }
