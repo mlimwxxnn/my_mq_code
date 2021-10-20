@@ -12,13 +12,13 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
 
 public class PmemDataWriter {
 
-    private volatile Integer beginPositionRecord = 0;
+    AtomicBoolean isNeedSaveStartChannelPosition = new AtomicBoolean(true);
     public BlockingQueue<WrappedData> pmemWrappedDataQueue = new LinkedBlockingQueue<>();
     private static TransactionalHeap heap;
     private static final Unsafe unsafe = UnsafeUtil.unsafe;
@@ -74,8 +74,7 @@ public class PmemDataWriter {
                             pmemPageInfo = new PmemPageInfo(block);
                             queueInfo.setDataPosInPmem(meta.getOffset(), pmemPageInfo);
                         } else {
-                            if(unsafe.compareAndSwapInt(beginPositionRecord, 12, 0, 2333)) {
-                                System.out.println("unsafe.compareAndSwapInt run");
+                            if(isNeedSaveStartChannelPosition.compareAndSet(true, false)) {
                                 for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
                                     range[i][0] = dataWriteChannels[i].size();
                                 }
