@@ -257,9 +257,16 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         WrappedData wrappedData = new WrappedData(topicId, (short) queueId, data, offset, queueInfo);
         ssdDataWriter.pushWrappedData(wrappedData);
-        pmemDataWriter.pushWrappedData(wrappedData);
+//        pmemDataWriter.pushWrappedData(wrappedData);
 
         try {
+            if(roughWrittenDataSize > 20 * GB){
+//                ramDataWriter.pushWrappedData(wrappedData);
+                pmemDataWriter.pushWrappedData(wrappedData);
+            } else {
+                wrappedData.getMeta().getCountDownLatch().countDown();
+            }
+
 //            ramDataWriter.pushWrappedData(wrappedData);
 //            wrappedData.getMeta().getCountDownLatch().countDown();
             wrappedData.getMeta().getCountDownLatch().await();

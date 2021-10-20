@@ -51,9 +51,7 @@ public class PmemDataWriter {
     public static TransactionalMemoryBlock getBlockByAllocateAndSetData(ByteBuffer data, int saveLength) {
         try {
             long writeStart = System.nanoTime();
-
             TransactionalMemoryBlock block = heap.allocateMemoryBlock(saveLength, range -> { });
-
             long directAddress = unsafe.getLong(block, blockAddressOffset);
             unsafe.copyMemory(data.array(), data.position() + 16, null, directAddress + 8, saveLength);
 
