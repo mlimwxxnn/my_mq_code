@@ -17,7 +17,7 @@ import static io.openmessaging.DefaultMessageQueueImpl.*;
 
 public class PmemDataWriter {
 
-    private final Integer beginPositionRecord = 0;
+    private Integer beginPositionRecord = 0;
     public BlockingQueue<WrappedData> pmemWrappedDataQueue = new LinkedBlockingQueue<>();
     private static TransactionalHeap heap;
     private static final Unsafe unsafe = UnsafeUtil.unsafe;
@@ -74,6 +74,7 @@ public class PmemDataWriter {
                             queueInfo.setDataPosInPmem(meta.getOffset(), pmemPageInfo);
                         } else {
                             if(unsafe.compareAndSwapInt(beginPositionRecord, 12, 0, 1)) {
+                                System.out.println("unsafe.compareAndSwapInt run");
                                 for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
                                     range[i][0] = dataWriteChannels[i].size();
                                 }
