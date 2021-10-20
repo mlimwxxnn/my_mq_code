@@ -37,15 +37,12 @@ public class MergedData {
         short dataLen = meta.getDataLen();
         mergedBuffer.putShort(dataLen);
         mergedBuffer.putInt(wrappedData.getMeta().getOffset());
+
         meta.setOffsetInMergedBuffer(mergedBuffer.position());
 
         // 放入数据本体
         unsafe.copyMemory(wrappedData.getData().array(), 16 + wrappedData.getData().position(), null, ((DirectBuffer)mergedBuffer).address() + mergedBuffer.position(), dataLen);
         mergedBuffer.position(mergedBuffer.position() + dataLen);
-    }
-
-    public void putAllData(List<WrappedData> wrappedDataList) {
-        wrappedDataList.forEach(this::putData);
     }
 
     public int getCount() {
