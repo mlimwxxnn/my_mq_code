@@ -85,11 +85,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 }
                 dataWriteChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
             }
+            reLoader = new ReLoader();
             // 恢复阶段不实例化写
             if (getTotalFileSize() > 0){
                 return;
             }
-            reLoader = new ReLoader();
             ssdDataWriter = new SsdDataWriter();
             pmemDataWriter = new PmemDataWriter();
 //            ramDataWriter = new RamDataWriter();
@@ -259,12 +259,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         ssdDataWriter.pushWrappedData(wrappedData);
 
         try {
-            if(roughWrittenDataSize > 20 * GB){
-//                ramDataWriter.pushWrappedData(wrappedData);
-                pmemDataWriter.pushWrappedData(wrappedData);
-            } else {
-                wrappedData.getMeta().getCountDownLatch().countDown();
-            }
+//            ramDataWriter.pushWrappedData(wrappedData);
+
+            pmemDataWriter.pushWrappedData(wrappedData);
+//            wrappedData.getMeta().getCountDownLatch().countDown();
+
             wrappedData.getMeta().getCountDownLatch().await();
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -334,9 +333,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
         }
 
-        if(!haveAppended){
-            System.exit(-1);
-        }
+//        if(!haveAppended){
+//            System.exit(-1);
+//        }
 
         GetRangeTaskData task = getTask(Thread.currentThread());
         task.setGetRangeParameter(topic, queueId, offset, fetchNum);

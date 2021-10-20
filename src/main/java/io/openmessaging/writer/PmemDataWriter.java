@@ -5,10 +5,12 @@ import io.openmessaging.data.MetaData;
 import io.openmessaging.data.WrappedData;
 import io.openmessaging.info.PmemPageInfo;
 import io.openmessaging.info.QueueInfo;
+import io.openmessaging.util.ArrayQueue;
 import io.openmessaging.util.UnsafeUtil;
 import sun.misc.Unsafe;
 
 import java.io.IOException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -21,6 +23,15 @@ public class PmemDataWriter {
     public BlockingQueue<WrappedData> pmemWrappedDataQueue = new LinkedBlockingQueue<>();
     private static TransactionalHeap heap;
     private static final Unsafe unsafe = UnsafeUtil.unsafe;
+    static long blockAddressOffset;
+
+    static {
+        try {
+            blockAddressOffset = unsafe.objectFieldOffset(MemoryAccessor.class.getDeclaredField("directAddress"));
+        } catch (NoSuchFieldException e) {
+            e.printStackTrace();
+        }
+    }
 
 
     private void initPmem() {
@@ -41,14 +52,11 @@ public class PmemDataWriter {
         try {
             long writeStart = System.nanoTime();
 
-            TransactionalMemoryBlock block = heap.allocateMemoryBlock(saveLength, range -> {
-                range.copyFromArray(data.array(), data.position(), 0, saveLength);
-            });
-            long addressOffset = unsafe.objectFieldOffset(block.getClass().getDeclaredField("directAddress"));
-            long directAddress = unsafe.getLong(block, addressOffset);
+            TransactionalMemoryBlock block = heap.allocateMemoryBlock(saveLength, range -> { });
+
+            long directAddress = unsafe.getLong(block, blockAddressOffset);
             unsafe.copyMemory(data.array(), data.position() + 16, null, directAddress + 8, saveLength);
 
-            block.free();
             // 统计信息
             long writeStop = System.nanoTime();
             if (GET_WRITE_TIME_COST_INFO) {

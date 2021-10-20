@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
 
-
+// todo 这里把初始化改到MQ构造函数里会更快
 public class GetRangeTaskData {
     public final ByteBuffer[] buffers = new ByteBuffer[100]; // 用来响应查询的buffer
     public final TransactionalMemoryBlock[] blocks = new TransactionalMemoryBlock[100];
@@ -36,7 +36,6 @@ public class GetRangeTaskData {
     ArrayQueue<ByteBuffer> freeDataBuffers = new ArrayQueue<>(100);
     ArrayQueue<ByteBuffer> toFreeBuffers = new ArrayQueue<>(100);
 
-
     {
         try {
             bufferCapacityOffset = unsafe.objectFieldOffset(Buffer.class.getDeclaredField("capacity"));
@@ -47,10 +46,8 @@ public class GetRangeTaskData {
         }
     }
 
-
     public GetRangeTaskData() {
         for (int i = 0; i < buffers.length; i++) {
-            // todo 这里改成directByteBuffer能提高ssd的read速度， by wl
             buffers[i] = ByteBuffer.allocateDirect(1);
             unsafe.freeMemory(unsafe.getLong(buffers[i], bufferAddressOffset));
             unsafe.putInt(buffers[i], bufferCapacityOffset, 17 * 1024);
@@ -80,7 +77,6 @@ public class GetRangeTaskData {
             while (toFreeBuffers.size() > 0) {
                 freeDataBuffers.put(toFreeBuffers.get());
             }
-
 
             Byte topicId = DefaultMessageQueueImpl.getTopicId(topic, false);
             if (topicId == null) {
@@ -154,6 +150,7 @@ public class GetRangeTaskData {
 
                     buf = freeDataBuffers.get();
                     buf.clear();
+                    buf.limit(dataLen);
                     int id = (int) (p[1] >> 32);
                     DefaultMessageQueueImpl.dataWriteChannels[id].read(buf, p[0]);
                     buf.flip();
