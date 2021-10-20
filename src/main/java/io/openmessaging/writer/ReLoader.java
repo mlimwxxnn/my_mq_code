@@ -3,17 +3,10 @@ package io.openmessaging.writer;
 import com.intel.pmem.llpl.TransactionalMemoryBlock;
 import io.openmessaging.info.PmemPageInfo;
 import io.openmessaging.info.QueueInfo;
-import io.openmessaging.util.UnsafeUtil;
-import sun.misc.Unsafe;
-
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.BlockingQueue;;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
 import static io.openmessaging.writer.PmemDataWriter.getBlockByAllocateAndSetData;

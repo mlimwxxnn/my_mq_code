@@ -11,7 +11,6 @@ import sun.misc.Unsafe;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;

@@ -3,8 +3,6 @@ package io.openmessaging.data;
 import io.openmessaging.DefaultMessageQueueImpl;
 import io.openmessaging.info.PmemPageInfo;
 import io.openmessaging.info.QueueInfo;
-import io.openmessaging.util.UnsafeUtil;
-import sun.misc.Unsafe;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;
@@ -18,7 +16,6 @@ import static io.openmessaging.DefaultMessageQueueImpl.*;
 public class GetRangeTaskData {
     public final ByteBuffer[] buffers = new ByteBuffer[100]; // 用来响应查询的buffer
     private Map<Integer, ByteBuffer> result = new HashMap<>();
-    private Unsafe unsafe = UnsafeUtil.unsafe;
     String topic;
     int queueId;
     long offset;
