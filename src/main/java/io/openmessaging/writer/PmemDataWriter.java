@@ -12,12 +12,13 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
 
 public class PmemDataWriter {
 
-    private Integer beginPositionRecord = 0;
+    private volatile Integer beginPositionRecord = 0;
     public BlockingQueue<WrappedData> pmemWrappedDataQueue = new LinkedBlockingQueue<>();
     private static TransactionalHeap heap;
     private static final Unsafe unsafe = UnsafeUtil.unsafe;

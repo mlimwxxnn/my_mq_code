@@ -72,8 +72,6 @@ public class ReLoader {
                     long readPosition = range[id][0];
 
                     log.info("channel-{} read start", id);
-//                    FileChannel channel = FileChannel.open(Paths.get("/essd", "data-" + id), StandardOpenOption.READ);
-//                    channel.position(range[id][0]);
                     FileChannel channel = dataWriteChannels[id];
                     short dataLen;
                     while (readPosition < range[id][1]){
@@ -91,9 +89,7 @@ public class ReLoader {
                             dataBuffer.position(dataBuffer.position() + dataLen + DATA_INFORMATION_LENGTH);
                         }
                         readPosition += readLen - dataBuffer.remaining();
-//                        channel.position(channel.position() - dataBuffer.remaining());
-                        dataBuffer.limit(dataBuffer.position());
-                        dataBuffer.position(0);
+                        dataBuffer.flip();
                         loadedDataBufferQueue.offer(dataBuffer);
                     }
                     log.info("channel-{} read finish", id);

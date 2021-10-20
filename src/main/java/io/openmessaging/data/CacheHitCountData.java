@@ -4,7 +4,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class CacheHitCountData {
     private final AtomicInteger totalQueryCount = new AtomicInteger();
+//    public static final long[] l1 = new  long[8];
     private final AtomicInteger pmemHitCount = new AtomicInteger();
+    public static final long[] l2 = new  long[8];
     private final AtomicInteger ramHitCount = new AtomicInteger();
 
     public CacheHitCountData(){
