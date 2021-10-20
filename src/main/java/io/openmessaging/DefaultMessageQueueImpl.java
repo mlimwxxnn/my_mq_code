@@ -50,7 +50,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //     public static final long PMEM_HEAP_SIZE = 20 * MB;
     public static long roughWrittenDataSize = 0;
     public static final int RELOAD_BUFFER_SIZE = (int) (8 * MB);
-    public static final int RELOAD_BUFFER_COUNT = 50;
 
     public static AtomicInteger topicCount = new AtomicInteger();
     static private final ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
