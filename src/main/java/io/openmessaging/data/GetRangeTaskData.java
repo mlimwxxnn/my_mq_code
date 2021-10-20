@@ -17,6 +17,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
+import static io.openmessaging.writer.PmemDataWriter.currentAllocateSize;
 
 // todo 这里把初始化改到MQ构造函数里会更快
 public class GetRangeTaskData {
@@ -72,7 +73,8 @@ public class GetRangeTaskData {
             result.clear();
 
             while (toFreeBlockCount > 0){
-                blocks[--toFreeBlockCount].free();
+                currentAllocateSize.getAndAdd(-blocks[--toFreeBlockCount].size());
+                blocks[toFreeBlockCount].free();
             }
             while (toFreeBuffers.size() > 0) {
                 freeDataBuffers.put(toFreeBuffers.get());
@@ -93,6 +95,7 @@ public class GetRangeTaskData {
                     PmemPageInfo pmemPageInfo = allPmemPageInfos[j];
                     queueInfo.setWillNotToQuery(j);
                     if (pmemPageInfo != null) {
+                        currentAllocateSize.getAndAdd(-pmemPageInfo.block.size());
                         pmemPageInfo.block.free();
                     }
                 }
@@ -149,6 +152,7 @@ public class GetRangeTaskData {
                     long queryStart = System.nanoTime();
 
                     buf = freeDataBuffers.get();
+                    toFreeBuffers.put(buf);
                     buf.clear();
                     buf.limit(dataLen);
                     int id = (int) (p[1] >> 32);

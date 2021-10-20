@@ -14,16 +14,18 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
 
 public class PmemDataWriter {
-
     volatile boolean isNeedSaveStartChannelPosition = true;
     public BlockingQueue<WrappedData> pmemWrappedDataQueue = new LinkedBlockingQueue<>();
     private static TransactionalHeap heap;
     private static final Unsafe unsafe = UnsafeUtil.unsafe;
     static long blockAddressOffset;
+    public static final AtomicLong currentAllocateSize = new AtomicLong();
+    private static long maxAllocateSize = 60 * GB;
 
     static {
         try {
@@ -49,6 +51,9 @@ public class PmemDataWriter {
     }
 
     public static TransactionalMemoryBlock getBlockByAllocateAndSetData(ByteBuffer data, int saveLength) {
+        if(currentAllocateSize.get() >= maxAllocateSize)
+            return null;
+
         try {
             long writeStart = System.nanoTime();
             TransactionalMemoryBlock block = heap.allocateMemoryBlock(saveLength, range -> { });
@@ -60,8 +65,10 @@ public class PmemDataWriter {
             if (GET_WRITE_TIME_COST_INFO) {
                 writeTimeCostCount.addPmemTimeCost(writeStop - writeStart);
             }
+            currentAllocateSize.getAndAdd(saveLength);
             return block;
         } catch (Exception e) {
+            maxAllocateSize -= saveLength;
             return null;
         }
     }
@@ -86,6 +93,7 @@ public class PmemDataWriter {
                             synchronized (this) {
                                 if (isNeedSaveStartChannelPosition) {
                                     isNeedSaveStartChannelPosition = false;
+                                    maxAllocateSize = currentAllocateSize.get();
                                     log.info("first time allocate exception, totalFileSize: {} M", getTotalFileSizeByPosition() / (1024 * 1024));
                                     for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
                                         range[i][0] = dataWriteChannels[i].position();
