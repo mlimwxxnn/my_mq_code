@@ -53,7 +53,7 @@ public class ReLoader {
                             }
                             queueInfo = metaInfo.get(topicId).get(queueId);
                             while (!queueInfo.willNotToQuery(offset)) {
-                                if ((block = getBlockByAllocateAndSetData(null, ((DirectBuffer) dataBuffer).address() , dataLen)) != null){
+                                if ((block = getBlockByAllocateAndSetData(null, ((DirectBuffer) dataBuffer).address() + dataBuffer.position() , dataLen)) != null){
                                     queueInfo.setDataPosInPmem(offset, new PmemPageInfo(block));
                                     break;
                                 } else {
