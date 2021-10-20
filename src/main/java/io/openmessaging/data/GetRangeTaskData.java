@@ -8,6 +8,7 @@ import io.openmessaging.info.QueueInfo;
 import io.openmessaging.util.ArrayQueue;
 import io.openmessaging.util.UnsafeUtil;
 import sun.misc.Unsafe;
+import sun.nio.ch.DirectBuffer;
 
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
@@ -18,6 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
 import static io.openmessaging.writer.PmemDataWriter.currentAllocateSize;
+import static io.openmessaging.writer.RamDataWriter.*;
 
 // todo 这里把初始化改到MQ构造函数里会更快
 public class GetRangeTaskData {
@@ -112,24 +114,30 @@ public class GetRangeTaskData {
                 ByteBuffer buf = buffers[i];
                 buf.clear();
                 buf.limit(dataLen);
-//                if(queueInfo.isInRam(currentOffset)){
-//                    long queryStart = System.nanoTime();
-//
-//                    Integer address = queueInfo.getDataPosInRam();
-//                    int ramBufferIndex = getIndexByDataLength(dataLen);
-//                    unsafe.copyMemory(null, ((DirectBuffer)ramBuffers[ramBufferIndex]).address() + address, buf.array(), 16, dataLen);//direct
-////                    arraycopy(ramBuffers[ramBufferIndex].array(), address, buf.array(), 0, dataLen);//heap
-//                    freeRamQueues[ramBufferIndex].offer(address);
-//
-//                    // 统计信息
-//                    long queryStop = System.nanoTime();
-//                    if (GET_READ_TIME_COST_INFO){
-//                        readTimeCostCount.addRamTimeCost(queryStop - queryStart);
-//                    }
-//                    if (GET_CACHE_HIT_INFO){
-//                        hitCountData.increaseRamHitCount();
-//                    }
-//                }else
+                if(queueInfo.isInRam(currentOffset)){
+                    long queryStart = System.nanoTime();
+
+                    Integer address = queueInfo.getDataPosInRam();
+                    int ramBufferIndex = getIndexByDataLength(dataLen);
+
+
+                    buf = freeDataBuffers.get();
+                    toFreeBuffers.put(buf);
+                    buf.clear();
+                    buf.limit(dataLen);
+
+                    unsafe.copyMemory(null, ((DirectBuffer)ramBuffers[ramBufferIndex]).address() + address, null, ((DirectBuffer) buf).address(), dataLen);//direct
+                    freeRamQueues[ramBufferIndex].offer(address);
+
+                    // 统计信息
+                    long queryStop = System.nanoTime();
+                    if (GET_READ_TIME_COST_INFO){
+                        readTimeCostCount.addRamTimeCost(queryStop - queryStart);
+                    }
+                    if (GET_CACHE_HIT_INFO){
+                        hitCountData.increaseRamHitCount();
+                    }
+                }else
                 if (queueInfo.isInPmem(currentOffset)) {
                     long queryStart = System.nanoTime();
 

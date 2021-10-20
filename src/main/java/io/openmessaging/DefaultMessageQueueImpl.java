@@ -40,7 +40,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File PMEM_ROOT;
 
     public static final int DATA_INFORMATION_LENGTH = 9;
-    public static final long KILL_SELF_TIMEOUT = 1 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 20 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 350;  // 微秒
     public static final int SSD_WRITE_THREAD_COUNT = 5;
     public static final int SSD_MERGE_THREAD_COUNT = 1;
@@ -97,7 +97,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
             ssdDataWriter = new SsdDataWriter();
             pmemDataWriter = new PmemDataWriter();
-//            ramDataWriter = new RamDataWriter();
+            ramDataWriter = new RamDataWriter();
             new Thread(() -> {
                 try {
                     while (roughWrittenDataSize < 75 * GB){
@@ -262,7 +262,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         WrappedData wrappedData = new WrappedData(topicId, (short) queueId, data, offset, queueInfo);
         ssdDataWriter.pushWrappedData(wrappedData);
-        pmemDataWriter.pushWrappedData(wrappedData);
+        ramDataWriter.pushWrappedData(wrappedData);
+//        pmemDataWriter.pushWrappedData(wrappedData);
 
         try {
 //            if(roughWrittenDataSize > 20 * GB){
@@ -271,7 +272,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //                wrappedData.getMeta().getCountDownLatch().countDown();
 //            }
 
-//            ramDataWriter.pushWrappedData(wrappedData);
+
 //            wrappedData.getMeta().getCountDownLatch().countDown();
             wrappedData.getMeta().getCountDownLatch().await();
         } catch (InterruptedException e) {
