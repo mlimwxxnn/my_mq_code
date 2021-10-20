@@ -18,13 +18,13 @@ import static io.openmessaging.DefaultMessageQueueImpl.*;
 
 public class PmemDataWriter {
 
-    AtomicBoolean isNeedSaveStartChannelPosition = new AtomicBoolean(true);
+    volatile boolean isNeedSaveStartChannelPosition = true;
     public BlockingQueue<WrappedData> pmemWrappedDataQueue = new LinkedBlockingQueue<>();
     private static TransactionalHeap heap;
     private static final Unsafe unsafe = UnsafeUtil.unsafe;
 
 
-    private void initPmem(){
+    private void initPmem() {
         boolean initialized = TransactionalHeap.exists(PMEM_ROOT + "/persistent_heap");
         heap = initialized ? TransactionalHeap.openHeap(PMEM_ROOT + "/persistent_heap") : TransactionalHeap.createHeap(PMEM_ROOT + "/persistent_heap", PMEM_HEAP_SIZE);
     }
@@ -38,7 +38,7 @@ public class PmemDataWriter {
         pmemWrappedDataQueue.offer(wrappedData);
     }
 
-    public static TransactionalMemoryBlock getBlockByAllocateAndSetData(ByteBuffer data, int saveLength){
+    public static TransactionalMemoryBlock getBlockByAllocateAndSetData(ByteBuffer data, int saveLength) {
         try {
             long writeStart = System.nanoTime();
 
@@ -48,11 +48,11 @@ public class PmemDataWriter {
 
             // 统计信息
             long writeStop = System.nanoTime();
-            if (GET_WRITE_TIME_COST_INFO){
+            if (GET_WRITE_TIME_COST_INFO) {
                 writeTimeCostCount.addPmemTimeCost(writeStop - writeStart);
             }
             return block;
-        }catch (Exception e){
+        } catch (Exception e) {
             return null;
         }
     }
@@ -73,10 +73,13 @@ public class PmemDataWriter {
                             queueInfo = meta.getQueueInfo();
                             pmemPageInfo = new PmemPageInfo(block);
                             queueInfo.setDataPosInPmem(meta.getOffset(), pmemPageInfo);
-                        } else {
-                            if(isNeedSaveStartChannelPosition.compareAndSet(true, false)) {
-                                for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
-                                    range[i][0] = dataWriteChannels[i].size();
+                        } else if (isNeedSaveStartChannelPosition) {
+                            synchronized (this) {
+                                if (isNeedSaveStartChannelPosition) {
+                                    isNeedSaveStartChannelPosition = false;
+                                    for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
+                                        range[i][0] = dataWriteChannels[i].size();
+                                    }
                                 }
                             }
                         }
