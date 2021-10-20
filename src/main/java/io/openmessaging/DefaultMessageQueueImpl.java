@@ -71,6 +71,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     private static long constructFinishTime;
 
     public static void init() {
+        Runtime.getRuntime().addShutdownHook(new Thread( () -> {
+            log.info("mq exit.");
+        }));
         try {
             metaInfo = new ConcurrentHashMap<>(100);
             dataReader = new DataReader();

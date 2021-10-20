@@ -80,7 +80,7 @@ public class PmemDataWriter {
                     while (true) {
                         wrappedData = pmemWrappedDataQueue.take();
                         meta = wrappedData.getMeta();
-                        if ((block = getBlockByAllocateAndSetData(wrappedData.getData(), wrappedData.getData().position() + 16, meta.getDataLen())) != null) {
+                        if ((block = getBlockByAllocateAndSetData(wrappedData.getData().array(), wrappedData.getData().position() + 16, meta.getDataLen())) != null) {
                             queueInfo = meta.getQueueInfo();
                             pmemPageInfo = new PmemPageInfo(block);
                             queueInfo.setDataPosInPmem(meta.getOffset(), pmemPageInfo);
