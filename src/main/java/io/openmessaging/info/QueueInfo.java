@@ -6,9 +6,9 @@ import static java.lang.System.arraycopy;
 
 // todo 这里尝试去掉多余的 volatile
 public class QueueInfo {
-    private int maxIndex;
+    private volatile int maxIndex;
     private volatile long[][] dataInfo;
-    private int capacity;
+    private volatile int capacity;
     // 末位为 1 表示数据在pmem中，倒数第二位为 1 表示数据在内存中，倒数第三位为 1 表示此offset的数据不会再被查
     private volatile byte[] status;
     private volatile PmemPageInfo[] pmemPageInfos;
