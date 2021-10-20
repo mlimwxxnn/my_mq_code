@@ -33,7 +33,7 @@ public class ToggleDebugAndRelease {
                             line = "//" + line;  // 加上注释
                         }
                     }
-                    bufferedWriter.write(line + "\n");
+                    bufferedWriter.write(line + "\r\n");
                 }
                 bufferedReader.close();
                 bufferedWriter.close();
