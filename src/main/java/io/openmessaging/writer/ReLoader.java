@@ -46,14 +46,16 @@ public class ReLoader {
                         offset = dataBuffer.getInt();
 
                         queueInfo = metaInfo.get(topicId).get(queueId);
-                        while (!queueInfo.willNotToQuery(offset)) {
-                            if ((block = getBlockByAllocateAndSetData(dataBuffer, dataLen)) == null){
-                                Thread.sleep(1);
-                            } else {
-                                queueInfo.setDataPosInPmem(offset, new PmemPageInfo(block));
-                                break;
-                            }
-                        }
+
+//                        while (!queueInfo.willNotToQuery(offset)) {
+//                            if ((block = getBlockByAllocateAndSetData(dataBuffer, dataLen)) != null){
+//                                queueInfo.setDataPosInPmem(offset, new PmemPageInfo(block));
+//                                break;
+//                            } else {
+//                                Thread.sleep(1);
+//                            }
+//                        }
+
                         dataBuffer.position(dataBuffer.position() + dataLen);
                     }
                     freeDataBufferQueue.offer(dataBuffer);
