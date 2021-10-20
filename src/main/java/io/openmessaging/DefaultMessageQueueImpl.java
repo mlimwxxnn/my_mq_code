@@ -38,7 +38,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File PMEM_ROOT;
 
     public static final int DATA_INFORMATION_LENGTH = 9;
-    public static final long KILL_SELF_TIMEOUT = 20 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 2 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 300;  // 微秒
     public static final int SSD_WRITE_THREAD_COUNT = 5;
     public static final int SSD_MERGE_THREAD_COUNT = 1;
@@ -257,13 +257,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         WrappedData wrappedData = new WrappedData(topicId, (short) queueId, data, offset, queueInfo);
         ssdDataWriter.pushWrappedData(wrappedData);
+        pmemDataWriter.pushWrappedData(wrappedData);
 
         try {
 //            ramDataWriter.pushWrappedData(wrappedData);
-
-            pmemDataWriter.pushWrappedData(wrappedData);
 //            wrappedData.getMeta().getCountDownLatch().countDown();
-
             wrappedData.getMeta().getCountDownLatch().await();
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -322,7 +320,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
                     for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
                         try {
-                            range[i][1] = dataWriteChannels[i].size();
+                            range[i][1] = dataWriteChannels[i].position();
                         } catch (IOException e) {
                             e.printStackTrace();
                         }

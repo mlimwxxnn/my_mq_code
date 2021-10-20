@@ -89,7 +89,7 @@ public class PmemDataWriter {
                                 if (isNeedSaveStartChannelPosition) {
                                     isNeedSaveStartChannelPosition = false;
                                     for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
-                                        range[i][0] = dataWriteChannels[i].size();
+                                        range[i][0] = dataWriteChannels[i].position();
                                     }
                                 }
                             }
