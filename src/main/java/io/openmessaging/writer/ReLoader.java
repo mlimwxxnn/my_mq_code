@@ -29,6 +29,7 @@ public class ReLoader {
                     log.info("channel-{} reload start", id);
                     FileChannel channel = dataWriteChannels[id];
                     ByteBuffer dataBuffer = reloadByteBuffers[id];
+                    long dataBufferAddress = ((DirectBuffer) dataBuffer).address();
                     byte topicId;
                     short queueId;
                     short dataLen;
@@ -53,7 +54,7 @@ public class ReLoader {
                             }
                             queueInfo = metaInfo.get(topicId).get(queueId);
                             while (!queueInfo.willNotToQuery(offset)) {
-                                if ((block = getBlockByAllocateAndSetData(null, ((DirectBuffer) dataBuffer).address() + dataBuffer.position() , dataLen)) != null){
+                                if ((block = getBlockByAllocateAndSetData(null, dataBufferAddress + dataBuffer.position() , dataLen)) != null){
                                     queueInfo.setDataPosInPmem(offset, new PmemPageInfo(block));
                                     break;
                                 } else {
