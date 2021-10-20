@@ -31,7 +31,6 @@ public class PmemDataWriter {
         }
     }
 
-
     private void initPmem() {
         boolean initialized = TransactionalHeap.exists(PMEM_ROOT + "/persistent_heap");
         heap = initialized ? TransactionalHeap.openHeap(PMEM_ROOT + "/persistent_heap") : TransactionalHeap.createHeap(PMEM_ROOT + "/persistent_heap", PMEM_HEAP_SIZE);

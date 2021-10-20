@@ -13,7 +13,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
-import static java.lang.System.arraycopy;
 
 @SuppressWarnings({"ResultOfMethodCallIgnored", "unchecked"})
 public class RamDataWriter {

@@ -53,14 +53,16 @@ public class ReLoader {
                                 break;
                             }
                             queueInfo = metaInfo.get(topicId).get(queueId);
-                            while (!queueInfo.willNotToQuery(offset)) {
-                                if ((block = getBlockByAllocateAndSetData(null, dataBufferAddress + dataBuffer.position() , dataLen)) != null){
-                                    queueInfo.setDataPosInPmem(offset, new PmemPageInfo(block));
-                                    break;
-                                } else {
-                                    Thread.sleep(1);
-                                }
-                            }
+
+//                            while (!queueInfo.willNotToQuery(offset)) {
+//                                if ((block = getBlockByAllocateAndSetData(null, dataBufferAddress + dataBuffer.position() , dataLen)) != null){
+//                                    queueInfo.setDataPosInPmem(offset, new PmemPageInfo(block));
+//                                    break;
+//                                } else {
+//                                    Thread.sleep(1);
+//                                }
+//                            }
+
                             dataBuffer.position(dataBuffer.position() + dataLen);
                         }
                         readPosition += readLen - dataBuffer.remaining();
