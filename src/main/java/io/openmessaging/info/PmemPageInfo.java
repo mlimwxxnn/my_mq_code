@@ -1,6 +1,5 @@
 package io.openmessaging.info;
 
-import com.intel.pmem.llpl.TransactionalHeap;
 import com.intel.pmem.llpl.TransactionalMemoryBlock;
 
 public class PmemPageInfo {

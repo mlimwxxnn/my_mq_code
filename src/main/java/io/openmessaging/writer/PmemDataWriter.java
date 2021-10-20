@@ -74,7 +74,7 @@ public class PmemDataWriter {
                             pmemPageInfo = new PmemPageInfo(block);
                             queueInfo.setDataPosInPmem(meta.getOffset(), pmemPageInfo);
                         } else {
-                            if(unsafe.compareAndSwapInt(beginPositionRecord, 12, 0, 1)) {
+                            if(unsafe.compareAndSwapInt(beginPositionRecord, 12, 0, 2333)) {
                                 System.out.println("unsafe.compareAndSwapInt run");
                                 for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
                                     range[i][0] = dataWriteChannels[i].size();
