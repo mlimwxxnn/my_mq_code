@@ -5,13 +5,9 @@ import io.openmessaging.data.MetaData;
 import io.openmessaging.data.WrappedData;
 import io.openmessaging.info.PmemPageInfo;
 import io.openmessaging.info.QueueInfo;
-import io.openmessaging.util.ArrayQueue;
 import io.openmessaging.util.UnsafeUtil;
 import sun.misc.Unsafe;
 
-import java.io.IOException;
-import java.nio.Buffer;
-import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
@@ -50,7 +46,7 @@ public class PmemDataWriter {
         pmemWrappedDataQueue.offer(wrappedData);
     }
 
-    public static TransactionalMemoryBlock getBlockByAllocateAndSetData(ByteBuffer data, int saveLength) {
+    public static TransactionalMemoryBlock getBlockByAllocateAndSetData(Object srcObj, long srcOffset, int saveLength) {
         if(currentAllocateSize.get() >= maxAllocateSize)
             return null;
 
@@ -58,13 +54,13 @@ public class PmemDataWriter {
             long writeStart = System.nanoTime();
             TransactionalMemoryBlock block = heap.allocateMemoryBlock(saveLength, range -> { });
             long directAddress = unsafe.getLong(block, blockAddressOffset);
-            unsafe.copyMemory(data.array(), data.position() + 16, null, directAddress + 8, saveLength);
+            unsafe.copyMemory(srcObj, srcOffset, null, directAddress + 8, saveLength);
 
             // 统计信息
-            long writeStop = System.nanoTime();
-            if (GET_WRITE_TIME_COST_INFO) {
-                writeTimeCostCount.addPmemTimeCost(writeStop - writeStart);
-            }
+            long writeStop = System.nanoTime(); // @
+            if (GET_WRITE_TIME_COST_INFO) {  // @
+                writeTimeCostCount.addPmemTimeCost(writeStop - writeStart);  // @
+            }  // @
             currentAllocateSize.getAndAdd(saveLength);
             return block;
         } catch (Exception e) {
@@ -85,7 +81,7 @@ public class PmemDataWriter {
                     while (true) {
                         wrappedData = pmemWrappedDataQueue.take();
                         meta = wrappedData.getMeta();
-                        if ((block = getBlockByAllocateAndSetData(wrappedData.getData(), meta.getDataLen())) != null) {
+                        if ((block = getBlockByAllocateAndSetData(wrappedData.getData(), wrappedData.getData().position() + 16, meta.getDataLen())) != null) {
                             queueInfo = meta.getQueueInfo();
                             pmemPageInfo = new PmemPageInfo(block);
                             queueInfo.setDataPosInPmem(meta.getOffset(), pmemPageInfo);

@@ -41,9 +41,9 @@ public class ToggleDebugAndRelease {
                 FileChannel srcChannel = FileChannel.open(Paths.get("tmpFile"), StandardOpenOption.READ);
                 dstChannel.truncate(0);
                 srcChannel.transferTo(0, srcChannel.size(), dstChannel);
+                new File("tmpFile").delete();
             }
             System.out.println("切换完成");
-            new File("tmpFile").delete();
         }catch (Exception e){
             e.printStackTrace();
         }

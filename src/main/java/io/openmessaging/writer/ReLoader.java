@@ -3,10 +3,10 @@ package io.openmessaging.writer;
 import com.intel.pmem.llpl.TransactionalMemoryBlock;
 import io.openmessaging.info.PmemPageInfo;
 import io.openmessaging.info.QueueInfo;
+import sun.nio.ch.DirectBuffer;
+
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.concurrent.BlockingQueue;;
-import java.util.concurrent.LinkedBlockingQueue;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
 import static io.openmessaging.writer.PmemDataWriter.getBlockByAllocateAndSetData;
@@ -16,7 +16,7 @@ public class ReLoader {
 
     public ReLoader() {
         for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
-            reloadByteBuffers[i] = ByteBuffer.allocate(RELOAD_BUFFER_SIZE);
+            reloadByteBuffers[i] = ByteBuffer.allocateDirect(RELOAD_BUFFER_SIZE);
         }
     }
 
@@ -53,7 +53,7 @@ public class ReLoader {
                             }
                             queueInfo = metaInfo.get(topicId).get(queueId);
                             while (!queueInfo.willNotToQuery(offset)) {
-                                if ((block = getBlockByAllocateAndSetData(dataBuffer, dataLen)) != null){
+                                if ((block = getBlockByAllocateAndSetData(null, ((DirectBuffer) dataBuffer).address() , dataLen)) != null){
                                     queueInfo.setDataPosInPmem(offset, new PmemPageInfo(block));
                                     break;
                                 } else {
