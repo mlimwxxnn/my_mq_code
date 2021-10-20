@@ -14,46 +14,48 @@ public class TimeCostCountData {
     private final AtomicLong pmemCost = new AtomicLong();
     private final AtomicLong ssdCost = new AtomicLong();
 
-    public TimeCostCountData(String timeCostType){
+    public TimeCostCountData(String timeCostType) {
         this.timeCostType = timeCostType;
         new Thread(() -> {
             try {
-                while (true){
+                while (true) {
                     // 每隔20s打印一次统计信息
                     Thread.sleep(20 * 1000);
                     DefaultMessageQueueImpl.log.info(getQueryTimeCostInfo());
                 }
-            }catch (Exception e){
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }).start();
     }
 
-    public void addRamTimeCost(long timeCost){
+    public void addRamTimeCost(long timeCost) {
         ramItemCount.incrementAndGet();
         ramCost.getAndAdd(timeCost);
     }
 
-    public void addPmemTimeCost(long timeCost){
+    public void addPmemTimeCost(long timeCost) {
         pmemItemCount.incrementAndGet();
         pmemCost.getAndAdd(timeCost);
     }
 
-    public void addSsdTimeCost(long timeCost){
+    public void addSsdTimeCost(long timeCost) {
         ssdItemCount.incrementAndGet();
         ssdCost.getAndAdd(timeCost);
     }
 
-    public void addSsdTimeCost(long timeCost, int itemCount){
+    public void addSsdTimeCost(long timeCost, int itemCount) {
         ssdItemCount.addAndGet(itemCount);
         ssdCost.addAndGet(timeCost);
     }
 
-    public String getQueryTimeCostInfo(){
+    public String getQueryTimeCostInfo() {
         long ramCostPerData = ramItemCount.get() > 0 ? ramCost.get() / ramItemCount.get() : 0;
         long pmemCostPerData = pmemItemCount.get() > 0 ? pmemCost.get() / pmemItemCount.get() : 0;
         long ssdCostPerData = ssdItemCount.get() > 0 ? ssdCost.get() / ssdItemCount.get() : 0;
-        return String.format("%s cost time per data(ns): {ram: %d, pmem: %d, ssd: %d}", timeCostType, ramCostPerData, pmemCostPerData, ssdCostPerData);
+        String timeCostInfo = String.format("%s cost per data(ns): {ram: %d, pmem: %d, ssd: %d}, %s times count: {ram: %d, pmem: %d, ssd: %d}",
+                timeCostType, ramCostPerData, pmemCostPerData, ssdCostPerData, timeCostType, ramItemCount.get(), pmemItemCount.get(), ssdItemCount.get());
+        return timeCostInfo;
     }
 
     public static void main(String[] args) {
