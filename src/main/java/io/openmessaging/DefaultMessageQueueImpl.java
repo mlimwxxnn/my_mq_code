@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static io.openmessaging.writer.PmemDataWriter.currentAllocateSize;
 
 
 @SuppressWarnings("ResultOfMethodCallIgnored")
@@ -173,7 +172,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             try {
                 Thread.sleep(timeout * 1000);
                 long writtenSize = getTotalFileSizeByPosition() / (1024 * 1024);
-                log.info("kill self, written: [ssd: {}M, pmem: {}M]]", writtenSize, currentAllocateSize.get() / (1024 * 1024));
+                log.info("kill self, written: [ssd: {}M]", writtenSize);
                 System.exit(-1);
             } catch (Exception e) {
                 e.printStackTrace();

@@ -1,6 +1,5 @@
 package io.openmessaging.writer;
 
-import com.intel.pmem.llpl.*;
 import io.openmessaging.data.MetaData;
 import io.openmessaging.data.WrappedData;
 import io.openmessaging.info.PmemPageInfo;
@@ -8,93 +7,84 @@ import io.openmessaging.info.QueueInfo;
 import io.openmessaging.util.UnsafeUtil;
 import sun.misc.Unsafe;
 
+import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicLong;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
 
+@SuppressWarnings({"ResultOfMethodCallIgnored", "unchecked"})
 public class PmemDataWriter {
-    volatile boolean isNeedSaveStartChannelPosition = true;
-    public BlockingQueue<WrappedData> pmemWrappedDataQueue = new LinkedBlockingQueue<>();
-    private static TransactionalHeap heap;
-    private static final Unsafe unsafe = UnsafeUtil.unsafe;
-    static long blockAddressOffset;
-    public static final AtomicLong currentAllocateSize = new AtomicLong();
-    private static long maxAllocateSize = 60 * GB;
 
-    static {
+    public static final FileChannel[] pmemChannels = new FileChannel[17];
+    public static final BlockingQueue<Long>[] freePmemQueues = new LinkedBlockingQueue[17];
+    private static final BlockingQueue<WrappedData> pmemWrappedDataQueue = new LinkedBlockingQueue<>();
+    private static final Unsafe unsafe = UnsafeUtil.unsafe;
+
+    public void init(){
+        RandomAccessFile[] rafs = new RandomAccessFile[17];
         try {
-            blockAddressOffset = unsafe.objectFieldOffset(MemoryAccessor.class.getDeclaredField("directAddress"));
-        } catch (NoSuchFieldException e) {
+            for (int queueIndex = 0; queueIndex < PMEM_BLOCK_GROUP_COUNT; queueIndex++) {
+                rafs[queueIndex] = new RandomAccessFile("/pmem/" + queueIndex, "rw");
+                pmemChannels[queueIndex] = rafs[queueIndex].getChannel();
+            }
+
+            while (true) {
+                for (int i = 0; i < 17; i++) {
+                    rafs[i].setLength(rafs[i].length() + 1024 * (i + 1));
+                    freePmemQueues[i].offer(rafs[i].length() - 1024 * (i + 1));
+                }
+            }
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private void initPmem() {
-        boolean initialized = TransactionalHeap.exists(PMEM_ROOT + "/persistent_heap");
-        heap = initialized ? TransactionalHeap.openHeap(PMEM_ROOT + "/persistent_heap") : TransactionalHeap.createHeap(PMEM_ROOT + "/persistent_heap", PMEM_HEAP_SIZE);
-    }
-
     public PmemDataWriter() {
-        initPmem();
+        init();
         writeDataToPmem();
     }
 
-    public void pushWrappedData(WrappedData wrappedData) {
+    public static int getIndexByDataLength(short dataLen){
+        return (dataLen + 1023) / 1024 - 1;
+    }
+
+    public void pushWrappedData(WrappedData wrappedData){
         pmemWrappedDataQueue.offer(wrappedData);
     }
 
-    public static TransactionalMemoryBlock getBlockByAllocateAndSetData(Object srcObj, long srcOffset, int saveLength) {
-        if(currentAllocateSize.get() >= maxAllocateSize)
-            return null;
-
-        try {
-            long writeStart = System.nanoTime();
-            TransactionalMemoryBlock block = heap.allocateMemoryBlock(saveLength, range -> { });
-            long directAddress = unsafe.getLong(block, blockAddressOffset);
-            unsafe.copyMemory(srcObj, srcOffset, null, directAddress + 8, saveLength);
-
-            // 统计信息
-            long writeStop = System.nanoTime(); // @
-            if (GET_WRITE_TIME_COST_INFO) {  // @
-                writeTimeCostCount.addPmemTimeCost(writeStop - writeStart);  // @
-            }  // @
-            currentAllocateSize.getAndAdd(saveLength);
-            return block;
-        } catch (Exception e) {
-            maxAllocateSize -= saveLength;
-            return null;
-        }
-    }
-
-    private void writeDataToPmem() {
-        for (int t = 0; t < PMEM_WRITE_THREAD_COUNT; t++) {
+    private void writeDataToPmem(){
+        for(int t = 0; t < RAM_WRITE_THREAD_COUNT; t++) {
             new Thread(() -> {
                 try {
                     WrappedData wrappedData;
+                    ByteBuffer buf;
                     QueueInfo queueInfo;
                     MetaData meta;
-                    TransactionalMemoryBlock block;
-                    PmemPageInfo pmemPageInfo;
+                    byte[] data;
+                    short dataLen;
+                    Long address;
                     while (true) {
                         wrappedData = pmemWrappedDataQueue.take();
                         meta = wrappedData.getMeta();
-                        if ((block = getBlockByAllocateAndSetData(wrappedData.getData().array(), wrappedData.getData().position() + 16, meta.getDataLen())) != null) {
-                            queueInfo = meta.getQueueInfo();
-                            pmemPageInfo = new PmemPageInfo(block);
-                            queueInfo.setDataPosInPmem(meta.getOffset(), pmemPageInfo);
-                        } else if (isNeedSaveStartChannelPosition) {
-                            synchronized (this) {
-                                if (isNeedSaveStartChannelPosition) {
-                                    isNeedSaveStartChannelPosition = false;
-                                    maxAllocateSize = currentAllocateSize.get();
-                                    log.info("first time allocate exception, totalFileSize: {} M", getTotalFileSizeByPosition() / (1024 * 1024));
-                                    for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
-                                        range[i][0] = dataWriteChannels[i].position();
-                                    }
-                                }
-                            }
+
+                        queueInfo = meta.getQueueInfo();
+                        dataLen = meta.getDataLen();
+                        int i = getIndexByDataLength(dataLen);
+                        if ((address = freePmemQueues[i].poll()) != null) {
+                            long writeStart = System.nanoTime(); // @
+
+                            buf = wrappedData.getData();
+                            pmemChannels[i].write(buf, address);
+                            queueInfo.setDataPosInPmem(meta.getOffset(), new PmemPageInfo(address, i));
+
+                            // 统计信息
+                            long writeStop = System.nanoTime();  // @
+                            if (GET_WRITE_TIME_COST_INFO){  // @
+                                writeTimeCostCount.addPmemTimeCost(writeStop - writeStart);  // @
+                            }  // @
                         }
                         meta.getCountDownLatch().countDown();
                     }
