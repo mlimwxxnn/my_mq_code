@@ -46,7 +46,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int PMEM_WRITE_THREAD_COUNT = 8;
     public static final int RAM_WRITE_THREAD_COUNT = 8;
     public static final long DIRECT_CACHE_SIZE = 1900 * MB;
-    public static final long HEAP_CACHE_SIZE = 2500 * MB;
+    public static final long HEAP_CACHE_SIZE = 2 * GB;
     public static final long PMEM_HEAP_SIZE = 60 * GB;
 //     public static final long PMEM_HEAP_SIZE = 20 * MB;
     public static long roughWrittenDataSize = 0;
@@ -75,7 +75,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }));
         try {
             metaInfo = new ConcurrentHashMap<>(100);
-            dataReader = new DataReader();
             for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
                 File file = new File(DISC_ROOT, "data-" + i);
                 File parentFile = file.getParentFile();
@@ -306,12 +305,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         GetRangeTaskData task = getTask(Thread.currentThread());
         task.setGetRangeParameter(topic, queueId, offset, fetchNum);
-        dataReader.pushTask(task);
-        try {
-            task.getCountDownLatch().await();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+        task.queryData();
         if (GET_CACHE_HIT_INFO && hitCountData != null){
             hitCountData.addTotalQueryCount(task.getResult().size());
         }

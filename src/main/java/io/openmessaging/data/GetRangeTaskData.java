@@ -70,6 +70,12 @@ public class GetRangeTaskData {
                     if (pmemInfo != null) {
                         freePmemQueues[pmemInfo.group].offer(pmemInfo.address);
                     }
+                    if(queueInfo.isInRam(j)){
+                        long[] dataPosInFile = queueInfo.getDataPosInFile(j);
+                        short dataLen = (short)dataPosInFile[1];
+                        int ramBufferIndex = getIndexByDataLength(dataLen);
+                        freeRamQueues[ramBufferIndex].offer(queueInfo.getDataPosInRam());
+                    }
                 }
             }
 

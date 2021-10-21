@@ -72,6 +72,9 @@ public class QueueInfo {
         return dataPosInRam.isFull();
     }
 
+    public boolean ramIsEmpty(){
+        return dataPosInRam.isEmpty();
+    }
     public void setDataPosInPmem(int i, PmemInfo pmemInfo){
         ensureCapacity(i);
         synchronized (this){

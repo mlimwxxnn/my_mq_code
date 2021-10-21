@@ -90,7 +90,7 @@ public class RamDataWriter {
                         queueInfo = meta.getQueueInfo();
                         dataLen = meta.getDataLen();
                         int i = getIndexByDataLength(dataLen);
-                        if (!queueInfo.ramIsFull() && queueInfo.haveQueried() && (ramInfo = freeRamQueues[i].poll()) != null) {
+                        if (!queueInfo.ramIsFull() && (ramInfo = freeRamQueues[i].poll()) != null) {
                             long writeStart = System.nanoTime(); // @
 
                             buf = wrappedData.getData();
