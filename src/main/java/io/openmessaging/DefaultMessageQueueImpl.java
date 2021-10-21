@@ -89,7 +89,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 }
                 dataWriteChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
             }
-            reLoader = new ReLoader();
             // 恢复阶段不实例化写
             if (getTotalFileSize() > 0){
                 return;
@@ -248,11 +247,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
 
-    AtomicInteger a = new AtomicInteger();
     @SuppressWarnings("ConstantConditions")
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
-        System.out.printf("append%d", a.getAndIncrement());
         haveAppended = true;
         Byte topicId = getTopicId(topic, true);
 
