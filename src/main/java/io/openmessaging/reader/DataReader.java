@@ -4,6 +4,7 @@ import io.openmessaging.DefaultMessageQueueImpl;
 import io.openmessaging.data.GetRangeTaskData;
 
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 public class DataReader {
