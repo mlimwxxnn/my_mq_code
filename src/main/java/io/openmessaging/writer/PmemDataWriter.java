@@ -2,7 +2,7 @@ package io.openmessaging.writer;
 
 import io.openmessaging.data.MetaData;
 import io.openmessaging.data.WrappedData;
-import io.openmessaging.info.PmemPageInfo;
+import io.openmessaging.info.PmemInfo;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.util.UnsafeUtil;
 import sun.misc.Unsafe;
@@ -33,7 +33,7 @@ public class PmemDataWriter {
                 pmemChannels[queueIndex] = rafs[queueIndex].getChannel();
             }
 
-            int count = 411000;
+            long count = 60 * GB / (153 * 1024);
             while (--count > 0) {
                 for (int i = 0; i < 17; i++) {
                     rafs[i].setLength(rafs[i].length() + 1024 * (i + 1));
@@ -85,7 +85,7 @@ public class PmemDataWriter {
                             int position = buf.position();
                             pmemChannels[i].write(buf, address);
                             buf.position(position);
-                            queueInfo.setDataPosInPmem(meta.getOffset(), new PmemPageInfo(address, i));
+                            queueInfo.setDataPosInPmem(meta.getOffset(), new PmemInfo(address, i));
 
                             // 统计信息
                             long writeStop = System.nanoTime();  // @

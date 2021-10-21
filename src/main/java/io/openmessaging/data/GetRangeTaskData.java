@@ -2,8 +2,9 @@ package io.openmessaging.data;
 
 import com.intel.pmem.llpl.TransactionalMemoryBlock;
 import io.openmessaging.DefaultMessageQueueImpl;
-import io.openmessaging.info.PmemPageInfo;
+import io.openmessaging.info.PmemInfo;
 import io.openmessaging.info.QueueInfo;
+import io.openmessaging.info.RamInfo;
 import io.openmessaging.util.UnsafeUtil;
 import sun.misc.Unsafe;
 import sun.nio.ch.DirectBuffer;
@@ -63,11 +64,11 @@ public class GetRangeTaskData {
             }
 
             if (!queueInfo.haveQueried()) {
-                PmemPageInfo[] allPmemPageInfos = queueInfo.getAllPmemPageInfos();
+                PmemInfo[] allPmemInfos = queueInfo.getAllPmemPageInfos();
                 for (int j = 0; j < offset; j++) {
-                    PmemPageInfo pmemPageInfo = allPmemPageInfos[j];
-                    if (pmemPageInfo != null) {
-                        freePmemQueues[pmemPageInfo.group].offer(pmemPageInfo.address);
+                    PmemInfo pmemInfo = allPmemInfos[j];
+                    if (pmemInfo != null) {
+                        freePmemQueues[pmemInfo.group].offer(pmemInfo.address);
                     }
                 }
             }
@@ -85,11 +86,11 @@ public class GetRangeTaskData {
                 if(queueInfo.isInRam(currentOffset)){
                     long queryStart = System.nanoTime(); // @
 
-                    Integer address = queueInfo.getDataPosInRam();
+                    RamInfo ramInfo = queueInfo.getDataPosInRam();
                     int ramBufferIndex = getIndexByDataLength(dataLen);
 
-                    unsafe.copyMemory(null, ((DirectBuffer)ramBuffers[ramBufferIndex]).address() + address, null, ((DirectBuffer) buf).address(), dataLen);//direct
-                    freeRamQueues[ramBufferIndex].offer(address);
+                    unsafe.copyMemory(ramInfo.ramObj, ramInfo.offset, null, ((DirectBuffer) buf).address(), dataLen);//direct
+                    freeRamQueues[ramBufferIndex].offer(ramInfo);
 
                     // 统计信息
                     long queryStop = System.nanoTime();// @
@@ -103,10 +104,10 @@ public class GetRangeTaskData {
                 if (queueInfo.isInPmem(currentOffset)) {
                     long queryStart = System.nanoTime();
 
-                    PmemPageInfo pmemPageInfo = queueInfo.getDataPosInPmem(currentOffset);
-                    int pmemChannelIndex = pmemPageInfo.group;
-                    pmemChannels[pmemChannelIndex].read(buf, pmemPageInfo.address);
-                    freePmemQueues[pmemPageInfo.group].offer(pmemPageInfo.address); // 回收
+                    PmemInfo pmemInfo = queueInfo.getDataPosInPmem(currentOffset);
+                    int pmemChannelIndex = pmemInfo.group;
+                    pmemChannels[pmemChannelIndex].read(buf, pmemInfo.address);
+                    freePmemQueues[pmemInfo.group].offer(pmemInfo.address); // 回收
                     buf.flip();
 
                     // 统计信息

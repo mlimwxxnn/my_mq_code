@@ -11,9 +11,9 @@ public class QueueInfo {
     private volatile int capacity;
     // 末位为 1 表示数据在pmem中，倒数第二位为 1 表示数据在内存中，倒数第三位为 1 表示此offset的数据不会再被查
     private volatile byte[] status;
-    private volatile PmemPageInfo[] pmemPageInfos;
+    private volatile PmemInfo[] pmemInfos;
     private volatile boolean haveQueried;
-    private final ArrayQueue<Integer> dataPosInRam = new ArrayQueue<>(80);  // todo 这里堆内用多少，要再试
+    private final ArrayQueue<RamInfo> dataPosInRam = new ArrayQueue<>(80);  // todo 这里堆内用多少，要再试
     private static final int DEFAULT_CAPACITY = 100;
 
     public QueueInfo(){
@@ -23,7 +23,7 @@ public class QueueInfo {
     public QueueInfo(int initialCapacity){
         dataInfo = new long[initialCapacity][2];
         status = new byte[initialCapacity];
-        pmemPageInfos = new PmemPageInfo[initialCapacity];
+        pmemInfos = new PmemInfo[initialCapacity];
         maxIndex = -1;
         capacity = initialCapacity;
     }
@@ -35,15 +35,15 @@ public class QueueInfo {
                     int newCapacity = index * 2;
                     long[][] newDataInfo = new long[newCapacity][2];
                     byte[] newStatus = new byte[newCapacity];
-                    PmemPageInfo[] newPmemPageInfos = new PmemPageInfo[newCapacity];
+                    PmemInfo[] newPmemInfos = new PmemInfo[newCapacity];
 
                     arraycopy(dataInfo, 0, newDataInfo, 0, maxIndex + 1);
                     arraycopy(status, 0, newStatus, 0, maxIndex + 1);
-                    arraycopy(pmemPageInfos, 0, newPmemPageInfos, 0, maxIndex + 1);
+                    arraycopy(pmemInfos, 0, newPmemInfos, 0, maxIndex + 1);
 
                     this.dataInfo = newDataInfo;
                     this.status = newStatus;
-                    this.pmemPageInfos = newPmemPageInfos;
+                    this.pmemInfos = newPmemInfos;
                     capacity = newCapacity;
                 }
             }
@@ -55,15 +55,15 @@ public class QueueInfo {
             maxIndex = i;
         }
     }
-    public void setDataPosInRam(int i, int address) {
+    public void setDataPosInRam(int i, RamInfo ramInfo) {
         ensureCapacity(i);
-        dataPosInRam.put(address);
+        dataPosInRam.put(ramInfo);
         synchronized (this){
             status[i] |= 2;
         }
     }
 
-    public Integer getDataPosInRam(){
+    public RamInfo getDataPosInRam(){
         return dataPosInRam.get();
     }
 
@@ -72,10 +72,10 @@ public class QueueInfo {
         return dataPosInRam.isFull();
     }
 
-    public void setDataPosInPmem(int i, PmemPageInfo pmemPageInfo){
+    public void setDataPosInPmem(int i, PmemInfo pmemInfo){
         ensureCapacity(i);
         synchronized (this){
-            pmemPageInfos[i] = pmemPageInfo;
+            pmemInfos[i] = pmemInfo;
             status[i] |= 1;
         }
     }
@@ -103,16 +103,16 @@ public class QueueInfo {
         return maxIndex + 1;
     }
 
-    public PmemPageInfo getDataPosInPmem(int i) {
+    public PmemInfo getDataPosInPmem(int i) {
         if(i > maxIndex){
             throw new IndexOutOfBoundsException("索引越界");
         }
-        return pmemPageInfos[i];
+        return pmemInfos[i];
     }
 
-    public PmemPageInfo[] getAllPmemPageInfos() {
+    public PmemInfo[] getAllPmemPageInfos() {
         haveQueried = true;
-        return pmemPageInfos;
+        return pmemInfos;
     }
 
 
