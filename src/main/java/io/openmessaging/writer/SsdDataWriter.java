@@ -21,11 +21,13 @@ public class SsdDataWriter {
     public final BlockingQueue<MergedData> freeMergedDataQueue = new LinkedBlockingQueue<>(50);
 
     public SsdDataWriter() {
+        log.info("SsdDataWriter初始化");
         for (int i = 0; i < 50; i++) {
             freeMergedDataQueue.offer(new MergedData(ByteBuffer.allocateDirect(50 * 18 * 1024)));
         }
         mergeData();
         writeData();
+        log.info("SsdDataWriter初始化完成");
     }
 
     public void pushWrappedData(WrappedData data) {

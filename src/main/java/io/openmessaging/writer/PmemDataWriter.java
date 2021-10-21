@@ -45,8 +45,10 @@ public class PmemDataWriter {
     }
 
     public PmemDataWriter() {
+        log.info("PmemDataWriter初始化");
         init();
         writeDataToPmem();
+        log.info("PmemDataWriter初始化完成");
     }
 
     public static int getIndexByDataLength(short dataLen){

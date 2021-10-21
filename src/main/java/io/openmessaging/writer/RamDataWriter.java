@@ -45,8 +45,10 @@ public class RamDataWriter {
     }
 
     public RamDataWriter() {
+        log.info("RamDataWriter初始化");
         init();
         writeDataToRam();
+        log.info("RamDataWriter初始化完成");
     }
 
     public static int getIndexByDataLength(short dataLen){
