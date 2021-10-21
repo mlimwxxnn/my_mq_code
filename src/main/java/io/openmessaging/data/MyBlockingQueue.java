@@ -93,14 +93,14 @@ public class MyBlockingQueue<E> extends AbstractQueue<E>
         }
     }
 
-    /**
-     * Links node at end of queue.
-     *
-     * @param node the node
-     */
-    private void enqueue(Node<E> node) {
+
+    private void enqueue(E e) {
         // assert putLock.isHeldByCurrentThread();
         // assert last.next == null;
+        Node<E> node = freeHead;
+        freeHead = freeHead.next;
+        node.item = e;
+        node.next = null;
         last = last.next = node;
     }
 
@@ -113,11 +113,21 @@ public class MyBlockingQueue<E> extends AbstractQueue<E>
         // assert takeLock.isHeldByCurrentThread();
         // assert head.item == null;
         Node<E> h = head;
+
+        if(h == null){
+            System.out.println();
+        }
         Node<E> first = h.next;
-        h.next = h; // help GC
+//        h.next = h; // help GC
         head = first;
         E x = first.item;
         first.item = null;
+
+
+
+        h.next = null;
+        freeLast = freeLast.next = h;
+
         return x;
     }
 
@@ -145,17 +155,16 @@ public class MyBlockingQueue<E> extends AbstractQueue<E>
 //                 takeLock.isHeldByCurrentThread());
 //     }
 
-    final Node<E>[] nodes;
-    final AtomicInteger lastFreeNodeIndex;
+    private Node<E> freeHead;
+    private Node<E> freeLast;
     public MyBlockingQueue(int capacity) {
         if (capacity <= 0) throw new IllegalArgumentException();
         this.capacity = capacity;
         last = head = new Node<E>(null);
 
-        lastFreeNodeIndex = new AtomicInteger(capacity - 1);
-        nodes = new Node[capacity];
+        freeHead = freeLast = new Node<>(null);
         for (int i = 0; i < capacity; i++) {
-            nodes[i] = new Node<>(null);
+            freeLast = freeLast.next = new Node<>(null);
         }
     }
 
@@ -234,12 +243,15 @@ public class MyBlockingQueue<E> extends AbstractQueue<E>
         if (count.get() == capacity)
             return false;
         int c = -1;
-        Node<E> node = nodes[lastFreeNodeIndex.getAndDecrement()];
+
+
+
+
         final ReentrantLock putLock = this.putLock;
         putLock.lock();
         try {
             if (count.get() < capacity) {
-                enqueue(node);
+                enqueue(e);
                 c = count.getAndIncrement();
                 if (c + 1 < capacity)
                     notFull.signal();
@@ -675,141 +687,5 @@ public class MyBlockingQueue<E> extends AbstractQueue<E>
             }
         }
     }
-
-    /** A customized variant of Spliterators.IteratorSpliterator */
-    static final class LBQSpliterator<E> implements Spliterator<E> {
-        static final int MAX_BATCH = 1 << 25;  // max batch array size;
-        final MyBlockingQueue<E> queue;
-        Node<E> current;    // current node; null until initialized
-        int batch;          // batch size for splits
-        boolean exhausted;  // true when no more nodes
-        long est;           // size estimate
-        LBQSpliterator(MyBlockingQueue<E> queue) {
-            this.queue = queue;
-            this.est = queue.size();
-        }
-
-        public long estimateSize() { return est; }
-
-        public Spliterator<E> trySplit() {
-            Node<E> h;
-            final MyBlockingQueue<E> q = this.queue;
-            int b = batch;
-            int n = (b <= 0) ? 1 : (b >= MAX_BATCH) ? MAX_BATCH : b + 1;
-            if (!exhausted &&
-                    ((h = current) != null || (h = q.head.next) != null) &&
-                    h.next != null) {
-                Object[] a = new Object[n];
-                int i = 0;
-                Node<E> p = current;
-                q.fullyLock();
-                try {
-                    if (p != null || (p = q.head.next) != null) {
-                        do {
-                            if ((a[i] = p.item) != null)
-                                ++i;
-                        } while ((p = p.next) != null && i < n);
-                    }
-                } finally {
-                    q.fullyUnlock();
-                }
-                if ((current = p) == null) {
-                    est = 0L;
-                    exhausted = true;
-                }
-                else if ((est -= i) < 0L)
-                    est = 0L;
-                if (i > 0) {
-                    batch = i;
-                    return Spliterators.spliterator
-                            (a, 0, i, Spliterator.ORDERED | Spliterator.NONNULL |
-                                    Spliterator.CONCURRENT);
-                }
-            }
-            return null;
-        }
-
-        public void forEachRemaining(Consumer<? super E> action) {
-            if (action == null) throw new NullPointerException();
-            final MyBlockingQueue<E> q = this.queue;
-            if (!exhausted) {
-                exhausted = true;
-                Node<E> p = current;
-                do {
-                    E e = null;
-                    q.fullyLock();
-                    try {
-                        if (p == null)
-                            p = q.head.next;
-                        while (p != null) {
-                            e = p.item;
-                            p = p.next;
-                            if (e != null)
-                                break;
-                        }
-                    } finally {
-                        q.fullyUnlock();
-                    }
-                    if (e != null)
-                        action.accept(e);
-                } while (p != null);
-            }
-        }
-
-        public boolean tryAdvance(Consumer<? super E> action) {
-            if (action == null) throw new NullPointerException();
-            final MyBlockingQueue<E> q = this.queue;
-            if (!exhausted) {
-                E e = null;
-                q.fullyLock();
-                try {
-                    if (current == null)
-                        current = q.head.next;
-                    while (current != null) {
-                        e = current.item;
-                        current = current.next;
-                        if (e != null)
-                            break;
-                    }
-                } finally {
-                    q.fullyUnlock();
-                }
-                if (current == null)
-                    exhausted = true;
-                if (e != null) {
-                    action.accept(e);
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        public int characteristics() {
-            return Spliterator.ORDERED | Spliterator.NONNULL |
-                    Spliterator.CONCURRENT;
-        }
-    }
-
-    /**
-     * Returns a {@link Spliterator} over the elements in this queue.
-     *
-     * <p>The returned spliterator is
-     * <a href="package-summary.html#Weakly"><i>weakly consistent</i></a>.
-     *
-     * <p>The {@code Spliterator} reports {@link Spliterator#CONCURRENT},
-     * {@link Spliterator#ORDERED}, and {@link Spliterator#NONNULL}.
-     *
-     * @implNote
-     * The {@code Spliterator} implements {@code trySplit} to permit limited
-     * parallelism.
-     *
-     * @return a {@code Spliterator} over the elements in this queue
-     * @since 1.8
-     */
-    public Spliterator<E> spliterator() {
-        return new LBQSpliterator<E>(this);
-    }
-
-
 
 }
