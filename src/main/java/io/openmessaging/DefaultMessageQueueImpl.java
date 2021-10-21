@@ -202,7 +202,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public DefaultMessageQueueImpl() {
         log.info("DefaultMessageQueueImpl 开始执行构造函数");
-        DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./essd") : new File("/essd");
+        DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("d:/essd") : new File("/essd");
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
 
         init();
@@ -248,10 +248,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
 
+    AtomicInteger a = new AtomicInteger();
     @SuppressWarnings("ConstantConditions")
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
-
+        System.out.printf("append%d", a.getAndIncrement());
         haveAppended = true;
         Byte topicId = getTopicId(topic, true);
 
@@ -329,14 +330,14 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     }
                     log.info("第一阶段结束 cost: {}", System.currentTimeMillis() - constructFinishTime);
 
-                    for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
-                        try {
-                            range[i][1] = dataWriteChannels[i].position();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
-                    }
-                    reLoader.reload();
+//                    for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
+//                        try {
+//                            range[i][1] = dataWriteChannels[i].position();
+//                        } catch (IOException e) {
+//                            e.printStackTrace();
+//                        }
+//                    }
+//                    reLoader.reload();
 //                    System.exit(-1);
                 }
             }

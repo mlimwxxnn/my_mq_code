@@ -7,6 +7,7 @@ import io.openmessaging.info.QueueInfo;
 import io.openmessaging.util.UnsafeUtil;
 import sun.misc.Unsafe;
 
+import java.io.File;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -28,7 +29,7 @@ public class PmemDataWriter {
         try {
             for (int queueIndex = 0; queueIndex < PMEM_BLOCK_GROUP_COUNT; queueIndex++) {
                 freePmemQueues[queueIndex] = new LinkedBlockingQueue<>();
-                rafs[queueIndex] = new RandomAccessFile("/pmem/" + queueIndex, "rw");
+                rafs[queueIndex] = new RandomAccessFile(PMEM_ROOT + File.separator + queueIndex, "rw");
                 pmemChannels[queueIndex] = rafs[queueIndex].getChannel();
             }
 
@@ -39,7 +40,7 @@ public class PmemDataWriter {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            log.info("pmem分配完成");
         }
     }
 
@@ -78,7 +79,9 @@ public class PmemDataWriter {
                             long writeStart = System.nanoTime(); // @
 
                             buf = wrappedData.getData();
+                            int position = buf.position();
                             pmemChannels[i].write(buf, address);
+                            buf.position(position);
                             queueInfo.setDataPosInPmem(meta.getOffset(), new PmemPageInfo(address, i));
 
                             // 统计信息
