@@ -123,18 +123,4 @@ public class QueueInfo {
     public boolean isInRam(int i) {
         return (status[i] & 2) > 0;
     }
-
-    public void setWillNotToQuery(int i) {
-        synchronized (this) {
-            status[i] |= 4;
-        }
-    }
-
-    public boolean willNotToQuery(int i) {
-        boolean b;
-        synchronized (this){
-            b = (status[i] & 4) > 0;
-        }
-        return b;
-    }
 }

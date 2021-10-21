@@ -53,7 +53,6 @@ public class GetRangeTaskData {
         try {
             result.clear();
 
-
             Byte topicId = DefaultMessageQueueImpl.getTopicId(topic, false);
             if (topicId == null) {
                 return;
@@ -67,7 +66,6 @@ public class GetRangeTaskData {
                 PmemPageInfo[] allPmemPageInfos = queueInfo.getAllPmemPageInfos();
                 for (int j = 0; j < offset; j++) {
                     PmemPageInfo pmemPageInfo = allPmemPageInfos[j];
-                    queueInfo.setWillNotToQuery(j);
                     if (pmemPageInfo != null) {
                         freePmemQueues[pmemPageInfo.group].offer(pmemPageInfo.address);
                     }
@@ -79,7 +77,6 @@ public class GetRangeTaskData {
             short dataLen;
             for (int i = 0; i < n; i++) {
                 int currentOffset = i + (int) offset;
-                queueInfo.setWillNotToQuery(currentOffset);
                 long[] p = queueInfo.getDataPosInFile(currentOffset);
                 dataLen = (short) p[1];
                 ByteBuffer buf = buffers[i];
@@ -117,7 +114,7 @@ public class GetRangeTaskData {
                     if (GET_READ_TIME_COST_INFO) {// @
                         readTimeCostCount.addPmemTimeCost(queryStop - queryStart);// @
                     }// @
-                    if (GET_CACHE_HIT_INFO) {// @
+                    if (GET_CACHE_HIT_INFO && hitCountData != null) {// @
                         hitCountData.increasePmemHitCount();// @
                     }// @
                 } else {

@@ -8,7 +8,6 @@ import io.openmessaging.data.TimeCostCountData;
 import io.openmessaging.data.WrappedData;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.reader.DataReader;
-import io.openmessaging.writer.ReLoader;
 import io.openmessaging.writer.PmemDataWriter;
 import io.openmessaging.writer.RamDataWriter;
 import io.openmessaging.writer.SsdDataWriter;
@@ -62,8 +61,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static int initThreadCount = 0;
     public static PmemDataWriter pmemDataWriter;
     public static RamDataWriter ramDataWriter;
-    public static ReLoader reLoader;
-    public static final long[][] range = new long[SSD_WRITE_THREAD_COUNT][2];
 
 
     public static CacheHitCountData hitCountData;
@@ -179,26 +176,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }).start();
     }
 
-    public void testLlpl(){
-        byte[] data = new byte[8 * 1024];
-        int count = 0;
-        TransactionalHeap heap = TransactionalHeap.createHeap("/pmem" + "/persistent_heap", PMEM_HEAP_SIZE);
-        TransactionalMemoryBlock block;
-        do {
-            try {
-                block = heap.allocateMemoryBlock(data.length, range -> {
-                    range.copyFromArray(data, 0, 0, data.length);
-                });
-            }catch (Exception e){
-                block = null;
-            }
-            count ++;
-        }while (block != null);
-        System.out.printf("final block count: %d", count);
-        System.exit(-1);
-
-    }
-
     public DefaultMessageQueueImpl() {
         log.info("DefaultMessageQueueImpl 开始执行构造函数");
         DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("d:/essd") : new File("/essd");
@@ -263,14 +240,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //        pmemDataWriter.pushWrappedData(wrappedData);
 
         try {
-//            if(roughWrittenDataSize > 20 * GB){
-//                pmemDataWriter.pushWrappedData(wrappedData);
-//            } else {
-//                wrappedData.getMeta().getCountDownLatch().countDown();
-//            }
-
-
-//            wrappedData.getMeta().getCountDownLatch().countDown();
             wrappedData.getMeta().getCountDownLatch().await();
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -326,16 +295,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         readTimeCostCount = new TimeCostCountData("read");
                     }
                     log.info("第一阶段结束 cost: {}", System.currentTimeMillis() - constructFinishTime);
-
-//                    for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
-//                        try {
-//                            range[i][1] = dataWriteChannels[i].position();
-//                        } catch (IOException e) {
-//                            e.printStackTrace();
-//                        }
-//                    }
-//                    reLoader.reload();
-//                    System.exit(-1);
                 }
             }
         }
@@ -352,7 +311,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        if (GET_CACHE_HIT_INFO){
+        if (GET_CACHE_HIT_INFO && hitCountData != null){
             hitCountData.addTotalQueryCount(task.getResult().size());
         }
         return task.getResult();
