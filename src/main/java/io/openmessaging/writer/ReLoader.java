@@ -9,7 +9,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
-import static io.openmessaging.writer.PmemDataWriter.getBlockByAllocateAndSetData;
+import static io.openmessaging.writer.PmemDataWriter.*;
 
 public class ReLoader {
     private ByteBuffer[] reloadByteBuffers = new ByteBuffer[SSD_WRITE_THREAD_COUNT];
@@ -53,13 +53,16 @@ public class ReLoader {
                                 break;
                             }
                             queueInfo = metaInfo.get(topicId).get(queueId);
-
-                            while (!queueInfo.willNotToQuery(offset)) {
-                                if ((block = getBlockByAllocateAndSetData(null, dataBufferAddress + dataBuffer.position() , dataLen)) != null){
-                                    queueInfo.setDataPosInPmem(offset, new PmemPageInfo(block));
-                                    break;
+                            int pmemGroupIndex = getIndexByDataLength(dataLen);
+                            if (!queueInfo.willNotToQuery(offset)) {
+                                Long address = freePmemQueues[pmemGroupIndex].take();
+                                if(!queueInfo.willNotToQuery(offset)){
+                                    int oldLimit = dataBuffer.limit();
+                                    dataBuffer.limit(dataBuffer.position() + dataLen);
+                                    pmemChannels[pmemGroupIndex].write(dataBuffer, address);
+                                    dataBuffer.limit(oldLimit);
                                 } else {
-                                    Thread.sleep(1);
+                                    freePmemQueues[pmemGroupIndex].offer(address);
                                 }
                             }
 
