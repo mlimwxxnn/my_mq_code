@@ -33,7 +33,8 @@ public class PmemDataWriter {
                 pmemChannels[queueIndex] = rafs[queueIndex].getChannel();
             }
 
-            while (true) {
+            int count = 411000;
+            while (--count > 0) {
                 for (int i = 0; i < 17; i++) {
                     rafs[i].setLength(rafs[i].length() + 1024 * (i + 1));
                     freePmemQueues[i].offer(rafs[i].length() - 1024 * (i + 1));
