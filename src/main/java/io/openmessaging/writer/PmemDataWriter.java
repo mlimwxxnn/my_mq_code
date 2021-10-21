@@ -27,6 +27,7 @@ public class PmemDataWriter {
         RandomAccessFile[] rafs = new RandomAccessFile[17];
         try {
             for (int queueIndex = 0; queueIndex < PMEM_BLOCK_GROUP_COUNT; queueIndex++) {
+                freePmemQueues[queueIndex] = new LinkedBlockingQueue<>();
                 rafs[queueIndex] = new RandomAccessFile("/pmem/" + queueIndex, "rw");
                 pmemChannels[queueIndex] = rafs[queueIndex].getChannel();
             }

@@ -107,8 +107,9 @@ public class GetRangeTaskData {
                     long queryStart = System.nanoTime();
 
                     PmemPageInfo pmemPageInfo = queueInfo.getDataPosInPmem(currentOffset);
-                    int pmemChannelIndex = getIndexByDataLength(dataLen);
-                    pmemChannels[pmemChannelIndex].read(buf);
+                    int pmemChannelIndex = pmemPageInfo.group;
+                    pmemChannels[pmemChannelIndex].read(buf, pmemPageInfo.address);
+                    freePmemQueues[pmemPageInfo.group].offer(pmemPageInfo.address); // 回收
                     buf.flip();
 
                     // 统计信息
