@@ -13,7 +13,7 @@ public class QueueInfo {
     private volatile byte[] status;
     private volatile PmemPageInfo[] pmemPageInfos;
     private volatile boolean haveQueried;
-    private final ArrayQueue<Integer> dataPosInRam = new ArrayQueue<>(2);
+    private final ArrayQueue<Integer> dataPosInRam = new ArrayQueue<>(80);  // todo 这里堆内用多少，要再试
     private static final int DEFAULT_CAPACITY = 100;
 
     public QueueInfo(){
