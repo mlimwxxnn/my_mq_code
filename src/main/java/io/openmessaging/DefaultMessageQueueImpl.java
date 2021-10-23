@@ -38,7 +38,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File PMEM_ROOT;
 
     public static final int DATA_INFORMATION_LENGTH = 9;
-    public static final long KILL_SELF_TIMEOUT = 20 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 10 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 350;  // 微秒
     public static final int SSD_WRITE_THREAD_COUNT = 5;
     public static final int SSD_MERGE_THREAD_COUNT = 1;
