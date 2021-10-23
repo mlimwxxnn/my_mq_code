@@ -11,3 +11,4 @@ essd/
 *.classpath
 *.log
 pom.xml
+pmem

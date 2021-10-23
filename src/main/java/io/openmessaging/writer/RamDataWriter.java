@@ -1,16 +1,15 @@
 package io.openmessaging.writer;
 
 import io.openmessaging.data.MetaData;
+import io.openmessaging.data.RamSaveSpaceData;
 import io.openmessaging.data.WrappedData;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.info.RamInfo;
 import io.openmessaging.util.UnsafeUtil;
 import sun.misc.Unsafe;
-import sun.nio.ch.DirectBuffer;
 
 import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
@@ -18,42 +17,17 @@ import static io.openmessaging.DefaultMessageQueueImpl.*;
 @SuppressWarnings({"ResultOfMethodCallIgnored", "unchecked"})
 public class RamDataWriter {
 
-    public static final ByteBuffer[] directRamBuffers = new ByteBuffer[17];
-    public static final ByteBuffer[] heapRamBuffers = new ByteBuffer[17];
-    public static final BlockingQueue<RamInfo>[] freeRamQueues = new LinkedBlockingQueue[17];
+    private static RamSaveSpaceData ramSaveSpaceData;
     private static final BlockingQueue<WrappedData> ramWrappedDataQueue = new LinkedBlockingQueue<>();
     private static final Unsafe unsafe = UnsafeUtil.unsafe;
+    private static boolean isAllocateSpaceWhileNeed = true;
+    public static BlockingQueue<RamInfo>[] freeRamQueues = new LinkedBlockingQueue[spaceLevelCount];
+
 
     public void init(){
-
-        int directBlocksCountPerGroup = (int)(DIRECT_CACHE_SIZE / (1024 * 153));  // 1 + 2 + 3 + ... + 17 = 153
-        int heapBlocksCountPerGroup = (int)(HEAP_CACHE_SIZE / (1024 * 153));
-        CountDownLatch countDownLatch = new CountDownLatch(PMEM_BLOCK_GROUP_COUNT);
-
-        for (int i = 0; i < PMEM_BLOCK_GROUP_COUNT; i++) {
-            int queueIndex = i;
-            freeRamQueues[queueIndex] = new LinkedBlockingQueue<>();
-            new Thread(() -> {
-                try {
-                    directRamBuffers[queueIndex] = ByteBuffer.allocateDirect(1024 * (queueIndex + 1) * directBlocksCountPerGroup); // 1加到17等于153, set 6853 for allocate 1G RAM
-                    heapRamBuffers[queueIndex] = ByteBuffer.allocate(1024 * (queueIndex + 1) * heapBlocksCountPerGroup);
-                    for (int j = 0; j < directBlocksCountPerGroup; j++) {
-                        freeRamQueues[queueIndex].offer(new RamInfo(null, ((DirectBuffer) directRamBuffers[queueIndex]).address() + j * (queueIndex + 1) * 1024));
-                    }
-                    for (int j = 0; j < heapBlocksCountPerGroup; j++) {
-                        freeRamQueues[queueIndex].offer(new RamInfo(heapRamBuffers[queueIndex].array(), 16 + j * (queueIndex + 1) * 1024));
-                    }
-                }catch (Exception e){
-                    e.printStackTrace();
-                    System.exit(-1);
-                }
-                countDownLatch.countDown();
-            }).start();
-        }
-        try {
-            countDownLatch.await();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+        ramSaveSpaceData = new RamSaveSpaceData();
+        for (int i = 0; i < spaceLevelCount; i++) {
+            freeRamQueues[i] = new LinkedBlockingQueue<>();
         }
     }
 
@@ -70,6 +44,23 @@ public class RamDataWriter {
 
     public void pushWrappedData(WrappedData wrappedData){
         ramWrappedDataQueue.offer(wrappedData);
+    }
+
+    private RamInfo getFreeRamInfo(short dataLen){
+        RamInfo ramInfo;
+        if (isAllocateSpaceWhileNeed){
+            ramInfo = ramSaveSpaceData.allocate(dataLen);
+            if (ramInfo == null){
+                isAllocateSpaceWhileNeed = false;
+            }else {
+                return ramInfo;
+            }
+        }
+        int levelIndex = RamInfo.getEnoughFreeSpaceLevelIndexByDataLen(dataLen);
+        while ((ramInfo = freeRamQueues[levelIndex].poll())== null && levelIndex < spaceLevelCount - 1){
+            levelIndex++;
+        }
+        return ramInfo;
     }
 
     private void writeDataToRam(){
@@ -90,7 +81,7 @@ public class RamDataWriter {
                         queueInfo = meta.getQueueInfo();
                         dataLen = meta.getDataLen();
                         int i = getIndexByDataLength(dataLen);
-                        if (!queueInfo.ramIsFull() && (ramInfo = freeRamQueues[i].poll()) != null) {
+                        if (!queueInfo.ramIsFull() && (ramInfo = getFreeRamInfo(dataLen)) != null) {
                             long writeStart = System.nanoTime(); // @
 
                             buf = wrappedData.getData();

@@ -16,7 +16,7 @@ import java.util.concurrent.CountDownLatch;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
 import static io.openmessaging.writer.PmemDataWriter.freePmemQueues;
-import static io.openmessaging.writer.PmemDataWriter.pmemChannels;
+import static io.openmessaging.data.PmemSaveSpaceData.*;
 import static io.openmessaging.writer.RamDataWriter.*;
 
 // todo 这里把初始化改到MQ构造函数里会更快
@@ -68,13 +68,11 @@ public class GetRangeTaskData {
                 for (int j = 0; j < offset; j++) {
                     PmemInfo pmemInfo = allPmemInfos[j];
                     if (pmemInfo != null) {
-                        freePmemQueues[pmemInfo.group].offer(pmemInfo.address);
+                        freePmemQueues[pmemInfo.rLevelIndex].offer(pmemInfo);
                     }
                     if(queueInfo.isInRam(j)){
-                        long[] dataPosInFile = queueInfo.getDataPosInFile(j);
-                        short dataLen = (short)dataPosInFile[1];
-                        int ramBufferIndex = getIndexByDataLength(dataLen);
-                        freeRamQueues[ramBufferIndex].offer(queueInfo.getDataPosInRam());
+                        RamInfo ramInfo = queueInfo.getDataPosInRam();
+                        freeRamQueues[ramInfo.levelIndex].offer(ramInfo);
                     }
                 }
             }
@@ -95,8 +93,8 @@ public class GetRangeTaskData {
                     RamInfo ramInfo = queueInfo.getDataPosInRam();
                     int ramBufferIndex = getIndexByDataLength(dataLen);
 
-                    unsafe.copyMemory(ramInfo.ramObj, ramInfo.offset, null, ((DirectBuffer) buf).address(), dataLen);//direct
-                    freeRamQueues[ramBufferIndex].offer(ramInfo);
+                    unsafe.copyMemory(ramInfo.ramObj, ramInfo.offset, null, ((DirectBuffer) buf).address(), dataLen); //direct
+                    freeRamQueues[ramInfo.levelIndex].offer(ramInfo);
 
                     // 统计信息
                     long queryStop = System.nanoTime();// @
@@ -111,9 +109,9 @@ public class GetRangeTaskData {
                     long queryStart = System.nanoTime();
 
                     PmemInfo pmemInfo = queueInfo.getDataPosInPmem(currentOffset);
-                    int pmemChannelIndex = pmemInfo.group;
+                    int pmemChannelIndex = pmemInfo.rLevelIndex;
                     pmemChannels[pmemChannelIndex].read(buf, pmemInfo.address);
-                    freePmemQueues[pmemInfo.group].offer(pmemInfo.address); // 回收
+                    freePmemQueues[pmemInfo.rLevelIndex].offer(pmemInfo); // 回收
                     buf.flip();
 
                     // 统计信息

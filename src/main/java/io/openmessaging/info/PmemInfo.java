@@ -1,12 +1,10 @@
 package io.openmessaging.info;
 
-import com.intel.pmem.llpl.TransactionalMemoryBlock;
-
 public class PmemInfo {
-    public PmemInfo(long address, int group){
+    public PmemInfo(long address, int rLevelIndex){
         this.address = address;
-        this.group = group;
+        this.rLevelIndex = rLevelIndex;
     }
     public long address;
-    public int group;
+    public int rLevelIndex;  // means for: retrieveLevelIndex
 }

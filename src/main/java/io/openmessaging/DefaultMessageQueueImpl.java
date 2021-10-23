@@ -47,10 +47,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int RAM_WRITE_THREAD_COUNT = 8;
     public static final long DIRECT_CACHE_SIZE = 1900 * MB;
     public static final long HEAP_CACHE_SIZE = 2 * GB;
-    public static final long PMEM_HEAP_SIZE = 60 * GB;
+    public static final int RAM_SPACE_LEVEL_GAP = 200; // B
+    public static final int spaceLevelCount = (17 * 1024 + RAM_SPACE_LEVEL_GAP - 1) / RAM_SPACE_LEVEL_GAP;
+    public static final long PMEM_CACHE_SIZE = 60 * GB;
 //     public static final long PMEM_HEAP_SIZE = 20 * MB;
     public static long roughWrittenDataSize = 0;
     public static final int RELOAD_BUFFER_SIZE = (int) (8 * MB);
+
 
     public static AtomicInteger topicCount = new AtomicInteger();
     static private final ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
@@ -236,8 +239,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         WrappedData wrappedData = new WrappedData(topicId, (short) queueId, data, offset, queueInfo);
         ssdDataWriter.pushWrappedData(wrappedData);
-        ramDataWriter.pushWrappedData(wrappedData);
-//        pmemDataWriter.pushWrappedData(wrappedData);
+//        ramDataWriter.pushWrappedData(wrappedData);
+        pmemDataWriter.pushWrappedData(wrappedData);
 
         try {
             wrappedData.getMeta().getCountDownLatch().await();
@@ -316,6 +319,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         for (File file : new File("d:/essd").listFiles()) {
             if(file.isFile()){
                 file.delete();
+            }else{
+                for (File listFile : file.listFiles()) {
+                    if (listFile.isFile()){
+                        listFile.delete();
+                    }
+                }
             }
         }
         final int threadCount = 40;
@@ -357,8 +366,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         for (int i = 0; i < threadCount; i++) {
             threads[i].join();
         }
+        mq.append("big_data", 1, ByteBuffer.allocate(17*1024));
 
         Map<Integer, ByteBuffer> res = mq.getRange("10-1", 3, 0, 100);
         System.out.println(res.size());
+        Map<Integer, ByteBuffer> res1 = mq.getRange("big_data", 1, 0, 100);
+        System.out.println(res1.size());
     }
 }
