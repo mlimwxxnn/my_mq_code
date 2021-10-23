@@ -42,10 +42,6 @@ public class PmemDataWriter {
         log.info("PmemDataWriter初始化完成");
     }
 
-    public static int getIndexByDataLength(short dataLen){
-        return (dataLen + 1023) / 1024 - 1;
-    }
-
     public void pushWrappedData(WrappedData wrappedData){
         pmemWrappedDataQueue.offer(wrappedData);
     }
@@ -62,7 +58,8 @@ public class PmemDataWriter {
             }
         }
         int levelIndex = RamInfo.getEnoughFreeSpaceLevelIndexByDataLen(dataLen);
-        while ((pmemInfo = freePmemQueues[levelIndex].poll()) == null && levelIndex < spaceLevelCount - 1){
+        int maxTryLevelIndex = Math.min(spaceLevelCount - 1, levelIndex + MAX_TRY_TIMES_WHILE_ALLOCATE_SPACE);
+        while ((pmemInfo = freePmemQueues[levelIndex].poll()) == null && levelIndex < maxTryLevelIndex){
             levelIndex++;
         }
         return pmemInfo;

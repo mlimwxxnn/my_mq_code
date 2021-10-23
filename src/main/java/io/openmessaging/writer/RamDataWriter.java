@@ -57,7 +57,8 @@ public class RamDataWriter {
             }
         }
         int levelIndex = RamInfo.getEnoughFreeSpaceLevelIndexByDataLen(dataLen);
-        while ((ramInfo = freeRamQueues[levelIndex].poll())== null && levelIndex < spaceLevelCount - 1){
+        int maxTryLevelIndex = Math.min(spaceLevelCount - 1, levelIndex + MAX_TRY_TIMES_WHILE_ALLOCATE_SPACE);
+        while ((ramInfo = freeRamQueues[levelIndex].poll())== null && levelIndex < maxTryLevelIndex){
             levelIndex++;
         }
         return ramInfo;

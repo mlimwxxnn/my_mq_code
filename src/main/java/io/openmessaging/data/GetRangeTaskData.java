@@ -91,8 +91,6 @@ public class GetRangeTaskData {
                     long queryStart = System.nanoTime(); // @
 
                     RamInfo ramInfo = queueInfo.getDataPosInRam();
-                    int ramBufferIndex = getIndexByDataLength(dataLen);
-
                     unsafe.copyMemory(ramInfo.ramObj, ramInfo.offset, null, ((DirectBuffer) buf).address(), dataLen); //direct
                     freeRamQueues[ramInfo.levelIndex].offer(ramInfo);
 
