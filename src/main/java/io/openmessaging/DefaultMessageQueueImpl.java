@@ -1,7 +1,5 @@
 package io.openmessaging;
 
-import com.intel.pmem.llpl.TransactionalHeap;
-import com.intel.pmem.llpl.TransactionalMemoryBlock;
 import io.openmessaging.data.CacheHitCountData;
 import io.openmessaging.data.GetRangeTaskData;
 import io.openmessaging.data.TimeCostCountData;
@@ -30,7 +28,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final boolean GET_CACHE_HIT_INFO = true;
     public static final boolean GET_WRITE_TIME_COST_INFO = true;
     public static final boolean GET_READ_TIME_COST_INFO = true;
-    public static final int PMEM_BLOCK_GROUP_COUNT = 17;
     public static final Logger log = LoggerFactory.getLogger("myLogger");
     public static final long GB = 1024L * 1024L * 1024L;
     public static final long MB = 1024L * 1024L;
@@ -239,8 +236,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         WrappedData wrappedData = new WrappedData(topicId, (short) queueId, data, offset, queueInfo);
         ssdDataWriter.pushWrappedData(wrappedData);
-//        ramDataWriter.pushWrappedData(wrappedData);
-        pmemDataWriter.pushWrappedData(wrappedData);
+        ramDataWriter.pushWrappedData(wrappedData);
+//        pmemDataWriter.pushWrappedData(wrappedData);
 
         try {
             wrappedData.getMeta().getCountDownLatch().await();
