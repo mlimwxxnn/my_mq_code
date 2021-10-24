@@ -98,7 +98,7 @@ public class PmemDataWriter {
                                 writeTimeCostCount.addPmemTimeCost(writeStop - writeStart);  // @
                             }  // @
                         }
-//                        meta.getCountDownLatch().countDown();
+                        meta.getCountDownLatch().countDown();
                     }
                 } catch (Exception e) {
                     e.printStackTrace();

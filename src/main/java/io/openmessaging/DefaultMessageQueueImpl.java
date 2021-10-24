@@ -292,6 +292,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             // 单条写入
             appendSsdBySelf(topicId, queueId, offset, queueInfo, data);
         }
+        try {
+            wrappedData.getMeta().getCountDownLatch().await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         return offset;
 
 //        haveAppended = true;
@@ -339,6 +344,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             cyclicBarriers[groupId].await(5, TimeUnit.SECONDS);
         } catch (BrokenBarrierException | IOException | InterruptedException e) {
             e.printStackTrace();
+            System.exit(-1);
         } catch (TimeoutException e) {
             log.info("cyclicBarrier timeout.");
             // 这里把剩余的数据刷盘, WritePos 未归零时代表未刷盘
@@ -434,7 +440,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         readTimeCostCount = new TimeCostCountData("read");
                     }
                     log.info("第一阶段结束 cost: {}", System.currentTimeMillis() - constructFinishTime);
-//                    System.exit(-1);
+                    System.exit(-1);
                 }
             }
         }
