@@ -17,11 +17,12 @@ import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static io.openmessaging.util.UnsafeUtil.unsafe;
 
 
 @SuppressWarnings("ResultOfMethodCallIgnored")
@@ -69,7 +70,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     static private final ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
     public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo;
     public static volatile Map<Thread, GetRangeTaskData> getRangeTaskMap = new ConcurrentHashMap<>();
-    public static final FileChannel[] dataWriteChannels = new FileChannel[SSD_WRITE_THREAD_COUNT];
+    public static final FileChannel[] dataWriteChannels = new FileChannel[groupCount];
+
     public static SsdDataWriter ssdDataWriter;
     public static DataReader dataReader;
     public static int initThreadCount = 0;
@@ -112,7 +114,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             if (getTotalFileSize() > 0){
                 return;
             }
-            ssdDataWriter = new SsdDataWriter();
+//            ssdDataWriter = new SsdDataWriter();
             pmemDataWriter = new PmemDataWriter();
             ramDataWriter = new RamDataWriter();
             new Thread(() -> {
@@ -249,24 +251,26 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     @SuppressWarnings("ConstantConditions")
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
-        haveAppended = true;
-        Byte topicId = getTopicId(topic, true);
+        return appendV1(topic, queueId, data);
 
-        ConcurrentHashMap<Short, QueueInfo> topicInfo = metaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
-        QueueInfo queueInfo = topicInfo.computeIfAbsent((short) queueId, k -> new QueueInfo());
-        int offset = queueInfo.size();
-
-        WrappedData wrappedData = new WrappedData(topicId, (short) queueId, data, offset, queueInfo);
-        ssdDataWriter.pushWrappedData(wrappedData);
-        ramDataWriter.pushWrappedData(wrappedData);
-//        pmemDataWriter.pushWrappedData(wrappedData);
-
-        try {
-            wrappedData.getMeta().getCountDownLatch().await();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        return offset;
+//        haveAppended = true;
+//        Byte topicId = getTopicId(topic, true);
+//
+//        ConcurrentHashMap<Short, QueueInfo> topicInfo = metaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
+//        QueueInfo queueInfo = topicInfo.computeIfAbsent((short) queueId, k -> new QueueInfo());
+//        int offset = queueInfo.size();
+//
+//        WrappedData wrappedData = new WrappedData(topicId, (short) queueId, data, offset, queueInfo);
+//        ssdDataWriter.pushWrappedData(wrappedData);
+//        ramDataWriter.pushWrappedData(wrappedData);
+////        pmemDataWriter.pushWrappedData(wrappedData);
+//
+//        try {
+//            wrappedData.getMeta().getCountDownLatch().await();
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
+//        return offset;
     }
 
     public long appendV1(String topic, int queueId, ByteBuffer data) {
@@ -275,12 +279,41 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             groupId = totalThreadCount.getAndIncrement() % groupCount;
             groupMap.set(groupId);
         }
-        ByteBuffer groupBuffer = groupBuffers[groupId];
 
+        Byte topicId = getTopicId(topic, true);
+        ConcurrentHashMap<Short, QueueInfo> topicInfo = metaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
+        QueueInfo queueInfo = topicInfo.computeIfAbsent((short) queueId, k -> new QueueInfo());
+        int offset = queueInfo.size();
 
+        long currentBufferPos = groupBufferWritePos[groupId].getAndAdd(9 + data.remaining());
+        long currentBufferAddress = groupBufferBasePos[groupId] + currentBufferPos;
+        short dataLen = (short)data.remaining();
 
+        unsafe.putByte(currentBufferAddress, topicId);
+        unsafe.putShort(currentBufferAddress + 1, (short)queueId);
+        unsafe.putShort(currentBufferAddress + 3, dataLen);
+        unsafe.putInt(currentBufferAddress + 5, offset);
+        // 放入数据本体
+        unsafe.copyMemory(data.array(), 16 + data.position(), null, currentBufferAddress + 9, dataLen);
 
-        return 0;
+        try {
+            queueInfo.setDataPosInFile(offset, dataWriteChannels[groupId].position() + currentBufferPos, (((long) groupId) << 32) | dataLen);
+            if(groupAwaitThreadCount[groupId].incrementAndGet() == 10){
+                groupAwaitThreadCount[groupId].set(0);
+                groupBuffers[groupId].position(0);
+                groupBuffers[groupId].limit(groupBufferWritePos[groupId].get());
+                groupBufferWritePos[groupId].set(0);
+                dataWriteChannels[groupId].write(groupBuffers[groupId]);
+                dataWriteChannels[groupId].force(true);
+            }
+            cyclicBarriers[groupId].await(10, TimeUnit.SECONDS);
+        } catch (BrokenBarrierException | IOException | InterruptedException e) {
+            e.printStackTrace();
+        } catch (TimeoutException e) {
+            log.info("cyclicBarrier timeout.");
+            // do something
+        }
+        return offset;
     }
 
     /**
@@ -331,6 +364,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         readTimeCostCount = new TimeCostCountData("read");
                     }
                     log.info("第一阶段结束 cost: {}", System.currentTimeMillis() - constructFinishTime);
+                    System.exit(-1);
                 }
             }
         }
