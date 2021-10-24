@@ -99,7 +99,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
 
             metaInfo = new ConcurrentHashMap<>(100);
-            for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
+            for (int i = 0; i < groupCount; i++) {
                 File file = new File(DISC_ROOT, "data-" + i);
                 File parentFile = file.getParentFile();
                 if (!parentFile.exists()) {
@@ -251,7 +251,23 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     @SuppressWarnings("ConstantConditions")
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
-        return appendV1(topic, queueId, data);
+        Integer groupId = groupMap.get();
+        if (groupId == null){
+            groupId = totalThreadCount.getAndIncrement() % groupCount;
+            groupMap.set(groupId);
+        }
+        Byte topicId = getTopicId(topic, true);
+        ConcurrentHashMap<Short, QueueInfo> topicInfo = metaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
+        QueueInfo queueInfo = topicInfo.computeIfAbsent((short) queueId, k -> new QueueInfo());
+        int offset = queueInfo.size();
+
+        if (! cyclicBarriers[groupId].isBroken()){
+            appendV1(groupId, topicId, queueId, offset, queueInfo, data);
+        }else {
+            // 单条写入
+            System.out.println("hello world");
+        }
+        return offset;
 
 //        haveAppended = true;
 //        Byte topicId = getTopicId(topic, true);
@@ -273,18 +289,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //        return offset;
     }
 
-    public long appendV1(String topic, int queueId, ByteBuffer data) {
-        Integer groupId = groupMap.get();
-        if (groupId == null){
-            groupId = totalThreadCount.getAndIncrement() % groupCount;
-            groupMap.set(groupId);
-        }
-
-        Byte topicId = getTopicId(topic, true);
-        ConcurrentHashMap<Short, QueueInfo> topicInfo = metaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
-        QueueInfo queueInfo = topicInfo.computeIfAbsent((short) queueId, k -> new QueueInfo());
-        int offset = queueInfo.size();
-
+    public void appendV1(int groupId, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data) {
         long currentBufferPos = groupBufferWritePos[groupId].getAndAdd(9 + data.remaining());
         long currentBufferAddress = groupBufferBasePos[groupId] + currentBufferPos;
         short dataLen = (short)data.remaining();
@@ -295,7 +300,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         unsafe.putInt(currentBufferAddress + 5, offset);
         // 放入数据本体
         unsafe.copyMemory(data.array(), 16 + data.position(), null, currentBufferAddress + 9, dataLen);
-
         try {
             queueInfo.setDataPosInFile(offset, dataWriteChannels[groupId].position() + currentBufferPos, (((long) groupId) << 32) | dataLen);
             if(groupAwaitThreadCount[groupId].incrementAndGet() == 10){
@@ -313,7 +317,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             log.info("cyclicBarrier timeout.");
             // do something
         }
-        return offset;
     }
 
     /**
