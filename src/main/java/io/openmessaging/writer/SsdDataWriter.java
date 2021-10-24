@@ -91,7 +91,7 @@ public class SsdDataWriter {
                             metaData.getQueueInfo().setDataPosInFile(metaData.getOffset(),
                                     metaData.getOffsetInMergedBuffer() + pos,
                                     (writeThreadId << 32) | metaData.getDataLen());
-                            metaData.getCountDownLatch().countDown();
+//                            metaData.getCountDownLatch().countDown();
 
                         });
 

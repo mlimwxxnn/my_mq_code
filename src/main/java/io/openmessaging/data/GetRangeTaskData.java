@@ -10,9 +10,11 @@ import sun.misc.Unsafe;
 import sun.nio.ch.DirectBuffer;
 
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
 import static io.openmessaging.writer.PmemDataWriter.freePmemQueues;
@@ -22,7 +24,6 @@ import static io.openmessaging.writer.RamDataWriter.*;
 // todo 这里把初始化改到MQ构造函数里会更快
 public class GetRangeTaskData {
     public final ByteBuffer[] buffers = new ByteBuffer[100]; // 用来响应查询的buffer
-    public final TransactionalMemoryBlock[] blocks = new TransactionalMemoryBlock[100];
     private Map<Integer, ByteBuffer> result = new HashMap<>();
     String topic;
     int queueId;
@@ -30,12 +31,13 @@ public class GetRangeTaskData {
     int fetchNum;
     private CountDownLatch countDownLatch;
     Unsafe unsafe = UnsafeUtil.unsafe;
-
+    public int threadId;
 
     public GetRangeTaskData() {
         for (int i = 0; i < buffers.length; i++) {
             buffers[i] = ByteBuffer.allocateDirect(17 * 1024);
         }
+
     }
 
     public void setGetRangeParameter(String topic, int queueId, long offset, int fetchNum) {

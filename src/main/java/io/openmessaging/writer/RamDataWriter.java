@@ -89,7 +89,7 @@ public class RamDataWriter {
                             data = buf.array();
                             unsafe.copyMemory(data, 16 + buf.position(), ramInfo.ramObj, ramInfo.offset, buf.remaining());//directByteBuffer
                             queueInfo.setDataPosInRam(meta.getOffset(), ramInfo);
-                            meta.getCountDownLatch().countDown();
+//                            meta.getCountDownLatch().countDown();
 
                             // 统计信息
                             long writeStop = System.nanoTime();  // @

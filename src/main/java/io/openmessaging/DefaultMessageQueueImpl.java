@@ -1,9 +1,6 @@
 package io.openmessaging;
 
-import io.openmessaging.data.CacheHitCountData;
-import io.openmessaging.data.GetRangeTaskData;
-import io.openmessaging.data.TimeCostCountData;
-import io.openmessaging.data.WrappedData;
+import io.openmessaging.data.*;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.reader.DataReader;
 import io.openmessaging.writer.PmemDataWriter;
@@ -17,7 +14,6 @@ import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -37,7 +33,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
 
-    public static final ThreadLocal<Integer> groupMap = new ThreadLocal<>();
+    public static final ThreadLocal<Integer> groupIdMap = new ThreadLocal<>();
+    public static final ThreadLocal<ThreadPrivateWorkContent> threadPrivateMap = new ThreadLocal<>();
     public static final AtomicInteger totalThreadCount = new AtomicInteger();
     public static final int groupCount = 4;
     public static final ByteBuffer[] groupBuffers = new ByteBuffer[groupCount];
@@ -48,7 +45,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 
     public static final int DATA_INFORMATION_LENGTH = 9;
-    public static final long KILL_SELF_TIMEOUT = 20 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 10 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 350;  // 微秒
     public static final int SSD_WRITE_THREAD_COUNT = 5;
     public static final int SSD_MERGE_THREAD_COUNT = 1;
@@ -215,14 +212,20 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
     public void powerFailureRecovery(ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo) {
-        for (int id = 0; id < dataWriteChannels.length; id++) {
-            FileChannel channel = dataWriteChannels[id];
+        if (getTotalFileSize() == 0){
+            return;
+        }
+        // 分组文件以及私有文件
+        for (int id = 0; id < dataWriteChannels.length + 50; id++) {
             ByteBuffer readBuffer = ByteBuffer.allocate(DATA_INFORMATION_LENGTH);
             byte topicId;
             short queueId;
             short dataLen = 0;
             int offset;
             try {
+                File file = new File(DISC_ROOT, "data-" + id);
+                FileChannel channel = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
+
                 ConcurrentHashMap<Short, QueueInfo> topicInfo;
                 QueueInfo queueInfo;
                 long dataFilesize = channel.size();
@@ -247,25 +250,47 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }
     }
 
+    private int getGroupId(){
+        Integer groupId = groupIdMap.get();
+        if (groupId == null){
+            int threadId = totalThreadCount.getAndIncrement();
+            groupId = threadId % groupCount;
+            groupIdMap.set(groupId);
+            // 线程私有的channel，用来写单条数据到ssd
+            try {
+                int fileId = threadId + groupCount;
+                File file = new File(DISC_ROOT, "data-" + fileId);
+                if (!file.exists()) {
+                    file.createNewFile();
+                }
+                FileChannel channel = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
+                threadPrivateMap.set(new ThreadPrivateWorkContent(channel, fileId));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        return groupId;
+    }
+
 
     @SuppressWarnings("ConstantConditions")
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
-        Integer groupId = groupMap.get();
-        if (groupId == null){
-            groupId = totalThreadCount.getAndIncrement() % groupCount;
-            groupMap.set(groupId);
-        }
+        int groupId = getGroupId();
         Byte topicId = getTopicId(topic, true);
         ConcurrentHashMap<Short, QueueInfo> topicInfo = metaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
         QueueInfo queueInfo = topicInfo.computeIfAbsent((short) queueId, k -> new QueueInfo());
         int offset = queueInfo.size();
 
+        WrappedData wrappedData = new WrappedData(topicId, (short) queueId, data, offset, queueInfo);
+        ramDataWriter.pushWrappedData(wrappedData);
+//        pmemDataWriter.pushWrappedData(wrappedData);
+
         if (! cyclicBarriers[groupId].isBroken()){
-            appendV1(groupId, topicId, queueId, offset, queueInfo, data);
+            appendSsdByGroup(groupId, topicId, queueId, offset, queueInfo, data);
         }else {
             // 单条写入
-            System.out.println("hello world");
+            appendSsdBySelf(topicId, queueId, offset, queueInfo, data);
         }
         return offset;
 
@@ -289,7 +314,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //        return offset;
     }
 
-    public void appendV1(int groupId, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data) {
+    // 聚合写入
+    public void appendSsdByGroup(int groupId, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data) {
         long currentBufferPos = groupBufferWritePos[groupId].getAndAdd(9 + data.remaining());
         long currentBufferAddress = groupBufferBasePos[groupId] + currentBufferPos;
         short dataLen = (short)data.remaining();
@@ -310,12 +336,53 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 dataWriteChannels[groupId].write(groupBuffers[groupId]);
                 dataWriteChannels[groupId].force(true);
             }
-            cyclicBarriers[groupId].await(10, TimeUnit.SECONDS);
+            cyclicBarriers[groupId].await(5, TimeUnit.SECONDS);
         } catch (BrokenBarrierException | IOException | InterruptedException e) {
             e.printStackTrace();
         } catch (TimeoutException e) {
             log.info("cyclicBarrier timeout.");
-            // do something
+            // 这里把剩余的数据刷盘, WritePos 未归零时代表未刷盘
+            if (groupBufferWritePos[groupId].get() != 0){
+                synchronized (groupBuffers[groupId]){
+                    if (groupBufferWritePos[groupId].get() != 0){
+                        groupBuffers[groupId].position(0);
+                        groupBuffers[groupId].limit(groupBufferWritePos[groupId].get());
+                        groupBufferWritePos[groupId].set(0);
+                        try {
+                            dataWriteChannels[groupId].write(groupBuffers[groupId]);
+                            dataWriteChannels[groupId].force(true);
+                        } catch (IOException ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 单条写入
+    public void appendSsdBySelf(byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data) {
+        ThreadPrivateWorkContent workContent = threadPrivateMap.get();
+        FileChannel channel = workContent.channel;
+        ByteBuffer buffer = workContent.buffer;
+
+        long currentBufferAddress = ((DirectBuffer) buffer).address();
+        short dataLen = (short)data.remaining();
+
+        unsafe.putByte(currentBufferAddress, topicId);
+        unsafe.putShort(currentBufferAddress + 1, (short)queueId);
+        unsafe.putShort(currentBufferAddress + 3, dataLen);
+        unsafe.putInt(currentBufferAddress + 5, offset);
+        // 放入数据本体
+        unsafe.copyMemory(data.array(), 16 + data.position(), null, currentBufferAddress + 9, dataLen);
+        try {
+            queueInfo.setDataPosInFile(offset, channel.position(), (workContent.fileId << 32) | dataLen);
+            buffer.position(0);
+            buffer.limit(dataLen + 9);
+            channel.write(buffer);
+            channel.force(true);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
@@ -367,7 +434,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         readTimeCostCount = new TimeCostCountData("read");
                     }
                     log.info("第一阶段结束 cost: {}", System.currentTimeMillis() - constructFinishTime);
-                    System.exit(-1);
+//                    System.exit(-1);
                 }
             }
         }
