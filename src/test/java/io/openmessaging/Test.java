@@ -5,10 +5,7 @@ import io.openmessaging.data.MyBlockingQueue;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.*;
 
 public class Test {
     public static void main(String[] args) throws IOException, InterruptedException {
@@ -48,5 +45,7 @@ public class Test {
         b.offer(3);
         long end = System.currentTimeMillis();
         System.out.printf("时间：%d", end -start);
+
+        CyclicBarrier cyclicBarrier = new CyclicBarrier(3);
     }
 }

@@ -11,6 +11,7 @@ import io.openmessaging.writer.RamDataWriter;
 import io.openmessaging.writer.SsdDataWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import sun.nio.ch.DirectBuffer;
 
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -18,6 +19,7 @@ import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
@@ -33,6 +35,16 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final long MB = 1024L * 1024L;
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
+
+    public static final ThreadLocal<Integer> groupMap = new ThreadLocal<>();
+    public static final AtomicInteger totalThreadCount = new AtomicInteger();
+    public static final int groupCount = 4;
+    public static final ByteBuffer[] groupBuffers = new ByteBuffer[groupCount];
+    public static final CyclicBarrier[] cyclicBarriers = new CyclicBarrier[groupCount];
+    public static final AtomicInteger[] groupBufferWritePos = new AtomicInteger[groupCount];
+    public static final long[] groupBufferBasePos = new long[groupCount];
+    public static final AtomicInteger[] groupAwaitThreadCount = new AtomicInteger[groupCount];
+
 
     public static final int DATA_INFORMATION_LENGTH = 9;
     public static final long KILL_SELF_TIMEOUT = 20 * 60;  // seconds
@@ -75,6 +87,15 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             log.info("mq exit.");
         }));
         try {
+            for (int i = 0; i < groupCount; i++) {
+                ByteBuffer byteBuffer = ByteBuffer.allocateDirect(10 * 18 * 1024);
+                groupBuffers[i] = byteBuffer;
+                groupBufferWritePos[i] = new AtomicInteger();
+                groupBufferBasePos[i] = ((DirectBuffer) byteBuffer).address();
+                cyclicBarriers[i] = new CyclicBarrier(10);
+                groupAwaitThreadCount[i] = new AtomicInteger();
+            }
+
             metaInfo = new ConcurrentHashMap<>(100);
             for (int i = 0; i < SSD_WRITE_THREAD_COUNT; i++) {
                 File file = new File(DISC_ROOT, "data-" + i);
@@ -246,6 +267,20 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             e.printStackTrace();
         }
         return offset;
+    }
+
+    public long appendV1(String topic, int queueId, ByteBuffer data) {
+        Integer groupId = groupMap.get();
+        if (groupId == null){
+            groupId = totalThreadCount.getAndIncrement() % groupCount;
+            groupMap.set(groupId);
+        }
+        ByteBuffer groupBuffer = groupBuffers[groupId];
+
+
+
+
+        return 0;
     }
 
     /**
