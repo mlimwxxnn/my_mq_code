@@ -67,7 +67,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     static private final ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
     public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo;
     public static volatile Map<Thread, GetRangeTaskData> getRangeTaskMap = new ConcurrentHashMap<>();
-    public static final FileChannel[] dataWriteChannels = new FileChannel[groupCount];
+    public static final FileChannel[] dataWriteChannels = new FileChannel[groupCount + 50];
 
     public static SsdDataWriter ssdDataWriter;
     public static DataReader dataReader;
@@ -216,16 +216,14 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             return;
         }
         // 分组文件以及私有文件
-        for (int id = 0; id < dataWriteChannels.length + 50; id++) {
+        for (int id = 0; id < dataWriteChannels.length; id++) {
             ByteBuffer readBuffer = ByteBuffer.allocate(DATA_INFORMATION_LENGTH);
+            FileChannel channel = dataWriteChannels[id];
             byte topicId;
             short queueId;
             short dataLen = 0;
             int offset;
             try {
-                File file = new File(DISC_ROOT, "data-" + id);
-                FileChannel channel = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
-
                 ConcurrentHashMap<Short, QueueInfo> topicInfo;
                 QueueInfo queueInfo;
                 long dataFilesize = channel.size();
@@ -440,7 +438,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         readTimeCostCount = new TimeCostCountData("read");
                     }
                     log.info("第一阶段结束 cost: {}", System.currentTimeMillis() - constructFinishTime);
-                    System.exit(-1);
+//                    System.exit(-1);
                 }
             }
         }
