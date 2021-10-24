@@ -96,7 +96,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
 
             metaInfo = new ConcurrentHashMap<>(100);
-            for (int i = 0; i < groupCount; i++) {
+            for (int i = 0; i < dataWriteChannels.length; i++) {
                 File file = new File(DISC_ROOT, "data-" + i);
                 File parentFile = file.getParentFile();
                 if (!parentFile.exists()) {
