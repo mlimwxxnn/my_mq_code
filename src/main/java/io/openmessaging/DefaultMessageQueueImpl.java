@@ -284,14 +284,15 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         ramDataWriter.pushWrappedData(wrappedData);
 //        pmemDataWriter.pushWrappedData(wrappedData);
 
-        if (! cyclicBarriers[groupId].isBroken()){
-            appendSsdByGroup(groupId, topicId, queueId, offset, queueInfo, data);
-        }else {
-            // 单条写入
-            appendSsdBySelf(topicId, queueId, offset, queueInfo, data);
-        }
         try {
-            wrappedData.getMeta().getCountDownLatch().await();
+            if (! cyclicBarriers[groupId].isBroken()){
+                appendSsdByGroup(groupId, topicId, queueId, offset, queueInfo, data);
+                wrappedData.getMeta().getCountDownLatch().await();
+            }else {
+                // 单条写入
+                wrappedData.getMeta().getCountDownLatch().await();
+                appendSsdBySelf(topicId, queueId, offset, queueInfo, data);
+            }
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
