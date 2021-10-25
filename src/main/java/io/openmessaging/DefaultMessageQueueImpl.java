@@ -311,9 +311,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
             while ((groupWaitThreadCountAndBufferWritePos[groupId].get() >>> 24) + 1 > awaitThreadCountLimits[groupId]){
                 // 单次自旋时间
-                unsafe.park(false, 1000);
+                unsafe.park(false, 20 * 1000);
             }
-
             currentBufferPos = groupWaitThreadCountAndBufferWritePos[groupId].getAndAdd((1 << 24) + 9 + data.remaining());
             waitThreadCount = (currentBufferPos >>> 24) + 1;
         }
