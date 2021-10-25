@@ -34,7 +34,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
 
-
     public static final ThreadLocal<ThreadWorkContent> threadWorkContentMap = new ThreadLocal<>();
     public static final AtomicInteger totalThreadCount = new AtomicInteger();
     public static final int groupCount = 4;
@@ -323,7 +322,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 dataWriteChannels[groupId].force(true);
                 groupWaitThreadCountAndBufferWritePos[groupId].set(0);
             }
-            cyclicBarriers[groupId].await(3, TimeUnit.SECONDS);
+            cyclicBarriers[groupId].await(5, TimeUnit.SECONDS);
         } catch ( IOException | InterruptedException e) {
             e.printStackTrace();
         } catch (BrokenBarrierException e){
@@ -335,8 +334,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 synchronized (groupBuffers[groupId]){
                     int waitThreadCountAndBufferWritePos;
                     if ((waitThreadCountAndBufferWritePos = groupWaitThreadCountAndBufferWritePos[groupId].get()) != 0){
-                        cyclicBarriers[groupId] = new CyclicBarrier(waitThreadCountAndBufferWritePos >>> 24);
-                        awaitThreadCountLimits[groupId] = waitThreadCountAndBufferWritePos >>> 24;
+//                        cyclicBarriers[groupId] = new CyclicBarrier(waitThreadCountAndBufferWritePos >>> 24);
+//                        awaitThreadCountLimits[groupId] = waitThreadCountAndBufferWritePos >>> 24;
                         groupBuffers[groupId].position(0);
                         groupBuffers[groupId].limit(waitThreadCountAndBufferWritePos & 0xffffff);
                         try {
