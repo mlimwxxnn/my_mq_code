@@ -34,7 +34,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File PMEM_ROOT;
 
     public static final ThreadLocal<Integer> groupIdMap = new ThreadLocal<>();
-    public static final ThreadLocal<ThreadPrivateWorkContent> threadPrivateMap = new ThreadLocal<>();
+    public static final ThreadLocal<ThreadWorkContent> threadPrivateMap = new ThreadLocal<>();
+    public static final ThreadLocal<ThreadWorkContent> threadWorkContentMap = new ThreadLocal<>();
     public static final AtomicInteger totalThreadCount = new AtomicInteger();
     public static final int groupCount = 4;
     public static final ByteBuffer[] groupBuffers = new ByteBuffer[groupCount];
@@ -248,12 +249,33 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }
     }
 
-    private int getGroupId(){
-        Integer groupId = groupIdMap.get();
-        if (groupId == null){
+//    private int getGroupId(){
+//        Integer groupId = groupIdMap.get();
+//        if (groupId == null){
+//            int threadId = totalThreadCount.getAndIncrement();
+//            groupId = threadId % groupCount;
+//            groupIdMap.set(groupId);
+//            // 线程私有的channel，用来写单条数据到ssd
+//            try {
+//                int fileId = threadId + groupCount;
+//                File file = new File(DISC_ROOT, "data-" + fileId);
+//                if (!file.exists()) {
+//                    file.createNewFile();
+//                }
+//                FileChannel channel = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
+//                threadPrivateMap.set(new ThreadWorkContent(channel, fileId));
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
+//        }
+//        return groupId;
+//    }
+
+    private ThreadWorkContent getWorkContent(){
+        ThreadWorkContent threadWorkContent = threadWorkContentMap.get();
+        if (threadWorkContent == null){
             int threadId = totalThreadCount.getAndIncrement();
-            groupId = threadId % groupCount;
-            groupIdMap.set(groupId);
+            int groupId = threadId % groupCount;
             // 线程私有的channel，用来写单条数据到ssd
             try {
                 int fileId = threadId + groupCount;
@@ -262,19 +284,21 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     file.createNewFile();
                 }
                 FileChannel channel = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
-                threadPrivateMap.set(new ThreadPrivateWorkContent(channel, fileId));
+                threadPrivateMap.set(new ThreadWorkContent(channel, fileId, groupId));
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
-        return groupId;
+        return threadWorkContent;
     }
 
 
     @SuppressWarnings("ConstantConditions")
     @Override
     public long append(String topic, int queueId, ByteBuffer data) {
-        int groupId = getGroupId();
+
+        ThreadWorkContent workContent = getWorkContent();
+        int groupId = workContent.groupId;
         Byte topicId = getTopicId(topic, true);
         ConcurrentHashMap<Short, QueueInfo> topicInfo = metaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
         QueueInfo queueInfo = topicInfo.computeIfAbsent((short) queueId, k -> new QueueInfo());
@@ -291,31 +315,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }else {
                 // 单条写入
                 wrappedData.getMeta().getCountDownLatch().await();
-                appendSsdBySelf(topicId, queueId, offset, queueInfo, data);
+                appendSsdBySelf(workContent, topicId, queueId, offset, queueInfo, data);
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
         return offset;
-
-//        haveAppended = true;
-//        Byte topicId = getTopicId(topic, true);
-//
-//        ConcurrentHashMap<Short, QueueInfo> topicInfo = metaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
-//        QueueInfo queueInfo = topicInfo.computeIfAbsent((short) queueId, k -> new QueueInfo());
-//        int offset = queueInfo.size();
-//
-//        WrappedData wrappedData = new WrappedData(topicId, (short) queueId, data, offset, queueInfo);
-//        ssdDataWriter.pushWrappedData(wrappedData);
-//        ramDataWriter.pushWrappedData(wrappedData);
-////        pmemDataWriter.pushWrappedData(wrappedData);
-//
-//        try {
-//            wrappedData.getMeta().getCountDownLatch().await();
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
-//        return offset;
     }
 
     // 聚合写入
@@ -340,7 +345,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 dataWriteChannels[groupId].write(groupBuffers[groupId]);
                 dataWriteChannels[groupId].force(true);
             }
-            cyclicBarriers[groupId].await(5, TimeUnit.SECONDS);
+            cyclicBarriers[groupId].await(2, TimeUnit.SECONDS);
         } catch (BrokenBarrierException | IOException | InterruptedException e) {
             e.printStackTrace();
             System.exit(-1);
@@ -350,6 +355,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             if (groupBufferWritePos[groupId].get() != 0){
                 synchronized (groupBuffers[groupId]){
                     if (groupBufferWritePos[groupId].get() != 0){
+                        cyclicBarriers[groupId] = new CyclicBarrier(groupAwaitThreadCount[groupId].get());
+                        groupAwaitThreadCount[groupId].set(0);
                         groupBuffers[groupId].position(0);
                         groupBuffers[groupId].limit(groupBufferWritePos[groupId].get());
                         groupBufferWritePos[groupId].set(0);
@@ -366,8 +373,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
     // 单条写入
-    public void appendSsdBySelf(byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data) {
-        ThreadPrivateWorkContent workContent = threadPrivateMap.get();
+    public void appendSsdBySelf(ThreadWorkContent workContent, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data) {
         FileChannel channel = workContent.channel;
         ByteBuffer buffer = workContent.buffer;
 
