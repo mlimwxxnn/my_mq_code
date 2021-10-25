@@ -308,7 +308,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         // 重分组后，若超过等待线程数限制，则自旋
         while (waitThreadCount > awaitThreadCountLimits[groupId]){
             try {
-                Thread.sleep(1);
+                while ((groupWaitThreadCountAndBufferWritePos[groupId].get() >>> 24) + 1 > awaitThreadCountLimits[groupId]){
+                    Thread.sleep(0);
+                }
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
