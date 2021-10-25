@@ -73,9 +73,7 @@ public class PmemDataWriter {
                     ByteBuffer buf;
                     QueueInfo queueInfo;
                     MetaData meta;
-                    byte[] data;
                     short dataLen;
-                    Long address;
                     PmemInfo pmemInfo;
                     while (true) {
                         wrappedData = pmemWrappedDataQueue.take();
@@ -84,7 +82,7 @@ public class PmemDataWriter {
                         queueInfo = meta.getQueueInfo();
                         dataLen = meta.getDataLen();
                         if ((pmemInfo = getFreePmemInfo(dataLen)) != null) {
-                            long writeStart = System.nanoTime(); // @
+//                            long writeStart = System.nanoTime(); // @
 
                             buf = wrappedData.getData();
                             int position = buf.position();
@@ -92,11 +90,11 @@ public class PmemDataWriter {
                             buf.position(position);
                             queueInfo.setDataPosInPmem(meta.getOffset(), pmemInfo);
 
-                            // 统计信息
-                            long writeStop = System.nanoTime();  // @
-                            if (GET_WRITE_TIME_COST_INFO){  // @
-                                writeTimeCostCount.addPmemTimeCost(writeStop - writeStart);  // @
-                            }  // @
+//                            // 统计信息
+//                            long writeStop = System.nanoTime();  // @
+//                            if (GET_WRITE_TIME_COST_INFO){  // @
+//                                writeTimeCostCount.addPmemTimeCost(writeStop - writeStart);  // @
+//                            }  // @
                         }
                         meta.getCountDownLatch().countDown();
                     }

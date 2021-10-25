@@ -78,7 +78,7 @@ public class SsdDataWriter {
                     List<MetaData> metaList;
                     while (true) {
                         mergedData = mergedDataQueue.take();
-                        long writeStart = System.nanoTime();
+//                        long writeStart = System.nanoTime();
 
                         mergedBuffer = mergedData.getMergedBuffer();
                         metaList = mergedData.getMetaList();
@@ -96,10 +96,10 @@ public class SsdDataWriter {
                         });
 
                         // 统计信息
-                        long writeStop = System.nanoTime();
-                        if (GET_WRITE_TIME_COST_INFO){
-                            writeTimeCostCount.addSsdTimeCost(writeStop - writeStart, metaList.size());
-                        }
+//                        long writeStop = System.nanoTime();
+//                        if (GET_WRITE_TIME_COST_INFO){
+//                            writeTimeCostCount.addSsdTimeCost(writeStop - writeStart, metaList.size());
+//                        }
                         freeMergedDataQueue.offer(mergedData);
                     }
                 } catch (Exception e) {

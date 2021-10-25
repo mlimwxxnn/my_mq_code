@@ -38,10 +38,6 @@ public class RamDataWriter {
         log.info("RamDataWriter初始化完成");
     }
 
-    public static int getIndexByDataLength(short dataLen){
-        return (dataLen + 1023) / 1024 - 1;
-    }
-
     public void pushWrappedData(WrappedData wrappedData){
         ramWrappedDataQueue.offer(wrappedData);
     }
@@ -81,9 +77,8 @@ public class RamDataWriter {
 
                         queueInfo = meta.getQueueInfo();
                         dataLen = meta.getDataLen();
-                        int i = getIndexByDataLength(dataLen);
                         if (!queueInfo.ramIsFull() && (ramInfo = getFreeRamInfo(dataLen)) != null) {
-                            long writeStart = System.nanoTime(); // @
+//                            long writeStart = System.nanoTime(); // @
 
                             buf = wrappedData.getData();
                             data = buf.array();
@@ -91,11 +86,11 @@ public class RamDataWriter {
                             queueInfo.setDataPosInRam(meta.getOffset(), ramInfo);
                             meta.getCountDownLatch().countDown();
 
-                            // 统计信息
-                            long writeStop = System.nanoTime();  // @
-                            if (GET_WRITE_TIME_COST_INFO){  // @
-                                writeTimeCostCount.addRamTimeCost(writeStop - writeStart);  // @
-                            }  // @
+//                            // 统计信息
+//                            long writeStop = System.nanoTime();  // @
+//                            if (GET_WRITE_TIME_COST_INFO){  // @
+//                                writeTimeCostCount.addRamTimeCost(writeStop - writeStart);  // @
+//                            }  // @
                         }else {
                             pmemDataWriter.pushWrappedData(wrappedData);
                         }

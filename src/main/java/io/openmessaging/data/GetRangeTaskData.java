@@ -90,23 +90,23 @@ public class GetRangeTaskData {
                 buf.clear();
                 buf.limit(dataLen);
                 if(queueInfo.isInRam(currentOffset)){
-                    long queryStart = System.nanoTime(); // @
+//                    long queryStart = System.nanoTime(); // @
 
                     RamInfo ramInfo = queueInfo.getDataPosInRam();
                     unsafe.copyMemory(ramInfo.ramObj, ramInfo.offset, null, ((DirectBuffer) buf).address(), dataLen); //direct
                     freeRamQueues[ramInfo.levelIndex].offer(ramInfo);
 
-                    // 统计信息
-                    long queryStop = System.nanoTime();// @
-                    if (GET_READ_TIME_COST_INFO){// @
-                        readTimeCostCount.addRamTimeCost(queryStop - queryStart);// @
-                    }// @
-                    if (GET_CACHE_HIT_INFO){// @
-                        hitCountData.increaseRamHitCount();// @
-                    }// @
+//                    // 统计信息
+//                    long queryStop = System.nanoTime();// @
+//                    if (GET_READ_TIME_COST_INFO){// @
+//                        readTimeCostCount.addRamTimeCost(queryStop - queryStart);// @
+//                    }// @
+//                    if (GET_CACHE_HIT_INFO){// @
+//                        hitCountData.increaseRamHitCount();// @
+//                    }// @
                 }else
                 if (queueInfo.isInPmem(currentOffset)) {
-                    long queryStart = System.nanoTime();
+//                    long queryStart = System.nanoTime();
 
                     PmemInfo pmemInfo = queueInfo.getDataPosInPmem(currentOffset);
                     int pmemChannelIndex = pmemInfo.rLevelIndex;
@@ -114,24 +114,24 @@ public class GetRangeTaskData {
                     freePmemQueues[pmemInfo.rLevelIndex].offer(pmemInfo); // 回收
                     buf.flip();
 
-                    // 统计信息
-                    long queryStop = System.nanoTime();// @
-                    if (GET_READ_TIME_COST_INFO) {// @
-                        readTimeCostCount.addPmemTimeCost(queryStop - queryStart);// @
-                    }// @
-                    if (GET_CACHE_HIT_INFO && hitCountData != null) {// @
-                        hitCountData.increasePmemHitCount();// @
-                    }// @
+//                    // 统计信息
+//                    long queryStop = System.nanoTime();// @
+//                    if (GET_READ_TIME_COST_INFO) {// @
+//                        readTimeCostCount.addPmemTimeCost(queryStop - queryStart);// @
+//                    }// @
+//                    if (GET_CACHE_HIT_INFO && hitCountData != null) {// @
+//                        hitCountData.increasePmemHitCount();// @
+//                    }// @
                 } else {
-                    long queryStart = System.nanoTime(); // @
+//                    long queryStart = System.nanoTime(); // @
                     int id = (int) (p[1] >> 32);
                     DefaultMessageQueueImpl.dataWriteChannels[id].read(buf, p[0]);
                     buf.flip();
                     // 统计信息
-                    long queryStop = System.nanoTime(); // @
-                    if (GET_READ_TIME_COST_INFO) { // @
-                        readTimeCostCount.addSsdTimeCost(queryStop - queryStart); // @
-                    } // @
+//                    long queryStop = System.nanoTime(); // @
+//                    if (GET_READ_TIME_COST_INFO) { // @
+//                        readTimeCostCount.addSsdTimeCost(queryStop - queryStart); // @
+//                    } // @
                 }
                 result.put(i, buf);
             }

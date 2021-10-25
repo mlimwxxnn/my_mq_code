@@ -25,9 +25,9 @@ import static io.openmessaging.util.UnsafeUtil.unsafe;
 @SuppressWarnings("ResultOfMethodCallIgnored")
 public class DefaultMessageQueueImpl extends MessageQueue {
 
-    public static final boolean GET_CACHE_HIT_INFO = false;
-    public static final boolean GET_WRITE_TIME_COST_INFO = false;
-    public static final boolean GET_READ_TIME_COST_INFO = false;
+//    public static final boolean GET_CACHE_HIT_INFO = false;
+//    public static final boolean GET_WRITE_TIME_COST_INFO = false;
+//    public static final boolean GET_READ_TIME_COST_INFO = false;
     public static final Logger log = LoggerFactory.getLogger("myLogger");
     public static final long GB = 1024L * 1024L * 1024L;
     public static final long MB = 1024L * 1024L;
@@ -60,8 +60,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int MAX_TRY_TIMES_WHILE_ALLOCATE_SPACE = 5;
     public static final long PMEM_CACHE_SIZE = 60 * GB;
 //     public static final long PMEM_HEAP_SIZE = 20 * MB;
-    public static long roughWrittenDataSize = 0;
-    public static final int RELOAD_BUFFER_SIZE = (int) (8 * MB);
 
 
     public static AtomicInteger topicCount = new AtomicInteger();
@@ -80,12 +78,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static CacheHitCountData hitCountData;
     public static TimeCostCountData writeTimeCostCount;
     public static TimeCostCountData readTimeCostCount;
-    private static long constructFinishTime;
 
     public static void init() {
-        Runtime.getRuntime().addShutdownHook(new Thread( () -> {
-            log.info("mq exit.");
-        }));
+//        Runtime.getRuntime().addShutdownHook(new Thread( () -> {
+//            log.info("mq exit.");
+//        }));
         try {
             for (int i = 0; i < groupCount * 2; i++) {
                 ByteBuffer byteBuffer = ByteBuffer.allocateDirect(10 * 18 * 1024);
@@ -121,40 +118,30 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //            ssdDataWriter = new SsdDataWriter();
             pmemDataWriter = new PmemDataWriter();
             ramDataWriter = new RamDataWriter();
-            new Thread(() -> {
-                try {
-                    while (roughWrittenDataSize < 75 * GB){
-                        Thread.sleep(10 * 1000);
-                        roughWrittenDataSize = getTotalFileSizeByPosition();
-                    }
-                }catch (Exception e){
-                    e.printStackTrace();
-                }
-            }).start();
 
             // 以下为debug或者打印日志信息初始化的区域
             //***********************************************************************
-            if(GET_WRITE_TIME_COST_INFO){// @
-                writeTimeCostCount = new TimeCostCountData("write");// @
-            }// @
-            if (GET_CACHE_HIT_INFO){// @
-                hitCountData = new CacheHitCountData();// @
-                new Thread(() -> {// @
-                    try {// @
-                        // 有查询后再打印// @
-                        while (roughWrittenDataSize < 75 * GB){// @
-                            Thread.sleep(10 * 1000);// @
-                        }// @
-                        while (true){// @
-                            // 每10s打印一次// @
-                            Thread.sleep(10 * 1000);// @
-                            log.info(hitCountData.getHitCountInfo());// @
-                        }// @
-                    }catch (InterruptedException e) {// @
-                        e.printStackTrace();// @
-                    }// @
-                }).start();// @
-            }// @
+//            if(GET_WRITE_TIME_COST_INFO){// @
+//                writeTimeCostCount = new TimeCostCountData("write");// @
+//            }// @
+//            if (GET_CACHE_HIT_INFO){// @
+//                hitCountData = new CacheHitCountData();// @
+//                new Thread(() -> {// @
+//                    try {// @
+//                        // 有查询后再打印// @
+//                        while (roughWrittenDataSize < 75 * GB){// @
+//                            Thread.sleep(10 * 1000);// @
+//                        }// @
+//                        while (true){// @
+//                            // 每10s打印一次// @
+//                            Thread.sleep(10 * 1000);// @
+//                            log.info(hitCountData.getHitCountInfo());// @
+//                        }// @
+//                    }catch (InterruptedException e) {// @
+//                        e.printStackTrace();// @
+//                    }// @
+//                }).start();// @
+//            }// @
         }catch(IOException e){
             e.printStackTrace();
         }
@@ -214,8 +201,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         powerFailureRecovery(metaInfo);
         initThreadCount = Thread.activeCount();
         log.info("DefaultMessageQueueImpl 构造函数执行完成");
-        killSelf(KILL_SELF_TIMEOUT);
-        constructFinishTime = System.currentTimeMillis();
+//        killSelf(KILL_SELF_TIMEOUT);
     }
 
     public void powerFailureRecovery(ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo) {
@@ -306,16 +292,17 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public void appendSsdByGroup(int groupId, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data) {
         int currentBufferPos = groupWaitThreadCountAndBufferWritePos[groupId].getAndAdd((1 << 24) + 9 + data.remaining());
         int waitThreadCount = (currentBufferPos >>> 24) + 1;
-        // 重分组后，若超过等待线程数限制，则自旋
-        while (waitThreadCount > awaitThreadCountLimits[groupId]){
 
-            while ((groupWaitThreadCountAndBufferWritePos[groupId].get() >>> 24) + 1 > awaitThreadCountLimits[groupId]){
-                // 单次自旋时间
-                unsafe.park(false, 20 * 1000);
-            }
-            currentBufferPos = groupWaitThreadCountAndBufferWritePos[groupId].getAndAdd((1 << 24) + 9 + data.remaining());
-            waitThreadCount = (currentBufferPos >>> 24) + 1;
-        }
+//        // 重分组后，若超过等待线程数限制，则自旋
+//        while (waitThreadCount > awaitThreadCountLimits[groupId]){
+//
+//            while ((groupWaitThreadCountAndBufferWritePos[groupId].get() >>> 24) + 1 > awaitThreadCountLimits[groupId]){
+//                // 单次自旋时间
+//                unsafe.park(false, 20 * 1000);
+//            }
+//            currentBufferPos = groupWaitThreadCountAndBufferWritePos[groupId].getAndAdd((1 << 24) + 9 + data.remaining());
+//            waitThreadCount = (currentBufferPos >>> 24) + 1;
+//        }
 
         currentBufferPos &= 0xffffff;
         long currentBufferAddress = groupBufferBasePos[groupId] + currentBufferPos;
@@ -430,36 +417,37 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     @Override
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
 
-        if (isFirstStageGoingOn) {
-            synchronized (this) {
-                if(isFirstStageGoingOn){
-                    isFirstStageGoingOn = false;
-                    if (GET_READ_TIME_COST_INFO){
-                        readTimeCostCount = new TimeCostCountData("read");
-                    }
-                    log.info("第一阶段结束 cost: {}", System.currentTimeMillis() - constructFinishTime);
-//                    System.exit(-1);
-                }
-            }
-        }
+//        if (isFirstStageGoingOn) {
+//            synchronized (this) {
+//                if(isFirstStageGoingOn){
+//                    isFirstStageGoingOn = false;
+////                    if (GET_READ_TIME_COST_INFO){
+////                        readTimeCostCount = new TimeCostCountData("read");
+////                    }
+//                    log.info("第一阶段结束 cost: {}", System.currentTimeMillis() - constructFinishTime);
+////                    System.exit(-1);
+//                }
+//            }
+//        }
+
 
 //        if(!haveAppended){
 //            System.exit(-1);
 //        }
 
         GetRangeTaskData task = getTask(Thread.currentThread());
-        if (task.isThreadFirstGetRange){
-            // 重新分组
-            ThreadWorkContent workContent = getWorkContent();
-            workContent.groupId += groupCount;
-            task.isThreadFirstGetRange = false;
-        }
+//        if (task.isThreadFirstGetRange){
+//            // 重新分组
+//            ThreadWorkContent workContent = getWorkContent();
+//            workContent.groupId += groupCount;
+//            task.isThreadFirstGetRange = false;
+//        }
 
         task.setGetRangeParameter(topic, queueId, offset, fetchNum);
         task.queryData();
-        if (GET_CACHE_HIT_INFO && hitCountData != null){
-            hitCountData.addTotalQueryCount(task.getResult().size());
-        }
+//        if (GET_CACHE_HIT_INFO && hitCountData != null){
+//            hitCountData.addTotalQueryCount(task.getResult().size());
+//        }
         return task.getResult();
     }
 
@@ -475,7 +463,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 }
             }
         }
-        final int threadCount = 38;
+        final int threadCount = 40;
         final int topicCountPerThread = 3;  // threadCount * topicCountPerThread <= 100
         final int queueIdCountPerTopic = 5;
         final int writeTimesPerQueueId = 3;
