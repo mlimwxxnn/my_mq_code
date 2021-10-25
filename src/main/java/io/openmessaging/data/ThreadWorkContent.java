@@ -10,11 +10,13 @@ public class ThreadWorkContent {
     public ByteBuffer buffer;
     public long fileId;
     public int groupId;
+    public WrappedData wrappedData;
 
     public ThreadWorkContent(FileChannel channel, int fileId, int groupId) {
         this.channel = channel;
         this.buffer = ByteBuffer.allocateDirect(17 * 1024 + 9);
         this.fileId = fileId;
         this.groupId = groupId;
+        this.wrappedData = new WrappedData();
     }
 }

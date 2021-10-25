@@ -7,12 +7,10 @@ import java.nio.ByteBuffer;
 public class WrappedData {
     private final MetaData meta;
 
-    private final ByteBuffer data;
+    private  ByteBuffer data;
 
-    public WrappedData(byte topicId, short queueId, ByteBuffer data, int offset, QueueInfo queueInfo) {
-        this.meta = new MetaData(topicId, queueId, (short)data.remaining(), offset, queueInfo);
-        this.data = data;
-
+    public WrappedData() {
+        this.meta = new MetaData();
     }
 
     public MetaData getMeta() {
@@ -21,5 +19,10 @@ public class WrappedData {
 
     public ByteBuffer getData() {
         return data;
+    }
+
+    public void setWrapInfo(byte topicId, short queueId, ByteBuffer data, int offset, QueueInfo queueInfo){
+        this.meta.setMetaInfo(topicId, queueId, (short)data.remaining(), offset, queueInfo);
+        this.data = data;
     }
 }

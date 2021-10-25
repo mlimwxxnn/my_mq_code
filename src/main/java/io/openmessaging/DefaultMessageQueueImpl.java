@@ -272,12 +272,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         ThreadWorkContent workContent = getWorkContent();
         int groupId = workContent.groupId;
+        WrappedData wrappedData = workContent.wrappedData;
         Byte topicId = getTopicId(topic, true);
         ConcurrentHashMap<Short, QueueInfo> topicInfo = metaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
         QueueInfo queueInfo = topicInfo.computeIfAbsent((short) queueId, k -> new QueueInfo());
         int offset = queueInfo.size();
 
-        WrappedData wrappedData = new WrappedData(topicId, (short) queueId, data, offset, queueInfo);
+        wrappedData.setWrapInfo(topicId, (short) queueId, data, offset, queueInfo);
         ramDataWriter.pushWrappedData(wrappedData);
 //        pmemDataWriter.pushWrappedData(wrappedData);
 

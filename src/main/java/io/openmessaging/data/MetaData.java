@@ -5,20 +5,25 @@ import io.openmessaging.info.QueueInfo;
 import java.util.concurrent.CountDownLatch;
 
 public class MetaData {
-    private final byte topicId;
-    private final short queueId;
-    private final int offset;
+    private  byte topicId;
+    private  short queueId;
+    private  int offset;
     private long offsetInMergedBuffer;
-    private final short dataLen;
-    private final QueueInfo queueInfo;
-    private final CountDownLatch countDownLatch = new CountDownLatch(1);
+    private  short dataLen;
+    private  QueueInfo queueInfo;
+    private  CountDownLatch countDownLatch;
 
-    public MetaData(byte topicId, short queueId, short dataLen, int offset, QueueInfo queueInfo) {
+    public MetaData() {
+
+    }
+
+    public void setMetaInfo(byte topicId, short queueId, short dataLen, int offset, QueueInfo queueInfo){
         this.topicId = topicId;
         this.queueId = queueId;
         this.dataLen = dataLen;
         this.offset = offset;
         this.queueInfo = queueInfo;
+        this.countDownLatch = new CountDownLatch(1);
     }
 
     public byte getTopicId() {
