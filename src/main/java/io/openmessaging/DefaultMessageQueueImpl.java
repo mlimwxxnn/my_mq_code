@@ -285,7 +285,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 }
                 FileChannel channel = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
                 threadWorkContent = new ThreadWorkContent(channel, fileId, groupId);
-                threadPrivateMap.set(threadWorkContent);
+                threadWorkContentMap.set(threadWorkContent);
             } catch (IOException e) {
                 e.printStackTrace();
             }
