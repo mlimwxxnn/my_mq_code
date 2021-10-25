@@ -331,7 +331,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         // 放入数据本体
         unsafe.copyMemory(data.array(), 16 + data.position(), null, currentBufferAddress + 9, dataLen);
         try {
-            queueInfo.setDataPosInFile(offset, dataWriteChannels[groupId].position() + currentBufferPos, (((long) groupId) << 32) | dataLen);
+            queueInfo.setDataPosInFile(offset, dataWriteChannels[groupId].position() + currentBufferPos + 9, (((long) groupId) << 32) | dataLen);
             if(groupAwaitThreadCount[groupId].incrementAndGet() == 10){
                 groupAwaitThreadCount[groupId].set(0);
                 groupBuffers[groupId].position(0);
@@ -381,7 +381,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         // 放入数据本体
         unsafe.copyMemory(data.array(), 16 + data.position(), null, currentBufferAddress + 9, dataLen);
         try {
-            queueInfo.setDataPosInFile(offset, channel.position(), (workContent.fileId << 32) | dataLen);
+            queueInfo.setDataPosInFile(offset, channel.position() + 9, (workContent.fileId << 32) | dataLen);
             buffer.position(0);
             buffer.limit(dataLen + 9);
             channel.write(buffer);
