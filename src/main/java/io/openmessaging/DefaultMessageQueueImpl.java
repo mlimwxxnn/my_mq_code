@@ -54,7 +54,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int PMEM_WRITE_THREAD_COUNT = 8;
     public static final int RAM_WRITE_THREAD_COUNT = 8;
     public static final long DIRECT_CACHE_SIZE = /*direct*/2000/*direct*/ * MB;
-    public static final long HEAP_CACHE_SIZE = /*heap*/1950/*heap*/ * MB;
+    public static final long HEAP_CACHE_SIZE = /*heap*/2048/*heap*/ * MB;
     public static final int RAM_SPACE_LEVEL_GAP = /*gap*/200/*gap*/; // B
     public static final int spaceLevelCount = (17 * 1024 + RAM_SPACE_LEVEL_GAP - 1) / RAM_SPACE_LEVEL_GAP;
     public static final int MAX_TRY_TIMES_WHILE_ALLOCATE_SPACE = 5;
