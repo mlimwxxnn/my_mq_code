@@ -80,9 +80,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static TimeCostCountData readTimeCostCount;
 
     public static void init() {
-//        Runtime.getRuntime().addShutdownHook(new Thread( () -> {
-//            log.info("mq exit.");
-//        }));
+        Runtime.getRuntime().addShutdownHook(new Thread( () -> {
+            System.out.printf("写入文件大小%d", getTotalFileSizeByPosition());
+            log.info("mq exit.");
+        }));
         try {
             for (int i = 0; i < groupCount * 2; i++) {
                 ByteBuffer byteBuffer = ByteBuffer.allocateDirect(10 * 18 * 1024);
