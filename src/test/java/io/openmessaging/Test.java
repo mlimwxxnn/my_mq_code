@@ -7,34 +7,18 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.concurrent.*;
 
+import static io.openmessaging.util.UnsafeUtil.unsafe;
+
 public class Test {
     public static void main(String[] args) throws IOException, InterruptedException {
-        // offer
-        // poll take poll(timeout )
+        User user = new User();
+        for (long i = 0; i < 20; i++) {
+            System.out.println(Byte.toString(unsafe.getByte(user, i)));
+        }
 
-        CyclicBarrier cyclicBarrier = new CyclicBarrier(3);
-        new Thread(()->{
-            try {
-                cyclicBarrier.await(100, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                System.out.println("0 i");
-            } catch (BrokenBarrierException e) {
-                System.out.println("0 b");
-            } catch (TimeoutException e) {
-                System.out.println("0 t");
-            }
-        }).start();
-        new Thread(()->{
-            try {
-                cyclicBarrier.await(1, TimeUnit.MILLISECONDS);
-
-            } catch (InterruptedException e) {
-                System.out.println("1， i");
-            } catch (BrokenBarrierException e) {
-                System.out.println("1 b");
-            } catch (TimeoutException e) {
-                System.out.println("1 t");
-            }
-        }).start();
     }
+}
+class User{
+    String name;
+    int id;
 }
