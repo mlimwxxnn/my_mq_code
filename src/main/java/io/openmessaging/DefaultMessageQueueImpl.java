@@ -328,7 +328,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         unsafe.copyMemory(data.array(), 16 + data.position(), null, currentBufferAddress + 9, dataLen);
         try {
             queueInfo.setDataPosInFile(offset, dataWriteChannels[groupId].position() + currentBufferPos + 9, (((long) groupId) << 32) | dataLen);
-            if(waitThreadCount == 10){
+            if(waitThreadCount == awaitThreadCountLimits[groupId]){
                 groupBuffers[groupId].position(0);
                 groupBuffers[groupId].limit(currentBufferPos + 9 + data.remaining());
                 dataWriteChannels[groupId].write(groupBuffers[groupId]);
@@ -346,6 +346,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     int waitThreadCountAndBufferWritePos;
                     if ((waitThreadCountAndBufferWritePos = groupWaitThreadCountAndBufferWritePos[groupId].get()) != 0){
                         cyclicBarriers[groupId] = new CyclicBarrier(waitThreadCountAndBufferWritePos >>> 24);
+                        awaitThreadCountLimits[groupId] = waitThreadCountAndBufferWritePos >>> 24;
                         groupBuffers[groupId].position(0);
                         groupBuffers[groupId].limit(waitThreadCountAndBufferWritePos & 0xffffff);
                         try {
@@ -471,7 +472,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 }
             }
         }
-        final int threadCount = 40;
+        final int threadCount = 38;
         final int topicCountPerThread = 3;  // threadCount * topicCountPerThread <= 100
         final int queueIdCountPerTopic = 5;
         final int writeTimesPerQueueId = 3;
