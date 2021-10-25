@@ -40,6 +40,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final ByteBuffer[] groupBuffers = new ByteBuffer[groupCount * 2];
     public static final CyclicBarrier[] cyclicBarriers = new CyclicBarrier[groupCount * 2];
     public static final long[] groupBufferBasePos = new long[groupCount * 2];
+    public static final int[] awaitThreadCountLimits = new int[groupCount * 2];
     public static final AtomicInteger[] groupWaitThreadCountAndBufferWritePos = new AtomicInteger[groupCount * 2];
 
 
@@ -92,9 +93,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 groupBufferBasePos[i] = ((DirectBuffer) byteBuffer).address();
                 if (i < groupCount){
                     cyclicBarriers[i] = new CyclicBarrier(10);
+                    awaitThreadCountLimits[i] = 10;
                 }else {
                     // 重分组的barrier设置
                     cyclicBarriers[i] = new CyclicBarrier(5);
+                    awaitThreadCountLimits[i] = 5;
                 }
             }
 
@@ -302,6 +305,16 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public void appendSsdByGroup(int groupId, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data) {
         int currentBufferPos = groupWaitThreadCountAndBufferWritePos[groupId].getAndAdd((1 << 24) + 9 + data.remaining());
         int waitThreadCount = (currentBufferPos >>> 24) + 1;
+        // 重分组后，若超过等待线程数限制，则自旋
+        while (waitThreadCount > awaitThreadCountLimits[groupId]){
+            try {
+                Thread.sleep(1);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            currentBufferPos = groupWaitThreadCountAndBufferWritePos[groupId].getAndAdd((1 << 24) + 9 + data.remaining());
+            waitThreadCount = (currentBufferPos >>> 24) + 1;
+        }
 
         currentBufferPos &= 0xffffff;
         long currentBufferAddress = groupBufferBasePos[groupId] + currentBufferPos;
@@ -316,13 +329,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         try {
             queueInfo.setDataPosInFile(offset, dataWriteChannels[groupId].position() + currentBufferPos + 9, (((long) groupId) << 32) | dataLen);
             if(waitThreadCount == 10){
-                groupWaitThreadCountAndBufferWritePos[groupId].set(0);
                 groupBuffers[groupId].position(0);
                 groupBuffers[groupId].limit(currentBufferPos + 9 + data.remaining());
                 dataWriteChannels[groupId].write(groupBuffers[groupId]);
                 dataWriteChannels[groupId].force(true);
+                groupWaitThreadCountAndBufferWritePos[groupId].set(0);
             }
-            cyclicBarriers[groupId].await(5, TimeUnit.SECONDS);
+            cyclicBarriers[groupId].await(3, TimeUnit.SECONDS);
         } catch (BrokenBarrierException | IOException | InterruptedException e) {
             e.printStackTrace();
         } catch (TimeoutException e) {
@@ -335,13 +348,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         cyclicBarriers[groupId] = new CyclicBarrier(waitThreadCountAndBufferWritePos >>> 24);
                         groupBuffers[groupId].position(0);
                         groupBuffers[groupId].limit(waitThreadCountAndBufferWritePos & 0xffffff);
-                        groupWaitThreadCountAndBufferWritePos[groupId].set(0);
                         try {
                             dataWriteChannels[groupId].write(groupBuffers[groupId]);
                             dataWriteChannels[groupId].force(true);
                         } catch (IOException ex) {
                             ex.printStackTrace();
                         }
+                        groupWaitThreadCountAndBufferWritePos[groupId].set(0);
                     }
                 }
             }
