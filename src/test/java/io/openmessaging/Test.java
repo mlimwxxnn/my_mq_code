@@ -12,40 +12,29 @@ public class Test {
         // offer
         // poll take poll(timeout )
 
-
-        int capacity = 15000000;
-        int threadCount = 50;
-        LinkedBlockingQueue<Integer> a = new LinkedBlockingQueue<>();
-        MyBlockingQueue<Integer> b = new MyBlockingQueue<>(capacity);
-        ArrayBlockingQueue<Integer> c = new ArrayBlockingQueue<>(capacity);
-        CountDownLatch countDownLatch = new CountDownLatch(2 * threadCount);
-        long start = System.currentTimeMillis();
-        BlockingQueue<Integer> use = c;
-        for (int i = 0; i < threadCount; i++) {
-            new Thread(()->{
-                for (int j = 0; j < capacity / threadCount; j++) {
-                    use.offer(j);
-                }
-                countDownLatch.countDown();
-            }).start();
-            new Thread(()->{
-                Integer take = 0;
-                for (int j = 0; j < capacity / threadCount; j++) {
-                    try {
-                        take = use.take();
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
-                System.out.println(take);
-                countDownLatch.countDown();
-            }).start();
-        }
-        countDownLatch.await();
-        b.offer(3);
-        long end = System.currentTimeMillis();
-        System.out.printf("时间：%d", end -start);
-
         CyclicBarrier cyclicBarrier = new CyclicBarrier(3);
+        new Thread(()->{
+            try {
+                cyclicBarrier.await(100, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                System.out.println("0 i");
+            } catch (BrokenBarrierException e) {
+                System.out.println("0 b");
+            } catch (TimeoutException e) {
+                System.out.println("0 t");
+            }
+        }).start();
+        new Thread(()->{
+            try {
+                cyclicBarrier.await(1, TimeUnit.MILLISECONDS);
+
+            } catch (InterruptedException e) {
+                System.out.println("1， i");
+            } catch (BrokenBarrierException e) {
+                System.out.println("1 b");
+            } catch (TimeoutException e) {
+                System.out.println("1 t");
+            }
+        }).start();
     }
 }

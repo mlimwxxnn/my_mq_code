@@ -53,9 +53,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int READ_THREAD_COUNT = 20;
     public static final int PMEM_WRITE_THREAD_COUNT = 8;
     public static final int RAM_WRITE_THREAD_COUNT = 8;
-    public static final long DIRECT_CACHE_SIZE = 1900 * MB;
-    public static final long HEAP_CACHE_SIZE = 2 * GB;
-    public static final int RAM_SPACE_LEVEL_GAP = 200; // B
+    public static final long DIRECT_CACHE_SIZE = /*direct*/1900/*direct*/ * MB;
+    public static final long HEAP_CACHE_SIZE = /*heap*/2048/*heap*/ * MB;
+    public static final int RAM_SPACE_LEVEL_GAP = /*gap*/200/*gap*/; // B
     public static final int spaceLevelCount = (17 * 1024 + RAM_SPACE_LEVEL_GAP - 1) / RAM_SPACE_LEVEL_GAP;
     public static final int MAX_TRY_TIMES_WHILE_ALLOCATE_SPACE = 5;
     public static final long PMEM_CACHE_SIZE = 60 * GB;
@@ -73,7 +73,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static int initThreadCount = 0;
     public static PmemDataWriter pmemDataWriter;
     public static RamDataWriter ramDataWriter;
-    public int test = /*a*/100/*a*/;
 
 
     public static CacheHitCountData hitCountData;
@@ -336,8 +335,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 synchronized (groupBuffers[groupId]){
                     int waitThreadCountAndBufferWritePos;
                     if ((waitThreadCountAndBufferWritePos = groupWaitThreadCountAndBufferWritePos[groupId].get()) != 0){
-                        cyclicBarriers[groupId] = new CyclicBarrier(waitThreadCountAndBufferWritePos >>> 24);
-                        awaitThreadCountLimits[groupId] = waitThreadCountAndBufferWritePos >>> 24;
+//                        cyclicBarriers[groupId] = new CyclicBarrier(waitThreadCountAndBufferWritePos >>> 24);
+//                        awaitThreadCountLimits[groupId] = waitThreadCountAndBufferWritePos >>> 24;
                         groupBuffers[groupId].position(0);
                         groupBuffers[groupId].limit(waitThreadCountAndBufferWritePos & 0xffffff);
                         try {
