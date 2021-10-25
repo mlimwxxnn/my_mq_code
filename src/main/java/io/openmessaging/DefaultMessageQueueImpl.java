@@ -52,8 +52,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int READ_THREAD_COUNT = 20;
     public static final int PMEM_WRITE_THREAD_COUNT = 8;
     public static final int RAM_WRITE_THREAD_COUNT = 8;
-    public static final long DIRECT_CACHE_SIZE = 190 * MB;
-    public static final long HEAP_CACHE_SIZE = 1 * GB;
+    public static final long DIRECT_CACHE_SIZE = 1900 * MB;
+    public static final long HEAP_CACHE_SIZE = 2 * GB;
     public static final int RAM_SPACE_LEVEL_GAP = 200; // B
     public static final int spaceLevelCount = (17 * 1024 + RAM_SPACE_LEVEL_GAP - 1) / RAM_SPACE_LEVEL_GAP;
     public static final int MAX_TRY_TIMES_WHILE_ALLOCATE_SPACE = 5;
@@ -229,9 +229,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             short queueId;
             short dataLen = 0;
             int offset;
-            if (id == 2){
-                System.out.println(id);
-            }
             try {
                 ConcurrentHashMap<Short, QueueInfo> topicInfo;
                 QueueInfo queueInfo;
