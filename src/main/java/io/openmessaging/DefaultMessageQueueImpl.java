@@ -299,7 +299,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     // 聚合写入
     public void appendSsdByGroup(int groupId, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data) {
-        int currentBufferPos = groupWaitThreadCountAndBufferWritePos[groupId].getAndAdd((1 << 24) + data.remaining());
+        int currentBufferPos = groupWaitThreadCountAndBufferWritePos[groupId].getAndAdd((1 << 24) + 9 + data.remaining());
         int waitThreadCount = (currentBufferPos >>> 24) + 1;
 
         currentBufferPos &= 0xffffff;
@@ -317,7 +317,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             if(waitThreadCount == 10){
                 groupWaitThreadCountAndBufferWritePos[groupId].set(0);
                 groupBuffers[groupId].position(0);
-                groupBuffers[groupId].limit(currentBufferPos);
+                groupBuffers[groupId].limit(currentBufferPos + 9 + data.remaining());
                 dataWriteChannels[groupId].write(groupBuffers[groupId]);
                 dataWriteChannels[groupId].force(true);
             }
