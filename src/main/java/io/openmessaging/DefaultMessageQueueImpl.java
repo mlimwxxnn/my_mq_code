@@ -80,7 +80,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static TimeCostCountData readTimeCostCount;
 
     public static void init() {
-//        Runtime.getRuntime().addShutdownHook(new Thread( () -> {
+//        Runtime.getRuntime().addShutdownHook(new Thread( () -> {//
 //            log.info("mq exit.");
 //        }));
         try {
