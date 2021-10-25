@@ -66,7 +66,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     static private final ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
     public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo;
     public static volatile Map<Thread, GetRangeTaskData> getRangeTaskMap = new ConcurrentHashMap<>();
-    public static final FileChannel[] dataWriteChannels = new FileChannel[groupCount * 2 + 50];
+    public static final FileChannel[] dataWriteChannels = new FileChannel[groupCount * 2 + 50];//
 
     public static SsdDataWriter ssdDataWriter;
     public static DataReader dataReader;
