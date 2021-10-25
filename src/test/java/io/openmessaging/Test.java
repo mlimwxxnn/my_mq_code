@@ -12,9 +12,10 @@ import static io.openmessaging.util.UnsafeUtil.unsafe;
 public class Test {
     public static void main(String[] args) throws IOException, InterruptedException {
         User user = new User();
-        for (long i = 0; i < 20; i++) {
-            System.out.println(Byte.toString(unsafe.getByte(user, i)));
+        for (long i = 0; i < 4; i+=8) {
+            System.out.printf("%s ", Long.toBinaryString(unsafe.getByte(user, i)));
         }
+
 
     }
 }
