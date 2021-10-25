@@ -96,8 +96,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     awaitThreadCountLimits[i] = 10;
                 }else {
                     // 重分组的barrier设置
-                    cyclicBarriers[i] = new CyclicBarrier(5);
-                    awaitThreadCountLimits[i] = 5;
+                    cyclicBarriers[i] = new CyclicBarrier(8);
+                    awaitThreadCountLimits[i] = 8;
                 }
             }
 
