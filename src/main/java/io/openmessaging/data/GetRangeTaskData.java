@@ -31,7 +31,7 @@ public class GetRangeTaskData {
     int fetchNum;
     private CountDownLatch countDownLatch;
     Unsafe unsafe = UnsafeUtil.unsafe;
-    public int threadId;
+    public boolean isThreadFirstGetRange = true;
 
     public GetRangeTaskData() {
         for (int i = 0; i < buffers.length; i++) {

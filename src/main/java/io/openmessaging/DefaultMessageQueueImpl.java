@@ -33,16 +33,15 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static File DISC_ROOT;
     public static File PMEM_ROOT;
 
-    public static final ThreadLocal<Integer> groupIdMap = new ThreadLocal<>();
-    public static final ThreadLocal<ThreadWorkContent> threadPrivateMap = new ThreadLocal<>();
+
     public static final ThreadLocal<ThreadWorkContent> threadWorkContentMap = new ThreadLocal<>();
     public static final AtomicInteger totalThreadCount = new AtomicInteger();
     public static final int groupCount = 4;
-    public static final ByteBuffer[] groupBuffers = new ByteBuffer[groupCount];
-    public static final CyclicBarrier[] cyclicBarriers = new CyclicBarrier[groupCount];
-    public static final AtomicInteger[] groupBufferWritePos = new AtomicInteger[groupCount];
-    public static final long[] groupBufferBasePos = new long[groupCount];
-    public static final AtomicInteger[] groupAwaitThreadCount = new AtomicInteger[groupCount];
+    public static final ByteBuffer[] groupBuffers = new ByteBuffer[groupCount * 2];
+    public static final CyclicBarrier[] cyclicBarriers = new CyclicBarrier[groupCount * 2];
+    public static final AtomicInteger[] groupBufferWritePos = new AtomicInteger[groupCount * 2];
+    public static final long[] groupBufferBasePos = new long[groupCount * 2];
+    public static final AtomicInteger[] groupAwaitThreadCount = new AtomicInteger[groupCount * 2];
 
 
     public static final int DATA_INFORMATION_LENGTH = 9;
@@ -68,7 +67,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     static private final ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
     public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo;
     public static volatile Map<Thread, GetRangeTaskData> getRangeTaskMap = new ConcurrentHashMap<>();
-    public static final FileChannel[] dataWriteChannels = new FileChannel[groupCount + 50];
+    public static final FileChannel[] dataWriteChannels = new FileChannel[groupCount * 2 + 50];
 
     public static SsdDataWriter ssdDataWriter;
     public static DataReader dataReader;
@@ -87,13 +86,18 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             log.info("mq exit.");
         }));
         try {
-            for (int i = 0; i < groupCount; i++) {
+            for (int i = 0; i < groupCount * 2; i++) {
                 ByteBuffer byteBuffer = ByteBuffer.allocateDirect(10 * 18 * 1024);
                 groupBuffers[i] = byteBuffer;
                 groupBufferWritePos[i] = new AtomicInteger();
                 groupBufferBasePos[i] = ((DirectBuffer) byteBuffer).address();
-                cyclicBarriers[i] = new CyclicBarrier(10);
                 groupAwaitThreadCount[i] = new AtomicInteger();
+                if (i < groupCount){
+                    cyclicBarriers[i] = new CyclicBarrier(10);
+                }else {
+                    // 重分组的barrier设置
+                    cyclicBarriers[i] = new CyclicBarrier(5);
+                }
             }
 
             metaInfo = new ConcurrentHashMap<>(100);
@@ -277,18 +281,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             int threadId = totalThreadCount.getAndIncrement();
             int groupId = threadId % groupCount;
             // 线程私有的channel，用来写单条数据到ssd
-            try {
-                int fileId = threadId + groupCount;
-                File file = new File(DISC_ROOT, "data-" + fileId);
-                if (!file.exists()) {
-                    file.createNewFile();
-                }
-                FileChannel channel = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
-                threadWorkContent = new ThreadWorkContent(channel, fileId, groupId);
-                threadWorkContentMap.set(threadWorkContent);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            int fileId = threadId + groupCount * 2;
+            FileChannel channel = dataWriteChannels[fileId];
+            threadWorkContent = new ThreadWorkContent(channel, fileId, groupId);
+            threadWorkContentMap.set(threadWorkContent);
         }
         return threadWorkContent;
     }
@@ -456,6 +452,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //        }
 
         GetRangeTaskData task = getTask(Thread.currentThread());
+        if (task.isThreadFirstGetRange){
+            // 重新分组
+            ThreadWorkContent workContent = getWorkContent();
+            workContent.groupId += groupCount;
+            task.isThreadFirstGetRange = false;
+        }
+
         task.setGetRangeParameter(topic, queueId, offset, fetchNum);
         task.queryData();
         if (GET_CACHE_HIT_INFO && hitCountData != null){
