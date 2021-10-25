@@ -73,6 +73,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static int initThreadCount = 0;
     public static PmemDataWriter pmemDataWriter;
     public static RamDataWriter ramDataWriter;
+    public int test = /*a*/100/*a*/;
 
 
     public static CacheHitCountData hitCountData;
