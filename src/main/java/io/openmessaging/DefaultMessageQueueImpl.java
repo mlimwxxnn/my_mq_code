@@ -223,12 +223,15 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }
         // 分组文件以及私有文件
         for (int id = 0; id < dataWriteChannels.length; id++) {
-            ByteBuffer readBuffer = ByteBuffer.allocate(DATA_INFORMATION_LENGTH);
+            ByteBuffer readBuffer = ByteBuffer.allocateDirect(DATA_INFORMATION_LENGTH);
             FileChannel channel = dataWriteChannels[id];
             byte topicId;
             short queueId;
             short dataLen = 0;
             int offset;
+            if (id == 2){
+                System.out.println(id);
+            }
             try {
                 ConcurrentHashMap<Short, QueueInfo> topicInfo;
                 QueueInfo queueInfo;
