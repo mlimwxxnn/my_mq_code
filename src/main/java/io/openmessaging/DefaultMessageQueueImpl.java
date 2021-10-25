@@ -17,6 +17,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.LockSupport;
 
 import static io.openmessaging.util.UnsafeUtil.unsafe;
 
@@ -307,13 +308,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         int waitThreadCount = (currentBufferPos >>> 24) + 1;
         // 重分组后，若超过等待线程数限制，则自旋
         while (waitThreadCount > awaitThreadCountLimits[groupId]){
-            try {
-                while ((groupWaitThreadCountAndBufferWritePos[groupId].get() >>> 24) + 1 > awaitThreadCountLimits[groupId]){
-                    Thread.sleep(0);
-                }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+
+            while ((groupWaitThreadCountAndBufferWritePos[groupId].get() >>> 24) + 1 > awaitThreadCountLimits[groupId]){
+                // 单次自旋时间
+                unsafe.park(false, 1000);
             }
+
             currentBufferPos = groupWaitThreadCountAndBufferWritePos[groupId].getAndAdd((1 << 24) + 9 + data.remaining());
             waitThreadCount = (currentBufferPos >>> 24) + 1;
         }
@@ -338,8 +338,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 groupWaitThreadCountAndBufferWritePos[groupId].set(0);
             }
             cyclicBarriers[groupId].await(3, TimeUnit.SECONDS);
-        } catch (BrokenBarrierException | IOException | InterruptedException e) {
+        } catch ( IOException | InterruptedException e) {
             e.printStackTrace();
+        } catch (BrokenBarrierException e){
+            log.info("BrokenBarrier one time");
         } catch (TimeoutException e) {
             log.info("cyclicBarrier timeout.");
             // 这里把剩余的数据刷盘, WritePos 未归零时代表未刷盘
