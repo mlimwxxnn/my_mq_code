@@ -284,7 +284,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     file.createNewFile();
                 }
                 FileChannel channel = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
-                threadPrivateMap.set(new ThreadWorkContent(channel, fileId, groupId));
+                threadWorkContent = new ThreadWorkContent(channel, fileId, groupId);
+                threadPrivateMap.set(threadWorkContent);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -314,6 +315,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 wrappedData.getMeta().getCountDownLatch().await();
             }else {
                 // 单条写入
+                log.info("write single data");
                 wrappedData.getMeta().getCountDownLatch().await();
                 appendSsdBySelf(workContent, topicId, queueId, offset, queueInfo, data);
             }
@@ -345,10 +347,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 dataWriteChannels[groupId].write(groupBuffers[groupId]);
                 dataWriteChannels[groupId].force(true);
             }
-            cyclicBarriers[groupId].await(2, TimeUnit.SECONDS);
+            cyclicBarriers[groupId].await(5, TimeUnit.SECONDS);
         } catch (BrokenBarrierException | IOException | InterruptedException e) {
             e.printStackTrace();
-            System.exit(-1);
         } catch (TimeoutException e) {
             log.info("cyclicBarrier timeout.");
             // 这里把剩余的数据刷盘, WritePos 未归零时代表未刷盘
