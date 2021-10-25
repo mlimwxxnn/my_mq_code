@@ -39,9 +39,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int groupCount = 4;
     public static final ByteBuffer[] groupBuffers = new ByteBuffer[groupCount * 2];
     public static final CyclicBarrier[] cyclicBarriers = new CyclicBarrier[groupCount * 2];
-    public static final AtomicInteger[] groupBufferWritePos = new AtomicInteger[groupCount * 2];
     public static final long[] groupBufferBasePos = new long[groupCount * 2];
-    public static final AtomicInteger[] groupAwaitThreadCount = new AtomicInteger[groupCount * 2];
+    public static final AtomicInteger[] groupWaitThreadCountAndBufferWritePos = new AtomicInteger[groupCount * 2];
 
 
     public static final int DATA_INFORMATION_LENGTH = 9;
@@ -89,9 +88,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             for (int i = 0; i < groupCount * 2; i++) {
                 ByteBuffer byteBuffer = ByteBuffer.allocateDirect(10 * 18 * 1024);
                 groupBuffers[i] = byteBuffer;
-                groupBufferWritePos[i] = new AtomicInteger();
+                groupWaitThreadCountAndBufferWritePos[i] = new AtomicInteger();
                 groupBufferBasePos[i] = ((DirectBuffer) byteBuffer).address();
-                groupAwaitThreadCount[i] = new AtomicInteger();
                 if (i < groupCount){
                     cyclicBarriers[i] = new CyclicBarrier(10);
                 }else {
@@ -253,28 +251,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }
     }
 
-//    private int getGroupId(){
-//        Integer groupId = groupIdMap.get();
-//        if (groupId == null){
-//            int threadId = totalThreadCount.getAndIncrement();
-//            groupId = threadId % groupCount;
-//            groupIdMap.set(groupId);
-//            // 线程私有的channel，用来写单条数据到ssd
-//            try {
-//                int fileId = threadId + groupCount;
-//                File file = new File(DISC_ROOT, "data-" + fileId);
-//                if (!file.exists()) {
-//                    file.createNewFile();
-//                }
-//                FileChannel channel = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
-//                threadPrivateMap.set(new ThreadWorkContent(channel, fileId));
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
-//        }
-//        return groupId;
-//    }
-
     private ThreadWorkContent getWorkContent(){
         ThreadWorkContent threadWorkContent = threadWorkContentMap.get();
         if (threadWorkContent == null){
@@ -323,7 +299,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     // 聚合写入
     public void appendSsdByGroup(int groupId, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data) {
-        long currentBufferPos = groupBufferWritePos[groupId].getAndAdd(9 + data.remaining());
+        int currentBufferPos = groupWaitThreadCountAndBufferWritePos[groupId].getAndAdd((1 << 24) + data.remaining());
+        int waitThreadCount = (currentBufferPos >>> 24) + 1;
+
+        currentBufferPos &= 0xffffff;
         long currentBufferAddress = groupBufferBasePos[groupId] + currentBufferPos;
         short dataLen = (short)data.remaining();
 
@@ -335,11 +314,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         unsafe.copyMemory(data.array(), 16 + data.position(), null, currentBufferAddress + 9, dataLen);
         try {
             queueInfo.setDataPosInFile(offset, dataWriteChannels[groupId].position() + currentBufferPos + 9, (((long) groupId) << 32) | dataLen);
-            if(groupAwaitThreadCount[groupId].incrementAndGet() == 10){
-                groupAwaitThreadCount[groupId].set(0);
+            if(waitThreadCount == 10){
+                groupWaitThreadCountAndBufferWritePos[groupId].set(0);
                 groupBuffers[groupId].position(0);
-                groupBuffers[groupId].limit(groupBufferWritePos[groupId].get());
-                groupBufferWritePos[groupId].set(0);
+                groupBuffers[groupId].limit(currentBufferPos);
                 dataWriteChannels[groupId].write(groupBuffers[groupId]);
                 dataWriteChannels[groupId].force(true);
             }
@@ -349,14 +327,14 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         } catch (TimeoutException e) {
             log.info("cyclicBarrier timeout.");
             // 这里把剩余的数据刷盘, WritePos 未归零时代表未刷盘
-            if (groupBufferWritePos[groupId].get() != 0){
+            if (groupWaitThreadCountAndBufferWritePos[groupId].get() != 0){
                 synchronized (groupBuffers[groupId]){
-                    if (groupBufferWritePos[groupId].get() != 0){
-                        cyclicBarriers[groupId] = new CyclicBarrier(groupAwaitThreadCount[groupId].get());
-                        groupAwaitThreadCount[groupId].set(0);
+                    int waitThreadCountAndBufferWritePos;
+                    if ((waitThreadCountAndBufferWritePos = groupWaitThreadCountAndBufferWritePos[groupId].get()) != 0){
+                        cyclicBarriers[groupId] = new CyclicBarrier(waitThreadCountAndBufferWritePos >>> 24);
                         groupBuffers[groupId].position(0);
-                        groupBuffers[groupId].limit(groupBufferWritePos[groupId].get());
-                        groupBufferWritePos[groupId].set(0);
+                        groupBuffers[groupId].limit(waitThreadCountAndBufferWritePos & 0xffffff);
+                        groupWaitThreadCountAndBufferWritePos[groupId].set(0);
                         try {
                             dataWriteChannels[groupId].write(groupBuffers[groupId]);
                             dataWriteChannels[groupId].force(true);
