@@ -7,45 +7,19 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.concurrent.*;
 
+import static io.openmessaging.util.UnsafeUtil.unsafe;
+
 public class Test {
     public static void main(String[] args) throws IOException, InterruptedException {
-        // offer
-        // poll take poll(timeout )
-
-
-        int capacity = 15000000;
-        int threadCount = 50;
-        LinkedBlockingQueue<Integer> a = new LinkedBlockingQueue<>();
-        MyBlockingQueue<Integer> b = new MyBlockingQueue<>(capacity);
-        ArrayBlockingQueue<Integer> c = new ArrayBlockingQueue<>(capacity);
-        CountDownLatch countDownLatch = new CountDownLatch(2 * threadCount);
-        long start = System.currentTimeMillis();
-        BlockingQueue<Integer> use = c;
-        for (int i = 0; i < threadCount; i++) {
-            new Thread(()->{
-                for (int j = 0; j < capacity / threadCount; j++) {
-                    use.offer(j);
-                }
-                countDownLatch.countDown();
-            }).start();
-            new Thread(()->{
-                Integer take = 0;
-                for (int j = 0; j < capacity / threadCount; j++) {
-                    try {
-                        take = use.take();
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
-                System.out.println(take);
-                countDownLatch.countDown();
-            }).start();
+        User user = new User();
+        for (long i = 0; i < 4; i+=8) {
+            System.out.printf("%s ", Long.toBinaryString(unsafe.getByte(user, i)));
         }
-        countDownLatch.await();
-        b.offer(3);
-        long end = System.currentTimeMillis();
-        System.out.printf("时间：%d", end -start);
 
-        CyclicBarrier cyclicBarrier = new CyclicBarrier(3);
+
     }
+}
+class User{
+    String name;
+    int id;
 }

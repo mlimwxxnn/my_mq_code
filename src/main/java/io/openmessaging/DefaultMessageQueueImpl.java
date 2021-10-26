@@ -45,16 +45,16 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 
     public static final int DATA_INFORMATION_LENGTH = 9;
-    public static final long KILL_SELF_TIMEOUT = 10 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 30 * 60;  // seconds
     public static final long WAITE_DATA_TIMEOUT = 350;  // 微秒
     public static final int SSD_WRITE_THREAD_COUNT = 5;
     public static final int SSD_MERGE_THREAD_COUNT = 1;
     public static final int READ_THREAD_COUNT = 20;
     public static final int PMEM_WRITE_THREAD_COUNT = 8;
     public static final int RAM_WRITE_THREAD_COUNT = 8;
-    public static final long DIRECT_CACHE_SIZE = 1900 * MB;
-    public static final long HEAP_CACHE_SIZE = 2 * GB;
-    public static final int RAM_SPACE_LEVEL_GAP = 200; // B
+    public static final long DIRECT_CACHE_SIZE = /*direct*/1900/*direct*/ * MB;
+    public static final long HEAP_CACHE_SIZE = /*heap*/2048/*heap*/ * MB;
+    public static final int RAM_SPACE_LEVEL_GAP = /*gap*/200/*gap*/; // B
     public static final int spaceLevelCount = (17 * 1024 + RAM_SPACE_LEVEL_GAP - 1) / RAM_SPACE_LEVEL_GAP;
     public static final int MAX_TRY_TIMES_WHILE_ALLOCATE_SPACE = 5;
     public static final long PMEM_CACHE_SIZE = 60 * GB;
@@ -65,7 +65,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     static private final ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
     public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo;
     public static volatile Map<Thread, GetRangeTaskData> getRangeTaskMap = new ConcurrentHashMap<>();
-    public static final FileChannel[] dataWriteChannels = new FileChannel[groupCount * 2 + 50];
+    public static final FileChannel[] dataWriteChannels = new FileChannel[groupCount * 2 + 50];//
 
     public static SsdDataWriter ssdDataWriter;
     public static DataReader dataReader;
@@ -80,6 +80,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static void init() {
 //        Runtime.getRuntime().addShutdownHook(new Thread( () -> {
+//            System.out.printf("写入文件大小%d", getTotalFileSizeByPosition());
 //            log.info("mq exit.");
 //        }));
         try {
