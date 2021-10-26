@@ -1,6 +1,5 @@
 package io.openmessaging.data;
 
-import com.intel.pmem.llpl.TransactionalMemoryBlock;
 import io.openmessaging.DefaultMessageQueueImpl;
 //import io.openmessaging.info.PmemInfo;
 import io.openmessaging.info.QueueInfo;

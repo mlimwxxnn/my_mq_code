@@ -40,8 +40,7 @@ public class QueueInfo {
         if(index >= capacity){
             synchronized (this) {
                 if (index >= capacity) {
-                    // 扩容为原来的1.5倍
-                    int newCapacity = capacity + (capacity >> 1);
+                    int newCapacity = index * 2;
                     long[][] newDataInfo = new long[newCapacity][2];
                     byte[] newStatus = new byte[newCapacity];
                     long[] newPmemInfos = new long[newCapacity];

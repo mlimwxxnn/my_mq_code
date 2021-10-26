@@ -43,7 +43,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 
     public static final int DATA_INFORMATION_LENGTH = 9;
-    public static final long KILL_SELF_TIMEOUT = 15 * 60;  // seconds
+    public static long KILL_SELF_TIMEOUT = 15 * 60;  // seconds
     public static final int PMEM_WRITE_THREAD_COUNT = 8;
     public static final int RAM_WRITE_THREAD_COUNT = 8;
     public static final long DIRECT_CACHE_SIZE = /*direct*/1900/*direct*/ * MB;
@@ -166,6 +166,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             return;
         }
         // 分组文件以及私有文件
+        KILL_SELF_TIMEOUT = 60 * 60;
         for (int id = 0; id < dataWriteChannels.length; id++) {
             ByteBuffer readBuffer = ByteBuffer.allocateDirect(DATA_INFORMATION_LENGTH);
             FileChannel channel = dataWriteChannels[id];
