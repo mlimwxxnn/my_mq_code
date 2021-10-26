@@ -9,10 +9,7 @@ import io.openmessaging.info.RamInfo;
 import io.openmessaging.util.UnsafeUtil;
 import sun.misc.Unsafe;
 
-import java.io.File;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -82,19 +79,12 @@ public class PmemDataWriter {
                         queueInfo = meta.getQueueInfo();
                         dataLen = meta.getDataLen();
                         if ((pmemInfo = getFreePmemInfo(dataLen)) != null) {
-//                            long writeStart = System.nanoTime(); // @
-
                             buf = wrappedData.getData();
                             int position = buf.position();
                             pmemChannels[pmemInfo.rLevelIndex].write(buf, pmemInfo.address);
                             buf.position(position);
                             queueInfo.setDataPosInPmem(meta.getOffset(), pmemInfo);
 
-//                            // 统计信息
-//                            long writeStop = System.nanoTime();  // @
-//                            if (GET_WRITE_TIME_COST_INFO){  // @
-//                                writeTimeCostCount.addPmemTimeCost(writeStop - writeStart);  // @
-//                            }  // @
                         }
                         meta.getCountDownLatch().countDown();
                     }

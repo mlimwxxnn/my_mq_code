@@ -78,19 +78,11 @@ public class RamDataWriter {
                         queueInfo = meta.getQueueInfo();
                         dataLen = meta.getDataLen();
                         if (!queueInfo.ramIsFull() && (ramInfo = getFreeRamInfo(dataLen)) != null) {
-//                            long writeStart = System.nanoTime(); // @
-
                             buf = wrappedData.getData();
                             data = buf.array();
                             unsafe.copyMemory(data, 16 + buf.position(), ramInfo.ramObj, ramInfo.offset, buf.remaining());//directByteBuffer
                             queueInfo.setDataPosInRam(meta.getOffset(), ramInfo);
                             meta.getCountDownLatch().countDown();
-
-//                            // 统计信息
-//                            long writeStop = System.nanoTime();  // @
-//                            if (GET_WRITE_TIME_COST_INFO){  // @
-//                                writeTimeCostCount.addRamTimeCost(writeStop - writeStart);  // @
-//                            }  // @
                         }else {
                             pmemDataWriter.pushWrappedData(wrappedData);
                         }
