@@ -43,7 +43,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 
     public static final int DATA_INFORMATION_LENGTH = 9;
-    public static final long KILL_SELF_TIMEOUT = 600;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 15 * 60;  // seconds
     public static final int PMEM_WRITE_THREAD_COUNT = 8;
     public static final int RAM_WRITE_THREAD_COUNT = 8;
     public static final long DIRECT_CACHE_SIZE = /*direct*/1900/*direct*/ * MB;
