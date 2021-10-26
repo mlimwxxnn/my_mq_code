@@ -10,13 +10,10 @@ import sun.misc.Unsafe;
 import sun.nio.ch.DirectBuffer;
 
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicInteger;
 
-import static io.openmessaging.DefaultMessageQueueImpl.*;
 import static io.openmessaging.writer.PmemDataWriter.freePmemQueues;
 import static io.openmessaging.data.PmemSaveSpaceData.*;
 import static io.openmessaging.writer.RamDataWriter.*;
@@ -92,9 +89,7 @@ public class GetRangeTaskData {
                     RamInfo ramInfo = queueInfo.getDataPosInRam();
                     unsafe.copyMemory(ramInfo.ramObj, ramInfo.offset, null, ((DirectBuffer) buf).address(), dataLen); //direct
                     freeRamQueues[ramInfo.levelIndex].offer(ramInfo);
-
-                }else
-                if (queueInfo.isInPmem(currentOffset)) {
+                }else if (queueInfo.isInPmem(currentOffset)) {
                     PmemInfo pmemInfo = queueInfo.getDataPosInPmem(currentOffset);
                     int pmemChannelIndex = pmemInfo.rLevelIndex;
                     pmemChannels[pmemChannelIndex].read(buf, pmemInfo.address);

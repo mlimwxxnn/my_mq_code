@@ -19,7 +19,6 @@ import static io.openmessaging.data.PmemSaveSpaceData.*;
 @SuppressWarnings({"ResultOfMethodCallIgnored", "unchecked"})
 public class PmemDataWriter {
 
-
     public static final BlockingQueue<PmemInfo>[] freePmemQueues = new LinkedBlockingQueue[spaceLevelCount];
     private static final BlockingQueue<WrappedData> pmemWrappedDataQueue = new LinkedBlockingQueue<>();
     private static final Unsafe unsafe = UnsafeUtil.unsafe;

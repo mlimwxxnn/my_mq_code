@@ -7,21 +7,26 @@ import static java.lang.System.arraycopy;
 // todo 这里尝试去掉多余的 volatile
 public class QueueInfo {
     private volatile int maxIndex;
-    private volatile long[][] dataInfo;
+    private volatile long[][] dataInfos;
     private volatile int capacity;
     // 末位为 1 表示数据在pmem中，倒数第二位为 1 表示数据在内存中，倒数第三位为 1 表示此offset的数据不会再被查
+    // 1500w data，一字节14M
+
     private volatile byte[] status;
     private volatile PmemInfo[] pmemInfos;
     private volatile boolean haveQueried;
     private final ArrayQueue<RamInfo> dataPosInRam = new ArrayQueue<>(80);  // todo 这里堆内用多少，要再试
     private static final int DEFAULT_CAPACITY = 100;
 
+    private PmemInfo pmemInfo;
+    private long[] dataInfo;
+
     public QueueInfo(){
         this(DEFAULT_CAPACITY);
     }
 
     public QueueInfo(int initialCapacity){
-        dataInfo = new long[initialCapacity][2];
+        dataInfos = new long[initialCapacity][2];
         status = new byte[initialCapacity];
         pmemInfos = new PmemInfo[initialCapacity];
         maxIndex = -1;
@@ -32,16 +37,17 @@ public class QueueInfo {
         if(index >= capacity){
             synchronized (this) {
                 if (index >= capacity) {
-                    int newCapacity = index * 2;
+                    // 扩容为原来的1.5倍
+                    int newCapacity = capacity + capacity >> 1;
                     long[][] newDataInfo = new long[newCapacity][2];
                     byte[] newStatus = new byte[newCapacity];
                     PmemInfo[] newPmemInfos = new PmemInfo[newCapacity];
 
-                    arraycopy(dataInfo, 0, newDataInfo, 0, maxIndex + 1);
+                    arraycopy(dataInfos, 0, newDataInfo, 0, maxIndex + 1);
                     arraycopy(status, 0, newStatus, 0, maxIndex + 1);
                     arraycopy(pmemInfos, 0, newPmemInfos, 0, maxIndex + 1);
 
-                    this.dataInfo = newDataInfo;
+                    this.dataInfos = newDataInfo;
                     this.status = newStatus;
                     this.pmemInfos = newPmemInfos;
                     capacity = newCapacity;
@@ -72,9 +78,6 @@ public class QueueInfo {
         return dataPosInRam.isFull();
     }
 
-    public boolean ramIsEmpty(){
-        return dataPosInRam.isEmpty();
-    }
     public void setDataPosInPmem(int i, PmemInfo pmemInfo){
         ensureCapacity(i);
         synchronized (this){
@@ -91,15 +94,17 @@ public class QueueInfo {
     public void setDataPosInFile(int i, long fileChannelOffset, long fileIdAndLen){
         ensureCapacity(i);
         updateMaxIndex(i);
-        dataInfo[i][0] = fileChannelOffset;
-        dataInfo[i][1] = fileIdAndLen;
+        dataInfos[i][0] = fileChannelOffset;
+        dataInfos[i][1] = fileIdAndLen;
     }
 
     public long[] getDataPosInFile(int i){
-        if(i > maxIndex){
-            throw new IndexOutOfBoundsException("索引越界");
-        }
-        return dataInfo[i];
+//        if(i > maxIndex){
+//            throw new IndexOutOfBoundsException("索引越界");
+//        }
+        dataInfo = this.dataInfos[i];
+        this.dataInfos[i] = null;
+        return dataInfo;
     }
 
     public int size(){
@@ -107,10 +112,12 @@ public class QueueInfo {
     }
 
     public PmemInfo getDataPosInPmem(int i) {
-        if(i > maxIndex){
-            throw new IndexOutOfBoundsException("索引越界");
-        }
-        return pmemInfos[i];
+//        if(i > maxIndex){
+//            throw new IndexOutOfBoundsException("索引越界");
+//        }
+        pmemInfo = pmemInfos[i];
+        pmemInfos[i] = null;
+        return pmemInfo;
     }
 
     public PmemInfo[] getAllPmemPageInfos() {
