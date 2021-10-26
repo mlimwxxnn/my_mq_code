@@ -2,6 +2,10 @@ package io.openmessaging.info;
 
 
 import io.openmessaging.util.ArrayQueue;
+
+import java.util.List;
+import java.util.Queue;
+
 import static java.lang.System.arraycopy;
 
 // todo 这里尝试去掉多余的 volatile
@@ -37,7 +41,7 @@ public class QueueInfo {
             synchronized (this) {
                 if (index >= capacity) {
                     // 扩容为原来的1.5倍
-                    int newCapacity = capacity + capacity >> 1;
+                    int newCapacity = capacity + (capacity >> 1);
                     long[][] newDataInfo = new long[newCapacity][2];
                     byte[] newStatus = new byte[newCapacity];
                     long[] newPmemInfos = new long[newCapacity];

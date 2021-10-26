@@ -384,8 +384,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }
         final int threadCount = 40;
         final int topicCountPerThread = 3;  // threadCount * topicCountPerThread <= 100
-        final int queueIdCountPerTopic = 5;
-        final int writeTimesPerQueueId = 3;
+        final int queueIdCountPerTopic = 5 * 100;
+        final int writeTimesPerQueueId = 3 * 100;
         ByteBuffer[][][] buffers = new ByteBuffer[threadCount][topicCountPerThread][queueIdCountPerTopic];
         DefaultMessageQueueImpl mq = new DefaultMessageQueueImpl();
 
