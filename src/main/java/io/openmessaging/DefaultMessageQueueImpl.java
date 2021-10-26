@@ -43,11 +43,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 
     public static final int DATA_INFORMATION_LENGTH = 9;
-    public static final long KILL_SELF_TIMEOUT = 30 * 60;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 520;  // seconds
     public static final int PMEM_WRITE_THREAD_COUNT = 8;
     public static final int RAM_WRITE_THREAD_COUNT = 8;
-    public static final long DIRECT_CACHE_SIZE = /*direct*/190/*direct*/ * MB;
-    public static final long HEAP_CACHE_SIZE = /*heap*/100/*heap*/ * MB;
+    public static final long DIRECT_CACHE_SIZE = /*direct*/1950/*direct*/ * MB;
+    public static final long HEAP_CACHE_SIZE = /*heap*/2000/*heap*/ * MB;
     public static final int RAM_SPACE_LEVEL_GAP = /*gap*/200/*gap*/; // B
     public static final int spaceLevelCount = (17 * 1024 + RAM_SPACE_LEVEL_GAP - 1) / RAM_SPACE_LEVEL_GAP;
     public static final int MAX_TRY_TIMES_WHILE_ALLOCATE_SPACE = 5;
@@ -158,7 +158,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         powerFailureRecovery(metaInfo);
         log.info("DefaultMessageQueueImpl 构造函数执行完成");
-//        killSelf(KILL_SELF_TIMEOUT);
+        killSelf(KILL_SELF_TIMEOUT);
     }
 
     public void powerFailureRecovery(ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo) {
