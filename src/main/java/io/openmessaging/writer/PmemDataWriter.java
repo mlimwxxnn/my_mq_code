@@ -43,11 +43,11 @@ public class PmemDataWriter {
     }
 
 
-    private Long getFreePmemInfo(short dataLen){
+    private long getFreePmemInfo(short dataLen){
         Long pmemInfo;
         if (isAllocateSpaceWhileNeed){
             pmemInfo = pmemSaveSpaceData.allocate(dataLen);
-            if (pmemInfo < 0){
+            if (pmemInfo == 0){
                 isAllocateSpaceWhileNeed = false;
             }else {
                 return pmemInfo;
@@ -58,7 +58,7 @@ public class PmemDataWriter {
         while ((pmemInfo = freePmemQueues[levelIndex].poll()) == null && levelIndex < maxTryLevelIndex){
             levelIndex++;
         }
-        return pmemInfo;
+        return pmemInfo == null ? 0 : pmemInfo;
     }
 
     private void writeDataToPmem(){

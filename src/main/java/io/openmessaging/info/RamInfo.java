@@ -7,7 +7,6 @@ public class RamInfo {
     public long offset;
     public int levelIndex;
 
-
     public RamInfo(Object obj, long offset, int dataLen){
         this.ramObj = obj;
         this.offset = offset;
