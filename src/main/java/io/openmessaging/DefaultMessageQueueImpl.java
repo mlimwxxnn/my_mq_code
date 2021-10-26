@@ -43,7 +43,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 
     public static final int DATA_INFORMATION_LENGTH = 9;
-    public static final long KILL_SELF_TIMEOUT = 520;  // seconds
+    public static final long KILL_SELF_TIMEOUT = 600;  // seconds
     public static final int PMEM_WRITE_THREAD_COUNT = 8;
     public static final int RAM_WRITE_THREAD_COUNT = 8;
     public static final long DIRECT_CACHE_SIZE = /*direct*/1900/*direct*/ * MB;
@@ -234,7 +234,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 wrappedData.getMeta().getCountDownLatch().await();
             }else {
                 // 单条写入
-                log.info("write single data");
+//                log.info("write single data");
                 wrappedData.getMeta().getCountDownLatch().await();
                 appendSsdBySelf(workContent, topicId, queueId, offset, queueInfo, data);
             }
@@ -272,9 +272,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         } catch ( IOException | InterruptedException e) {
             e.printStackTrace();
         } catch (BrokenBarrierException e){
-            log.info("BrokenBarrier one time");
+//            log.info("BrokenBarrier one time");
         } catch (TimeoutException e) {
-            log.info("cyclicBarrier timeout.");
+//            log.info("cyclicBarrier timeout.");
             // 这里把剩余的数据刷盘, WritePos 未归零时代表未刷盘
             if (groupWaitThreadCountAndBufferWritePos[groupId].get() != 0){
                 synchronized (groupBuffers[groupId]){
