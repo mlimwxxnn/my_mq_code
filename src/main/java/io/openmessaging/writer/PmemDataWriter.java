@@ -3,7 +3,7 @@ package io.openmessaging.writer;
 import io.openmessaging.data.MetaData;
 import io.openmessaging.data.PmemSaveSpaceData;
 import io.openmessaging.data.WrappedData;
-import io.openmessaging.info.PmemInfo;
+//import io.openmessaging.info.PmemInfo;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.info.RamInfo;
 import io.openmessaging.util.UnsafeUtil;
@@ -19,7 +19,7 @@ import static io.openmessaging.data.PmemSaveSpaceData.*;
 @SuppressWarnings({"ResultOfMethodCallIgnored", "unchecked"})
 public class PmemDataWriter {
 
-    public static final BlockingQueue<PmemInfo>[] freePmemQueues = new LinkedBlockingQueue[spaceLevelCount];
+    public static final BlockingQueue<Long>[] freePmemQueues = new LinkedBlockingQueue[spaceLevelCount];
     private static final BlockingQueue<WrappedData> pmemWrappedDataQueue = new LinkedBlockingQueue<>();
     private static final Unsafe unsafe = UnsafeUtil.unsafe;
     private final PmemSaveSpaceData pmemSaveSpaceData = new PmemSaveSpaceData();
@@ -43,11 +43,11 @@ public class PmemDataWriter {
     }
 
 
-    private PmemInfo getFreePmemInfo(short dataLen){
-        PmemInfo pmemInfo;
+    private Long getFreePmemInfo(short dataLen){
+        Long pmemInfo;
         if (isAllocateSpaceWhileNeed){
             pmemInfo = pmemSaveSpaceData.allocate(dataLen);
-            if (pmemInfo == null){
+            if (pmemInfo < 0){
                 isAllocateSpaceWhileNeed = false;
             }else {
                 return pmemInfo;
@@ -70,17 +70,17 @@ public class PmemDataWriter {
                     QueueInfo queueInfo;
                     MetaData meta;
                     short dataLen;
-                    PmemInfo pmemInfo;
+                    long pmemInfo;
                     while (true) {
                         wrappedData = pmemWrappedDataQueue.take();
                         meta = wrappedData.getMeta();
 
                         queueInfo = meta.getQueueInfo();
                         dataLen = meta.getDataLen();
-                        if ((pmemInfo = getFreePmemInfo(dataLen)) != null) {
+                        if ((pmemInfo = getFreePmemInfo(dataLen)) > 0) {
                             buf = wrappedData.getData();
                             int position = buf.position();
-                            pmemChannels[pmemInfo.rLevelIndex].write(buf, pmemInfo.address);
+                            pmemChannels[(int)(pmemInfo >>> 40)].write(buf, pmemInfo & 0xffffffffffL);
                             buf.position(position);
                             queueInfo.setDataPosInPmem(meta.getOffset(), pmemInfo);
 

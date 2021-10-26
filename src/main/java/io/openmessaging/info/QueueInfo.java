@@ -13,7 +13,7 @@ public class QueueInfo {
     // 1500w data，一字节14M
 
     private volatile byte[] status;
-    private volatile PmemInfo[] pmemInfos;
+    private volatile long[] pmemInfos;
     private volatile boolean haveQueried;
     private final ArrayQueue<RamInfo> dataPosInRam = new ArrayQueue<>(80);  // todo 这里堆内用多少，要再试
     private static final int DEFAULT_CAPACITY = 100;
@@ -28,7 +28,7 @@ public class QueueInfo {
     public QueueInfo(int initialCapacity){
         dataInfos = new long[initialCapacity][2];
         status = new byte[initialCapacity];
-        pmemInfos = new PmemInfo[initialCapacity];
+        pmemInfos = new long[initialCapacity];
         maxIndex = -1;
         capacity = initialCapacity;
     }
@@ -41,7 +41,7 @@ public class QueueInfo {
                     int newCapacity = capacity + capacity >> 1;
                     long[][] newDataInfo = new long[newCapacity][2];
                     byte[] newStatus = new byte[newCapacity];
-                    PmemInfo[] newPmemInfos = new PmemInfo[newCapacity];
+                    long[] newPmemInfos = new long[newCapacity];
 
                     arraycopy(dataInfos, 0, newDataInfo, 0, maxIndex + 1);
                     arraycopy(status, 0, newStatus, 0, maxIndex + 1);
@@ -78,7 +78,7 @@ public class QueueInfo {
         return dataPosInRam.isFull();
     }
 
-    public void setDataPosInPmem(int i, PmemInfo pmemInfo){
+    public void setDataPosInPmem(int i, long pmemInfo){
         ensureCapacity(i);
         synchronized (this){
             pmemInfos[i] = pmemInfo;
@@ -111,16 +111,14 @@ public class QueueInfo {
         return maxIndex + 1;
     }
 
-    public PmemInfo getDataPosInPmem(int i) {
+    public long getDataPosInPmem(int i) {
 //        if(i > maxIndex){
 //            throw new IndexOutOfBoundsException("索引越界");
 //        }
-        pmemInfo = pmemInfos[i];
-        pmemInfos[i] = null;
-        return pmemInfo;
+        return pmemInfos[i];
     }
 
-    public PmemInfo[] getAllPmemPageInfos() {
+    public long[] getAllPmemPageInfos() {
         haveQueried = true;
         return pmemInfos;
     }

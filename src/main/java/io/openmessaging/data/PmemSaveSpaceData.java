@@ -1,6 +1,6 @@
 package io.openmessaging.data;
 
-import io.openmessaging.info.PmemInfo;
+//import io.openmessaging.info.PmemInfo;
 import io.openmessaging.info.RamInfo;
 
 import java.io.File;
@@ -26,7 +26,7 @@ public class PmemSaveSpaceData {
         }
     }
 
-    public synchronized PmemInfo allocate(int size){
+    public synchronized long allocate(int size){
         if (size < RAM_SPACE_LEVEL_GAP){
             size = RAM_SPACE_LEVEL_GAP;
         }
@@ -35,10 +35,14 @@ public class PmemSaveSpaceData {
             size += RAM_SPACE_LEVEL_GAP - 1;
         }
         if (alreadyAllocateSize + size > PMEM_CACHE_SIZE){
-            return null;
+            return 0;
         }
         int retrieveLevelIndex = RamInfo.getRetrieveLevelIndexByDataLen(size);
-        PmemInfo pmemInfo = new PmemInfo(channelAlreadyAllocateSizes[retrieveLevelIndex], retrieveLevelIndex);
+        long pmemInfo = channelAlreadyAllocateSizes[retrieveLevelIndex] | ((long)(retrieveLevelIndex)<<40);
+        if (pmemInfo == 0){
+            pmemInfo += 1;
+            size += 1;
+        }
         channelAlreadyAllocateSizes[retrieveLevelIndex] += size;
         alreadyAllocateSize += size;
         return pmemInfo;

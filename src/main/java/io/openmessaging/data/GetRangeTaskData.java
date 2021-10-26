@@ -2,7 +2,7 @@ package io.openmessaging.data;
 
 import com.intel.pmem.llpl.TransactionalMemoryBlock;
 import io.openmessaging.DefaultMessageQueueImpl;
-import io.openmessaging.info.PmemInfo;
+//import io.openmessaging.info.PmemInfo;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.info.RamInfo;
 import io.openmessaging.util.UnsafeUtil;
@@ -62,11 +62,11 @@ public class GetRangeTaskData {
             }
 
             if (!queueInfo.haveQueried()) {
-                PmemInfo[] allPmemInfos = queueInfo.getAllPmemPageInfos();
+                long[] allPmemInfos = queueInfo.getAllPmemPageInfos();
                 for (int j = 0; j < offset; j++) {
-                    PmemInfo pmemInfo = allPmemInfos[j];
-                    if (pmemInfo != null) {
-                        freePmemQueues[pmemInfo.rLevelIndex].offer(pmemInfo);
+                    long pmemInfo = allPmemInfos[j];
+                    if (pmemInfo >0) {
+                        freePmemQueues[(int)(pmemInfo>>>40)].offer(pmemInfo);
                     }
                     if(queueInfo.isInRam(j)){
                         RamInfo ramInfo = queueInfo.getDataPosInRam();
@@ -90,10 +90,10 @@ public class GetRangeTaskData {
                     unsafe.copyMemory(ramInfo.ramObj, ramInfo.offset, null, ((DirectBuffer) buf).address(), dataLen); //direct
                     freeRamQueues[ramInfo.levelIndex].offer(ramInfo);
                 }else if (queueInfo.isInPmem(currentOffset)) {
-                    PmemInfo pmemInfo = queueInfo.getDataPosInPmem(currentOffset);
-                    int pmemChannelIndex = pmemInfo.rLevelIndex;
-                    pmemChannels[pmemChannelIndex].read(buf, pmemInfo.address);
-                    freePmemQueues[pmemInfo.rLevelIndex].offer(pmemInfo); // 回收
+                    long pmemInfo = queueInfo.getDataPosInPmem(currentOffset);
+                    int pmemChannelIndex = (int)(pmemInfo>>>40);
+                    pmemChannels[pmemChannelIndex].read(buf, pmemInfo & 0xffffffffffL);
+                    freePmemQueues[pmemChannelIndex].offer(pmemInfo); // 回收
                     buf.flip();
                 } else {
                     int id = (int) (p[1] >> 32);
