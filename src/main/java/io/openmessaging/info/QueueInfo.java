@@ -32,7 +32,7 @@ public class QueueInfo {
         if(index >= capacity){
             synchronized (this) {
                 if (index >= capacity) {
-                    int newCapacity = index * 2;
+                    int newCapacity = index + (index >> 1);
                     long[][] newDataInfo = new long[newCapacity][2];
                     byte[] newStatus = new byte[newCapacity];
                     PmemInfo[] newPmemInfos = new PmemInfo[newCapacity];
