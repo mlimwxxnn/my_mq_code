@@ -83,7 +83,7 @@ public class RamDataWriter {
                             unsafe.copyMemory(data, 16 + buf.position(), ramInfo.ramObj, ramInfo.offset, buf.remaining());//directByteBuffer
                             queueInfo.setDataPosInRam(meta.getOffset(), ramInfo);
                             meta.getCountDownLatch().countDown();
-                        }else {
+                        } else {
                             pmemDataWriter.pushWrappedData(wrappedData);
                         }
                     }

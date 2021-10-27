@@ -101,8 +101,8 @@ public class QueueInfo {
     }
 
     public long[] getDataPosInFile(int i){
-//        if(i > maxIndex){
-//            throw new IndexOutOfBoundsException("索引越界");
+//        if(dataInfos[i][1] != 0){
+//            System.out.printf("%d", i);
 //        }
         dataInfo = this.dataInfos[i];
         this.dataInfos[i] = null;
