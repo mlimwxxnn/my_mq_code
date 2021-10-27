@@ -170,7 +170,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         // 分组文件以及私有文件
         KILL_SELF_TIMEOUT = 60 * 60;
         for (int id = 0; id < dataWriteChannels.length; id++) {
-            ByteBuffer readBuffer = ByteBuffer.allocateDirect(DATA_INFORMATION_LENGTH);
+            ByteBuffer readBuffer = ByteBuffer.allocateDirect(DATA_INFORMATION_LENGTH + 8);
+            long baseAddress = ((DirectBuffer) readBuffer).address();
             FileChannel channel = dataWriteChannels[id];
             byte topicId;
             short queueId;
@@ -181,17 +182,25 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 QueueInfo queueInfo;
                 long dataFilesize = channel.size();
                 while (channel.position() + dataLen < dataFilesize) {
-                    channel.position(channel.position() + dataLen); // 跳过数据部分只读取数据头部的索引信息
+                    // todo 这里debug后要改的
+//                    channel.position(channel.position() + dataLen); // 跳过数据部分只读取数据头部的索引信息
+
                     readBuffer.clear();
                     channel.read(readBuffer);
-                    readBuffer.flip();
-                    topicId = readBuffer.get();
-                    queueId = Short.reverseBytes(readBuffer.getShort());
-                    dataLen = Short.reverseBytes(readBuffer.getShort());
+//                    readBuffer.flip();
+//                    topicId = readBuffer.get();
+//                    queueId = Short.reverseBytes(readBuffer.getShort());
+//                    dataLen = Short.reverseBytes(readBuffer.getShort());
+//                    offset = Integer.reverseBytes(readBuffer.getInt());
+
+                    topicId = unsafe.getByte(baseAddress);
+                    queueId = unsafe.getShort(baseAddress + 1);
+                    dataLen = unsafe.getShort(baseAddress + 3);
+                    offset = unsafe.getInt(baseAddress + 5);
                     if (dataLen != 8){
                         int a = 1;
                     }
-                    offset = Integer.reverseBytes(readBuffer.getInt());
+
 
                     topicInfo = metaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
                     queueInfo = topicInfo.computeIfAbsent(queueId, k -> new QueueInfo());
@@ -237,13 +246,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         int offset = queueInfo.size();
 
         wrappedData.setWrapInfo(topicId, (short) queueId, data, offset, queueInfo);
-        ramDataWriter.pushWrappedData(wrappedData);
+//        ramDataWriter.pushWrappedData(wrappedData);
 //        pmemDataWriter.pushWrappedData(wrappedData);
 
         try {
             if (! cyclicBarriers[groupId].isBroken()){
                 appendSsdByGroup(groupId, topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
-                wrappedData.getMeta().getCountDownLatch().await();
+//                wrappedData.getMeta().getCountDownLatch().await();
             }else {
                 // 单条写入
 //                log.info("write single data");
@@ -261,9 +270,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         int currentBufferPos = groupBufferWritePos[groupId].getAndAdd( 9 + dataLen);
         long currentBufferAddress = groupBufferBasePos[groupId] + currentBufferPos;
 
-//        if (dataLen != 8){
-//            int a = 1;
-//        }
+        if (dataLen != 8){
+            int a = 1;
+        }
 
         unsafe.putByte(currentBufferAddress, topicId);
         unsafe.putShort(currentBufferAddress + 1, (short)queueId);
@@ -276,6 +285,14 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             if(groupWaitThreadCount[groupId].incrementAndGet() == awaitThreadCountLimits[groupId]){
                 groupBuffers[groupId].position(0);
                 groupBuffers[groupId].limit(currentBufferPos + 9 + dataLen);
+
+                for (int i= 0; i < 10; i++) {
+                    int pos = i * 17 + 5;
+                    if (unsafe.getInt(groupBufferBasePos[groupId] + pos) != offset){
+                        int a = 1;
+                    }
+                }
+
                 dataWriteChannels[groupId].write(groupBuffers[groupId]);
                 dataWriteChannels[groupId].force(true);
                 groupBufferWritePos[groupId].set(0);
@@ -420,8 +437,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 }
             }
         }
-
-
 
         Thread[] threads = new Thread[threadCount];
         for (int i = 0; i < threadCount; i++) {

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Queue;
 
 import static java.lang.System.arraycopy;
+import static java.lang.System.in;
 
 // todo 这里尝试去掉多余的 volatile
 public class QueueInfo {
@@ -21,6 +22,7 @@ public class QueueInfo {
     private volatile boolean haveQueried;
     private final ArrayQueue<RamInfo> dataPosInRam = new ArrayQueue<>(80);  // todo 这里堆内用多少，要再试
     private static final int DEFAULT_CAPACITY = 100;
+    private int lastSetIndex = -1;
 
     private long[] dataInfo;
 
@@ -96,16 +98,24 @@ public class QueueInfo {
     public void setDataPosInFile(int i, long fileChannelOffset, long fileIdAndLen){
         ensureCapacity(i);
         updateMaxIndex(i);
+        if (i != lastSetIndex + 1){
+            int a = 1;
+        }
+        lastSetIndex = i;
+
+        if(dataInfos[i][1] != 0){
+            System.out.printf("%d", i);
+        }
+
         dataInfos[i][0] = fileChannelOffset;
         dataInfos[i][1] = fileIdAndLen;
+
+
     }
 
     public long[] getDataPosInFile(int i){
-//        if(dataInfos[i][1] != 0){
-//            System.out.printf("%d", i);
-//        }
         dataInfo = this.dataInfos[i];
-        this.dataInfos[i] = null;
+//        this.dataInfos[i] = null;
         return dataInfo;
     }
 
