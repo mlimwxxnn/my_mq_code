@@ -16,13 +16,11 @@ public class QueueInfo {
     private volatile int capacity;
     // 末位为 1 表示数据在pmem中，倒数第二位为 1 表示数据在内存中，倒数第三位为 1 表示此offset的数据不会再被查
     // 1500w data，一字节14M
-
     private volatile byte[] status;
     private volatile long[] pmemInfos;
     private volatile boolean haveQueried;
     private final ArrayQueue<RamInfo> dataPosInRam = new ArrayQueue<>(80);  // todo 这里堆内用多少，要再试
     private static final int DEFAULT_CAPACITY = 100;
-    private int lastSetIndex = -1;
 
     private long[] dataInfo;
 
@@ -98,24 +96,13 @@ public class QueueInfo {
     public void setDataPosInFile(int i, long fileChannelOffset, long fileIdAndLen){
         ensureCapacity(i);
         updateMaxIndex(i);
-        if (i != lastSetIndex + 1){
-            int a = 1;
-        }
-        lastSetIndex = i;
-
-        if(dataInfos[i][1] != 0){
-            System.out.printf("%d", i);
-        }
-
         dataInfos[i][0] = fileChannelOffset;
         dataInfos[i][1] = fileIdAndLen;
-
-
     }
 
     public long[] getDataPosInFile(int i){
         dataInfo = this.dataInfos[i];
-//        this.dataInfos[i] = null;
+        this.dataInfos[i] = null;
         return dataInfo;
     }
 
@@ -124,9 +111,6 @@ public class QueueInfo {
     }
 
     public long getDataPosInPmem(int i) {
-//        if(i > maxIndex){
-//            throw new IndexOutOfBoundsException("索引越界");
-//        }
         return pmemInfos[i];
     }
 

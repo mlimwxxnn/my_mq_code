@@ -35,7 +35,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final ThreadLocal<ThreadWorkContent> threadWorkContentMap = new ThreadLocal<>();
     public static final AtomicInteger totalThreadCount = new AtomicInteger();
     public static final int groupCount = 4;
-    public static final ByteBuffer[] groupBuffers = new ByteBuffer[groupCount * 2];
+    public static volatile ByteBuffer[] groupBuffers = new ByteBuffer[groupCount * 2];
     public static final CyclicBarrier[] cyclicBarriers = new CyclicBarrier[groupCount * 2];
     public static final long[] groupBufferBasePos = new long[groupCount * 2];
     public static final int[] awaitThreadCountLimits = new int[groupCount * 2];
@@ -168,9 +168,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             return;
         }
         // 分组文件以及私有文件
-        KILL_SELF_TIMEOUT = 60 * 60;
         for (int id = 0; id < dataWriteChannels.length; id++) {
-            ByteBuffer readBuffer = ByteBuffer.allocateDirect(DATA_INFORMATION_LENGTH + 8);
+            ByteBuffer readBuffer = ByteBuffer.allocateDirect(DATA_INFORMATION_LENGTH);
             long baseAddress = ((DirectBuffer) readBuffer).address();
             FileChannel channel = dataWriteChannels[id];
             byte topicId;
@@ -182,26 +181,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 QueueInfo queueInfo;
                 long dataFilesize = channel.size();
                 while (channel.position() + dataLen < dataFilesize) {
-                    // todo 这里debug后要改的
-//                    channel.position(channel.position() + dataLen); // 跳过数据部分只读取数据头部的索引信息
-
+                    channel.position(channel.position() + dataLen); // 跳过数据部分只读取数据头部的索引信息
                     readBuffer.clear();
                     channel.read(readBuffer);
-//                    readBuffer.flip();
-//                    topicId = readBuffer.get();
-//                    queueId = Short.reverseBytes(readBuffer.getShort());
-//                    dataLen = Short.reverseBytes(readBuffer.getShort());
-//                    offset = Integer.reverseBytes(readBuffer.getInt());
-
                     topicId = unsafe.getByte(baseAddress);
                     queueId = unsafe.getShort(baseAddress + 1);
                     dataLen = unsafe.getShort(baseAddress + 3);
                     offset = unsafe.getInt(baseAddress + 5);
-                    if (dataLen != 8){
-                        int a = 1;
-                    }
-
-
                     topicInfo = metaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
                     queueInfo = topicInfo.computeIfAbsent(queueId, k -> new QueueInfo());
                     long groupIdAndDataLength = (((long) id) << 32) | dataLen;
@@ -246,13 +232,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         int offset = queueInfo.size();
 
         wrappedData.setWrapInfo(topicId, (short) queueId, data, offset, queueInfo);
-//        ramDataWriter.pushWrappedData(wrappedData);
+        ramDataWriter.pushWrappedData(wrappedData);
 //        pmemDataWriter.pushWrappedData(wrappedData);
 
         try {
             if (! cyclicBarriers[groupId].isBroken()){
                 appendSsdByGroup(groupId, topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
-//                wrappedData.getMeta().getCountDownLatch().await();
+                wrappedData.getMeta().getCountDownLatch().await();
             }else {
                 // 单条写入
 //                log.info("write single data");
@@ -269,11 +255,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public void appendSsdByGroup(int groupId, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data, short dataLen, int dataPosition) {
         int currentBufferPos = groupBufferWritePos[groupId].getAndAdd( 9 + dataLen);
         long currentBufferAddress = groupBufferBasePos[groupId] + currentBufferPos;
-
-        if (dataLen != 8){
-            int a = 1;
-        }
-
         unsafe.putByte(currentBufferAddress, topicId);
         unsafe.putShort(currentBufferAddress + 1, (short)queueId);
         unsafe.putShort(currentBufferAddress + 3, dataLen);
@@ -284,15 +265,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             queueInfo.setDataPosInFile(offset, dataWriteChannels[groupId].position() + currentBufferPos + 9, (((long) groupId) << 32) | dataLen);
             if(groupWaitThreadCount[groupId].incrementAndGet() == awaitThreadCountLimits[groupId]){
                 groupBuffers[groupId].position(0);
-                groupBuffers[groupId].limit(currentBufferPos + 9 + dataLen);
-
-                for (int i= 0; i < 10; i++) {
-                    int pos = i * 17 + 5;
-                    if (unsafe.getInt(groupBufferBasePos[groupId] + pos) != offset){
-                        int a = 1;
-                    }
-                }
-
+                groupBuffers[groupId].limit(groupBufferWritePos[groupId].get());
                 dataWriteChannels[groupId].write(groupBuffers[groupId]);
                 dataWriteChannels[groupId].force(true);
                 groupBufferWritePos[groupId].set(0);
@@ -308,10 +281,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             // 这里把剩余的数据刷盘, WritePos 未归零时代表未刷盘
             if (groupBufferWritePos[groupId].get() != 0){
                 synchronized (groupBuffers[groupId]){
-                    int waitThreadCountAndBufferWritePos;
-                    if ((waitThreadCountAndBufferWritePos = groupBufferWritePos[groupId].get()) != 0){
+                    if (groupBufferWritePos[groupId].get() != 0){
                         groupBuffers[groupId].position(0);
-                        groupBuffers[groupId].limit(waitThreadCountAndBufferWritePos & 0xffffff);
+                        groupBuffers[groupId].limit(groupBufferWritePos[groupId].get());
                         try {
                             dataWriteChannels[groupId].write(groupBuffers[groupId]);
                             dataWriteChannels[groupId].force(true);
@@ -330,12 +302,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public void appendSsdBySelf(ThreadWorkContent workContent, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data, short dataLen, int dataPosition) {
         FileChannel channel = workContent.channel;
         ByteBuffer buffer = workContent.buffer;
-
         long currentBufferAddress = ((DirectBuffer) buffer).address();
-
-//        if (dataLen != 8){
-//            int a = 1;
-//        }
 
         unsafe.putByte(currentBufferAddress, topicId);
         unsafe.putShort(currentBufferAddress + 1, (short)queueId);
@@ -389,14 +356,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
 
-    boolean haveAppended = false;
-    volatile boolean isFirstStageGoingOn = true;
+
     @Override
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
-//        if(!haveAppended){
-//            System.exit(-1);
-//        }
-
         GetRangeTaskData task = getTask(Thread.currentThread());
 
         task.setGetRangeParameter(topic, queueId, offset, fetchNum);
@@ -406,7 +368,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 
     public static final int threadCount = 40;
-    public static final int topicCountPerThread = 3;  // threadCount * topicCountPerThread <= 100
+    public static final int topicCountPerThread = 2;  // threadCount * topicCountPerThread <= 100
     public static final int queueIdCountPerTopic = 5 * 2;
     public static final int writeTimesPerQueueId = 3 * 100;
 
@@ -460,6 +422,41 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         for (int i = 0; i < threadCount; i++) {
             threads[i].join();
         }
+
+
+        // ***********************************************
+        Thread[] threads1 = new Thread[threadCount];
+        for (int i = 0; i < threadCount; i++) {
+            int threadIndex = i;
+            threads1[i] = new Thread(() -> {
+                for (int topicIndex = 0; topicIndex < topicCountPerThread; topicIndex++) {
+                    String topic = threadIndex + "-" + topicIndex;
+                    for (int queueIndex = 0; queueIndex < queueIdCountPerTopic; queueIndex++) {
+                        for (int t = 0; t < writeTimesPerQueueId; t++) {
+                            Map<Integer, ByteBuffer> res = mq.getRange(topic, queueIndex, t, 1);
+                            ByteBuffer byteBuffer = res.get(0);
+                            if (topicIndex == 0 && queueIndex == 3 && t == 158 && "9-0".equals(topic)){
+                                int a = 1;
+                            }
+                            if (byteBuffer.remaining() != 8){
+                                System.out.println(String.format("remaining error: %d: %d: %d, topic: %s, remaining: %d", topicIndex, queueIndex, t, topic, byteBuffer.remaining()));
+                            }
+                            if (byteBuffer.getInt(0) != t || byteBuffer.getInt(4) != queueIndex){
+                                System.out.println(String.format("data error: %d: %d: %d topic: %s, data: {%d, %d}", topicIndex, queueIndex, t, topic, byteBuffer.getInt(), byteBuffer.getInt()));
+//                                System.exit(-1);
+                            }
+                        }
+                    }
+                }
+            });
+            threads1[i].start();
+        }
+        for (int i = 0; i < threadCount; i++) {
+            threads1[i].join();
+        }
+        System.out.println("query done.");
+
+
 //        mq.append("big_data", 1, ByteBuffer.allocate(17*1024));
         ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo = mq.metaInfo;
         for (Byte topicId : metaInfo.keySet()) {
@@ -475,10 +472,5 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 }
             }
         }
-
-        Map<Integer, ByteBuffer> res = mq.getRange("10-1", 3, 0, 100);
-        System.out.println(res.size());
-//        Map<Integer, ByteBuffer> res1 = mq.getRange("big_data", 1, 0, 100);
-//        System.out.println(res1.size());
     }
 }
