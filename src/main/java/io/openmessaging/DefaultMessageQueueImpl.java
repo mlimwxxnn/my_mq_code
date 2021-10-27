@@ -7,6 +7,7 @@ import io.openmessaging.writer.RamDataWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sun.nio.ch.DirectBuffer;
+import sun.security.provider.PolicySpiFile;
 
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -34,13 +35,14 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static final ThreadLocal<ThreadWorkContent> threadWorkContentMap = new ThreadLocal<>();
     public static final AtomicInteger totalThreadCount = new AtomicInteger();
-    public static final int groupCount = 4;
-    public static volatile ByteBuffer[] groupBuffers = new ByteBuffer[groupCount * 2];
-    public static final CyclicBarrier[] cyclicBarriers = new CyclicBarrier[groupCount * 2];
-    public static final long[] groupBufferBasePos = new long[groupCount * 2];
-    public static final int[] awaitThreadCountLimits = new int[groupCount * 2];
-    public static final AtomicInteger[] groupBufferWritePos = new AtomicInteger[groupCount * 2];
-    public static final AtomicInteger[] groupWaitThreadCount = new AtomicInteger[groupCount * 2];
+    public static final int THREAD_COUNT_PER_GROUP = 10;
+    public static final int MAX_THREAD_COUNT = 50;
+    public static final int groupCount = MAX_THREAD_COUNT / THREAD_COUNT_PER_GROUP;
+    public static volatile ByteBuffer[] groupBuffers = new ByteBuffer[groupCount];
+    public static final CyclicBarrier[] cyclicBarriers = new CyclicBarrier[groupCount];
+    public static final long[] groupBufferBasePos = new long[groupCount];
+    public static final AtomicInteger[] groupBufferWritePos = new AtomicInteger[groupCount];
+    public static final AtomicInteger[] groupWaitThreadCount = new AtomicInteger[groupCount];
 
 
     public static final int DATA_INFORMATION_LENGTH = 9;
@@ -60,7 +62,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     static private final ConcurrentHashMap<String, Byte> topicNameToTopicId = new ConcurrentHashMap<>();
     public static volatile ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo;
     public static volatile Map<Thread, GetRangeTaskData> getRangeTaskMap = new ConcurrentHashMap<>();
-    public static final FileChannel[] dataWriteChannels = new FileChannel[groupCount * 2 + 50];//
+    public static final FileChannel[] dataWriteChannels = new FileChannel[groupCount + MAX_THREAD_COUNT];//
 
     public static PmemDataWriter pmemDataWriter;
     public static RamDataWriter ramDataWriter;
@@ -68,20 +70,14 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static void init() {
         try {
-            for (int i = 0; i < groupCount * 2; i++) {
-                ByteBuffer byteBuffer = ByteBuffer.allocateDirect(10 * 18 * 1024);
+            for (int i = 0; i < groupCount; i++) {
+                ByteBuffer byteBuffer = ByteBuffer.allocateDirect(THREAD_COUNT_PER_GROUP * 18 * 1024);
+
                 groupBuffers[i] = byteBuffer;
                 groupBufferWritePos[i] = new AtomicInteger();
                 groupWaitThreadCount[i] = new AtomicInteger();
                 groupBufferBasePos[i] = ((DirectBuffer) byteBuffer).address();
-                if (i < groupCount){
-                    cyclicBarriers[i] = new CyclicBarrier(10);
-                    awaitThreadCountLimits[i] = 10;
-                }else {
-                    // 重分组的barrier设置
-                    cyclicBarriers[i] = new CyclicBarrier(8);
-                    awaitThreadCountLimits[i] = 8;
-                }
+                cyclicBarriers[i] = new CyclicBarrier(THREAD_COUNT_PER_GROUP);
             }
 
             metaInfo = new ConcurrentHashMap<>(100);
@@ -153,7 +149,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public DefaultMessageQueueImpl() {
         log.info("DefaultMessageQueueImpl 开始执行构造函数");
-        DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("d:/essd") : new File("/essd");
+        DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("h:/essd") : new File("/essd");
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
 
         init();
@@ -206,9 +202,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         ThreadWorkContent threadWorkContent = threadWorkContentMap.get();
         if (threadWorkContent == null){
             int threadId = totalThreadCount.getAndIncrement();
-            int groupId = threadId % groupCount;
+            int groupId = threadId / THREAD_COUNT_PER_GROUP;
             // 线程私有的channel，用来写单条数据到ssd
-            int fileId = threadId + groupCount * 2;
+            int fileId = threadId + groupCount;
             FileChannel channel = dataWriteChannels[fileId];
             threadWorkContent = new ThreadWorkContent(channel, fileId, groupId);
             threadWorkContentMap.set(threadWorkContent);
@@ -263,7 +259,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         unsafe.copyMemory(data.array(), 16 + dataPosition, null, currentBufferAddress + 9, dataLen);
         try {
             queueInfo.setDataPosInFile(offset, dataWriteChannels[groupId].position() + currentBufferPos + 9, (((long) groupId) << 32) | dataLen);
-            if(groupWaitThreadCount[groupId].incrementAndGet() == awaitThreadCountLimits[groupId]){
+            if(groupWaitThreadCount[groupId].incrementAndGet() == THREAD_COUNT_PER_GROUP){
                 groupBuffers[groupId].position(0);
                 groupBuffers[groupId].limit(groupBufferWritePos[groupId].get());
                 dataWriteChannels[groupId].write(groupBuffers[groupId]);
@@ -275,9 +271,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         } catch ( IOException | InterruptedException e) {
             e.printStackTrace();
         } catch (BrokenBarrierException e){
-//            log.info("BrokenBarrier one time");
+            log.info("BrokenBarrier one time");
         } catch (TimeoutException e) {
-//            log.info("cyclicBarrier timeout.");
+            log.info("cyclicBarrier timeout.");
             // 这里把剩余的数据刷盘, WritePos 未归零时代表未刷盘
             if (groupBufferWritePos[groupId].get() != 0){
                 synchronized (groupBuffers[groupId]){
@@ -367,13 +363,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
 
-    public static final int threadCount = 40;
+    public static final int threadCount = 42;
     public static final int topicCountPerThread = 2;  // threadCount * topicCountPerThread <= 100
     public static final int queueIdCountPerTopic = 5 * 2;
     public static final int writeTimesPerQueueId = 3 * 100;
 
     public static void main(String[] args) throws InterruptedException {
-        for (File file : new File("d:/essd").listFiles()) {
+        for (File file : new File("h:/essd").listFiles()) {
             if(file.isFile()){
                 file.delete();
             }else{
@@ -458,19 +454,19 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 
 //        mq.append("big_data", 1, ByteBuffer.allocate(17*1024));
-        ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo = mq.metaInfo;
-        for (Byte topicId : metaInfo.keySet()) {
-            ConcurrentHashMap<Short, QueueInfo> topicInfo = metaInfo.get(topicId);
-            for (Short queueId : topicInfo.keySet()) {
-                QueueInfo queueInfo = topicInfo.get(queueId);
-                for (int offset = 0; offset < queueInfo.size(); offset++) {
-                    long[] p = queueInfo.getDataPosInFile(offset);
-                    short dataLen = (short) p[1];
-                    if (dataLen != 8){
-                        int a = 1;
-                    }
-                }
-            }
-        }
+//        ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo = mq.metaInfo;
+//        for (Byte topicId : metaInfo.keySet()) {
+//            ConcurrentHashMap<Short, QueueInfo> topicInfo = metaInfo.get(topicId);
+//            for (Short queueId : topicInfo.keySet()) {
+//                QueueInfo queueInfo = topicInfo.get(queueId);
+//                for (int offset = 0; offset < queueInfo.size(); offset++) {
+//                    long[] p = queueInfo.getDataPosInFile(offset);
+//                    short dataLen = (short) p[1];
+//                    if (dataLen != 8){
+//                        int a = 1;
+//                    }
+//                }
+//            }
+//        }
     }
 }

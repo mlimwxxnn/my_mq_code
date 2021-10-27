@@ -12,26 +12,26 @@ public class PowerFailureTest {
     public static void main(String[] args) throws InterruptedException {
 
         DefaultMessageQueueImpl mq = new DefaultMessageQueueImpl();
-        int ab = 0;
-        ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo = mq.metaInfo;
-        for (Byte topicId : metaInfo.keySet()) {
-            ConcurrentHashMap<Short, QueueInfo> topicInfo = metaInfo.get(topicId);
-            for (Short queueId : topicInfo.keySet()) {
-                QueueInfo queueInfo = topicInfo.get(queueId);
-                if(queueInfo.size() != 300){
-                    int a = 3;
-                }
-                for (int offset = 0; offset < queueInfo.size(); offset++) {
-                    long[] p = queueInfo.getDataPosInFile(offset);
-                    short dataLen = (short) p[1];
-                    if (dataLen != 8){
-                        ab ++;
-                    }
-                }
-            }
-        }
-        System.out.println("ab: " + ab);
-        System.out.println("metaInfo done.");
+//        int ab = 0;
+//        ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo = mq.metaInfo;
+//        for (Byte topicId : metaInfo.keySet()) {
+//            ConcurrentHashMap<Short, QueueInfo> topicInfo = metaInfo.get(topicId);
+//            for (Short queueId : topicInfo.keySet()) {
+//                QueueInfo queueInfo = topicInfo.get(queueId);
+//                if(queueInfo.size() != 300){
+//                    int a = 3;
+//                }
+//                for (int offset = 0; offset < queueInfo.size(); offset++) {
+//                    long[] p = queueInfo.getDataPosInFile(offset);
+//                    short dataLen = (short) p[1];
+//                    if (dataLen != 8){
+//                        ab ++;
+//                    }
+//                }
+//            }
+//        }
+//        System.out.println("ab: " + ab);
+//        System.out.println("metaInfo done.");
 
 
         Thread[] threads = new Thread[threadCount];
@@ -70,4 +70,3 @@ public class PowerFailureTest {
 //        System.out.println(res.get(1).getInt());
     }
 }
-

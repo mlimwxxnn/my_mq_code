@@ -6,16 +6,18 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.LongAdder;
 
 import static io.openmessaging.util.UnsafeUtil.unsafe;
 
 public class Test {
     public static void main(String[] args) throws IOException, InterruptedException {
-        System.out.println(Short.MAX_VALUE / (1024));
+//        LongAdder a = new LongAdder();
+
 
     }
 }
 class User{
-    String name;
-    int id;
+    int a;
 }
