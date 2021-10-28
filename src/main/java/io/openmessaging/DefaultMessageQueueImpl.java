@@ -43,6 +43,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final long[] groupBufferBasePos = new long[groupCount];
     public static final AtomicInteger[] groupBufferWritePos = new AtomicInteger[groupCount];
     public static final AtomicInteger[] groupWaitThreadCount = new AtomicInteger[groupCount];
+    public static final CountDownLatch[] groupCountDownLatches = new CountDownLatch[groupCount];
 
 
     public static final int DATA_INFORMATION_LENGTH = 9;
@@ -78,6 +79,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 groupWaitThreadCount[i] = new AtomicInteger();
                 groupBufferBasePos[i] = ((DirectBuffer) byteBuffer).address();
                 cyclicBarriers[i] = new CyclicBarrier(THREAD_COUNT_PER_GROUP);
+                groupCountDownLatches[i] = new CountDownLatch(1);
             }
 
             metaInfo = new ConcurrentHashMap<>(100);
@@ -149,7 +151,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public DefaultMessageQueueImpl() {
         log.info("DefaultMessageQueueImpl 开始执行构造函数");
-        DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("h:/essd") : new File("/essd");
+        DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("d:/essd") : new File("/essd");
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
 
         init();
@@ -187,9 +189,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     topicInfo = metaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
                     queueInfo = topicInfo.computeIfAbsent(queueId, k -> new QueueInfo());
                     long groupIdAndDataLength = (((long) id) << 32) | dataLen;
-                    if(topicId == (byte) 34 && queueId == 1 && offset == 26){
-                        int a = 3;
-                    }
                     queueInfo.setDataPosInFile(offset, channel.position(), groupIdAndDataLength);
                 }
             } catch (Exception e) {
@@ -228,22 +227,22 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         int offset = queueInfo.size();
 
         wrappedData.setWrapInfo(topicId, (short) queueId, data, offset, queueInfo);
-        ramDataWriter.pushWrappedData(wrappedData);
+//        ramDataWriter.pushWrappedData(wrappedData);
 //        pmemDataWriter.pushWrappedData(wrappedData);
 
-        try {
+//        try {
             if (! cyclicBarriers[groupId].isBroken()){
                 appendSsdByGroup(groupId, topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
-                wrappedData.getMeta().getCountDownLatch().await();
+//                wrappedData.getMeta().getCountDownLatch().await();
             }else {
                 // 单条写入
 //                log.info("write single data");
-                wrappedData.getMeta().getCountDownLatch().await();
+//                wrappedData.getMeta().getCountDownLatch().await();
                 appendSsdBySelf(workContent, topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
             }
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+//        } catch (InterruptedException e) {
+//            e.printStackTrace();
+//        }
         return offset;
     }
 
@@ -272,6 +271,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             e.printStackTrace();
         } catch (BrokenBarrierException e){
             log.info("BrokenBarrier one time");
+            try {
+                groupCountDownLatches[groupId].await();
+            } catch (InterruptedException ex) {
+                ex.printStackTrace();
+            }
         } catch (TimeoutException e) {
             log.info("cyclicBarrier timeout.");
             // 这里把剩余的数据刷盘, WritePos 未归零时代表未刷盘
@@ -291,6 +295,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     }
                 }
             }
+            groupCountDownLatches[groupId].countDown();
         }
     }
 
@@ -369,7 +374,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int writeTimesPerQueueId = 3 * 100;
 
     public static void main(String[] args) throws InterruptedException {
-        for (File file : new File("h:/essd").listFiles()) {
+        for (File file : new File("d:/essd").listFiles()) {
             if(file.isFile()){
                 file.delete();
             }else{
