@@ -46,12 +46,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 
     public static final int DATA_INFORMATION_LENGTH = 9;
-    public static long KILL_SELF_TIMEOUT = 15 * 60;  // seconds
     public static final int PMEM_WRITE_THREAD_COUNT = 8;
     public static final int RAM_WRITE_THREAD_COUNT = 8;
-    public static final long DIRECT_CACHE_SIZE = /*direct*/1900/*direct*/ * MB;
-    public static final long HEAP_CACHE_SIZE = /*heap*/2048/*heap*/ * MB;
-    public static final int RAM_SPACE_LEVEL_GAP = /*gap*/200/*gap*/; // B
+    public static final long DIRECT_CACHE_SIZE = 1900 * MB;
+    public static final long HEAP_CACHE_SIZE = 2048 * MB;
+    public static final int RAM_SPACE_LEVEL_GAP = 200; // B
     public static final int spaceLevelCount = (17 * 1024 + RAM_SPACE_LEVEL_GAP - 1) / RAM_SPACE_LEVEL_GAP;
     public static final int MAX_TRY_TIMES_WHILE_ALLOCATE_SPACE = 5;
     public static final long PMEM_CACHE_SIZE = 60 * GB;
@@ -116,36 +115,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         return fileSize;
     }
 
-    public static long getTotalFileSizeByPosition() {
-        long fileSize = 0;
-        for (FileChannel dataWriteChannel : dataWriteChannels) {
-            try {
-                fileSize += dataWriteChannel.position();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-        return fileSize;
-    }
-
     public static GetRangeTaskData getTask(Thread thread) {
         return getRangeTaskMap.computeIfAbsent(thread, k -> new GetRangeTaskData());
-    }
-
-    public static void killSelf(long timeout) {
-        if (timeout <= 0) {
-            return;
-        }
-        new Thread(() -> {
-            try {
-                Thread.sleep(timeout * 1000);
-                long writtenSize = getTotalFileSizeByPosition() / (1024 * 1024);
-                log.info("kill self, written: [ssd: {}M]", writtenSize);
-                System.exit(-1);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }).start();
     }
 
     public DefaultMessageQueueImpl() {
@@ -154,10 +125,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
 
         init();
-
+        // 断电后数据恢复
         powerFailureRecovery(metaInfo);
         log.info("DefaultMessageQueueImpl 构造函数执行完成");
-        killSelf(KILL_SELF_TIMEOUT);
     }
 
     public void powerFailureRecovery(ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo) {
@@ -196,6 +166,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         }
     }
 
+    // 每个线程私有，barrier broken后用私有（不会和其他线程共同拥有）的channel单个落盘数据
     private ThreadWorkContent getWorkContent(){
         ThreadWorkContent threadWorkContent = threadWorkContentMap.get();
         if (threadWorkContent == null){
@@ -226,16 +197,19 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         int offset = queueInfo.size();
 
         wrappedData.setWrapInfo(topicId, (short) queueId, data, offset, queueInfo);
+        // 写缓存
         ramDataWriter.pushWrappedData(wrappedData);
 //        pmemDataWriter.pushWrappedData(wrappedData);
 
         try {
             if (! cyclicBarriers[groupId].isBroken()){
                 appendSsdByGroup(groupId, topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
+                // 等待缓存写完
                 wrappedData.getMeta().getCountDownLatch().await();
             }else {
                 // 单条写入
 //                log.info("write single data");
+                // 等待缓存写完
                 wrappedData.getMeta().getCountDownLatch().await();
                 appendSsdBySelf(workContent, topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
             }
@@ -357,11 +331,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
 
+    // 本地调试
     public static final int threadCount = 45;
     public static final int topicCountPerThread = 2;  // threadCount * topicCountPerThread <= 100
     public static final int queueIdCountPerTopic = 5 * 5;
     public static final int writeTimesPerQueueId = 3 * 100;
-
     public static void main(String[] args) throws InterruptedException {
         for (File file : new File("d:/essd").listFiles()) {
             if(file.isFile()){
