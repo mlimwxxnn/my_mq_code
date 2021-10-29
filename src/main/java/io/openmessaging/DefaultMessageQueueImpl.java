@@ -121,7 +121,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public DefaultMessageQueueImpl() {
         log.info("DefaultMessageQueueImpl 开始执行构造函数");
-        DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("d:/essd") : new File("/essd");
+        DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("h:/essd") : new File("/essd");
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
 
         init();
@@ -131,9 +131,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
     public void powerFailureRecovery(ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo) {
-        if (getTotalFileSize() == 0){
-            return;
-        }
+//        if (getTotalFileSize() == 0){
+//            return;
+//        }
         // 分组文件以及私有文件
         for (int id = 0; id < dataWriteChannels.length; id++) {
             ByteBuffer readBuffer = ByteBuffer.allocateDirect(DATA_INFORMATION_LENGTH);
@@ -319,7 +319,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int queueIdCountPerTopic = 5 * 10;
     public static final int writeTimesPerQueueId = 3 * 100;
     public static void main(String[] args) throws InterruptedException {
-        for (File file : new File("d:/essd").listFiles()) {
+        for (File file : new File("h:/essd").listFiles()) {
             if(file.isFile()){
                 file.delete();
             }else{
