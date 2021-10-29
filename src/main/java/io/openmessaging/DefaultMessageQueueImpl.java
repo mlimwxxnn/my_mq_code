@@ -41,8 +41,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final CyclicBarrier[] cyclicBarriers = new CyclicBarrier[groupCount];
     public static final long[] groupBufferBasePos = new long[groupCount];
     public static final AtomicInteger[] groupBufferWritePos = new AtomicInteger[groupCount];
-    public static final AtomicInteger[] groupWaitThreadCount = new AtomicInteger[groupCount];
-    public static final CountDownLatch[] groupCountDownLatches = new CountDownLatch[groupCount];
 
 
     public static final int DATA_INFORMATION_LENGTH = 9;
@@ -71,13 +69,21 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         try {
             for (int i = 0; i < groupCount; i++) {
                 ByteBuffer byteBuffer = ByteBuffer.allocateDirect(THREAD_COUNT_PER_GROUP * 18 * 1024);
-
-                groupBuffers[i] = byteBuffer;
-                groupBufferWritePos[i] = new AtomicInteger();
-                groupWaitThreadCount[i] = new AtomicInteger();
-                groupBufferBasePos[i] = ((DirectBuffer) byteBuffer).address();
-                cyclicBarriers[i] = new CyclicBarrier(THREAD_COUNT_PER_GROUP);
-                groupCountDownLatches[i] = new CountDownLatch(1);
+                final int groupId = i;
+                groupBuffers[groupId] = byteBuffer;
+                groupBufferWritePos[groupId] = new AtomicInteger();
+                groupBufferBasePos[groupId] = ((DirectBuffer) byteBuffer).address();
+                cyclicBarriers[groupId] = new CyclicBarrier(THREAD_COUNT_PER_GROUP, () -> {
+                    try {
+                        groupBuffers[groupId].position(0);
+                        groupBuffers[groupId].limit(groupBufferWritePos[groupId].get());
+                        dataWriteChannels[groupId].write(groupBuffers[groupId]);
+                        dataWriteChannels[groupId].force(true);
+                        groupBufferWritePos[groupId].set(0);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                });
             }
 
             metaInfo = new ConcurrentHashMap<>(100);
@@ -202,13 +208,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //        pmemDataWriter.pushWrappedData(wrappedData);
 
         try {
-            if (! cyclicBarriers[groupId].isBroken()){
-                appendSsdByGroup(groupId, topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
-            }else {
-                // 单条写入
-//                log.info("write single data");
-                appendSsdBySelf(workContent, topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
-            }
+            appendSsdByGroup(groupId, topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
             wrappedData.getMeta().getCountDownLatch().await();
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -228,18 +228,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         unsafe.copyMemory(data.array(), 16 + dataPosition, null, currentBufferAddress + 9, dataLen);
         try {
             queueInfo.setDataPosInFile(offset, dataWriteChannels[groupId].position() + currentBufferPos + 9, (((long) groupId) << 32) | dataLen);
-            if(groupWaitThreadCount[groupId].incrementAndGet() == THREAD_COUNT_PER_GROUP){
-                groupBuffers[groupId].position(0);
-                groupBuffers[groupId].limit(groupBufferWritePos[groupId].get());
-                dataWriteChannels[groupId].write(groupBuffers[groupId]);
-                dataWriteChannels[groupId].force(true);
-                groupBufferWritePos[groupId].set(0);
-                groupWaitThreadCount[groupId].set(0);
-            }
             cyclicBarriers[groupId].await(5, TimeUnit.SECONDS);
         } catch ( IOException | InterruptedException | BrokenBarrierException | TimeoutException e) {
             log.info("cyclicBarrier timeout handle groupId: {}", groupId);
             // 超时等异常后把数据写入自己的channel
+            groupBufferWritePos[groupId].set(0);
             appendSsdBySelf(getWorkContent(), topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
         }
     }
@@ -316,7 +309,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     // 本地调试
     public static final int threadCount = 50;
     public static final int topicCountPerThread = 2;  // threadCount * topicCountPerThread <= 100
-    public static final int queueIdCountPerTopic = 5 * 10;
+    public static final int queueIdCountPerTopic = 5 * 5;
     public static final int writeTimesPerQueueId = 3 * 100;
     public static void main(String[] args) throws InterruptedException {
         for (File file : new File("d:/essd").listFiles()) {
