@@ -1,10 +1,8 @@
 package io.openmessaging;
 
-import io.openmessaging.info.QueueInfo;
 
 import java.nio.ByteBuffer;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static io.openmessaging.DefaultMessageQueueImpl.*;
 

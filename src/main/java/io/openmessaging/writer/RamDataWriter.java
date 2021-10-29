@@ -80,7 +80,7 @@ public class RamDataWriter {
                         if (!queueInfo.ramIsFull() && (ramInfo = getFreeRamInfo(dataLen)) != null) {
                             buf = wrappedData.getData();
                             data = buf.array();
-                            unsafe.copyMemory(data, 16 + buf.position(), ramInfo.ramObj, ramInfo.offset, buf.remaining());//directByteBuffer
+                            unsafe.copyMemory(data, 16 + wrappedData.getDataPosition(), ramInfo.ramObj, ramInfo.offset, wrappedData.getMeta().getDataLen());//directByteBuffer
                             queueInfo.setDataPosInRam(meta.getOffset(), ramInfo);
                             meta.getCountDownLatch().countDown();
                         } else {

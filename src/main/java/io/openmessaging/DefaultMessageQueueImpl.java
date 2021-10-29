@@ -204,15 +204,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         try {
             if (! cyclicBarriers[groupId].isBroken()){
                 appendSsdByGroup(groupId, topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
-                // 等待缓存写完
-                wrappedData.getMeta().getCountDownLatch().await();
             }else {
                 // 单条写入
 //                log.info("write single data");
-                // 等待缓存写完
-                wrappedData.getMeta().getCountDownLatch().await();
                 appendSsdBySelf(workContent, topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
             }
+            wrappedData.getMeta().getCountDownLatch().await();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -242,23 +239,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             cyclicBarriers[groupId].await(5, TimeUnit.SECONDS);
         } catch ( IOException | InterruptedException | BrokenBarrierException | TimeoutException e) {
             log.info("cyclicBarrier timeout handle groupId: {}", groupId);
-            // 这里把剩余的数据刷盘, WritePos 未归零时代表未刷盘
-            if (groupBufferWritePos[groupId].get() != 0){
-                synchronized (groupBuffers[groupId]){
-                    if (groupBufferWritePos[groupId].get() != 0){
-                        groupBuffers[groupId].position(0);
-                        groupBuffers[groupId].limit(groupBufferWritePos[groupId].get());
-                        try {
-                            dataWriteChannels[groupId].write(groupBuffers[groupId]);
-                            dataWriteChannels[groupId].force(true);
-                        } catch (IOException ex) {
-                            ex.printStackTrace();
-                        }
-                        groupBufferWritePos[groupId].set(0);
-                        groupWaitThreadCount[groupId].set(0);
-                    }
-                }
-            }
+            // 超时等异常后把数据写入自己的channel
+            appendSsdBySelf(getWorkContent(), topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
         }
     }
 
@@ -299,7 +281,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         return null;
                     }
                     if (!topicIdFile.getParentFile().exists()) {
-                        topicIdFile.getParentFile().mkdir();
+                        topicIdFile.getParentFile().mkdirs();
                     }
                     // 文件不存在，这是一个新的Topic，保存topic名称到topicId的映射，文件名为topic，内容为id
                     topicNameToTopicId.put(topic, topicId = (byte) topicCount.getAndIncrement());
@@ -332,9 +314,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 
     // 本地调试
-    public static final int threadCount = 45;
+    public static final int threadCount = 50;
     public static final int topicCountPerThread = 2;  // threadCount * topicCountPerThread <= 100
-    public static final int queueIdCountPerTopic = 5 * 5;
+    public static final int queueIdCountPerTopic = 5 * 10;
     public static final int writeTimesPerQueueId = 3 * 100;
     public static void main(String[] args) throws InterruptedException {
         for (File file : new File("d:/essd").listFiles()) {

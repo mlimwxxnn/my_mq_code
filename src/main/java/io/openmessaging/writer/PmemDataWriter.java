@@ -79,9 +79,7 @@ public class PmemDataWriter {
                         dataLen = meta.getDataLen();
                         if ((pmemInfo = getFreePmemInfo(dataLen)) > 0) {
                             buf = wrappedData.getData();
-                            int position = buf.position();
                             pmemChannels[(int)(pmemInfo >>> 40)].write(buf, pmemInfo & 0xffffffffffL);
-                            buf.position(position);
                             queueInfo.setDataPosInPmem(meta.getOffset(), pmemInfo);
                         }
                         meta.getCountDownLatch().countDown();
