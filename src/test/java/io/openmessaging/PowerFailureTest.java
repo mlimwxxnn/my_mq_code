@@ -44,9 +44,6 @@ public class PowerFailureTest {
                         for (int t = 0; t < writeTimesPerQueueId; t++) {
                             Map<Integer, ByteBuffer> res = mq.getRange(topic, queueIndex, t, 1);
                             ByteBuffer byteBuffer = res.get(0);
-                            if (topicIndex == 0 && queueIndex == 3 && t == 158 && "9-0".equals(topic)){
-                                int a = 1;
-                            }
                             if (byteBuffer.remaining() != 8){
                                 System.out.println(String.format("remaining error: %d: %d: %d, topic: %s, remaining: %d", topicIndex, queueIndex, t, topic, byteBuffer.remaining()));
                             }

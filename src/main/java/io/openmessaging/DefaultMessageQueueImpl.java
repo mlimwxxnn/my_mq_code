@@ -7,7 +7,6 @@ import io.openmessaging.writer.RamDataWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sun.nio.ch.DirectBuffer;
-import sun.security.provider.PolicySpiFile;
 
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -227,22 +226,22 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         int offset = queueInfo.size();
 
         wrappedData.setWrapInfo(topicId, (short) queueId, data, offset, queueInfo);
-//        ramDataWriter.pushWrappedData(wrappedData);
+        ramDataWriter.pushWrappedData(wrappedData);
 //        pmemDataWriter.pushWrappedData(wrappedData);
 
-//        try {
+        try {
             if (! cyclicBarriers[groupId].isBroken()){
                 appendSsdByGroup(groupId, topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
-//                wrappedData.getMeta().getCountDownLatch().await();
+                wrappedData.getMeta().getCountDownLatch().await();
             }else {
                 // 单条写入
 //                log.info("write single data");
-//                wrappedData.getMeta().getCountDownLatch().await();
+                wrappedData.getMeta().getCountDownLatch().await();
                 appendSsdBySelf(workContent, topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
             }
-//        } catch (InterruptedException e) {
-//            e.printStackTrace();
-//        }
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         return offset;
     }
 
@@ -267,17 +266,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 groupWaitThreadCount[groupId].set(0);
             }
             cyclicBarriers[groupId].await(5, TimeUnit.SECONDS);
-        } catch ( IOException | InterruptedException e) {
-            e.printStackTrace();
-        } catch (BrokenBarrierException e){
-            log.info("BrokenBarrier one time");
-            try {
-                groupCountDownLatches[groupId].await();
-            } catch (InterruptedException ex) {
-                ex.printStackTrace();
-            }
-        } catch (TimeoutException e) {
-            log.info("cyclicBarrier timeout.");
+        } catch ( IOException | InterruptedException | BrokenBarrierException | TimeoutException e) {
+            log.info("cyclicBarrier timeout handle groupId: {}", groupId);
             // 这里把剩余的数据刷盘, WritePos 未归零时代表未刷盘
             if (groupBufferWritePos[groupId].get() != 0){
                 synchronized (groupBuffers[groupId]){
@@ -295,7 +285,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     }
                 }
             }
-            groupCountDownLatches[groupId].countDown();
         }
     }
 
@@ -368,9 +357,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
 
-    public static final int threadCount = 42;
+    public static final int threadCount = 45;
     public static final int topicCountPerThread = 2;  // threadCount * topicCountPerThread <= 100
-    public static final int queueIdCountPerTopic = 5 * 2;
+    public static final int queueIdCountPerTopic = 5 * 5;
     public static final int writeTimesPerQueueId = 3 * 100;
 
     public static void main(String[] args) throws InterruptedException {
