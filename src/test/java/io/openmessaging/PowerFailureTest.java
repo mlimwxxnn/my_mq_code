@@ -45,8 +45,8 @@ public class PowerFailureTest {
                             if (byteBuffer.remaining() != 8){
                                 System.out.println(String.format("remaining error: %d: %d: %d, topic: %s, remaining: %d", topicIndex, queueIndex, t, topic, byteBuffer.remaining()));
                             }
-                            if (byteBuffer.getInt(0) != t || byteBuffer.getInt(4) != queueIndex){
-                                System.out.println(String.format("data error: %d: %d: %d topic: %s, data: {%d, %d}", topicIndex, queueIndex, t, topic, byteBuffer.getInt(), byteBuffer.getInt()));
+                            if (byteBuffer.getInt() != t || byteBuffer.getInt() != queueIndex){
+                                System.out.println(String.format("data error: %d: %d: %d topic: %s, data: {%d, %d}", topicIndex, queueIndex, t, topic, byteBuffer.getInt(0), byteBuffer.getInt(4)));
 //                                System.exit(-1);
                             }
                         }

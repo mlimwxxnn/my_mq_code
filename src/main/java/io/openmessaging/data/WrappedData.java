@@ -23,8 +23,8 @@ public class WrappedData {
         return data;
     }
 
-    public void setWrapInfo(byte topicId, short queueId, ByteBuffer data, int offset, QueueInfo queueInfo){
-        this.meta.setMetaInfo(topicId, queueId, (short)data.remaining(), offset, queueInfo);
+    public void setWrapInfo(ByteBuffer data, int offset, QueueInfo queueInfo){
+        this.meta.setMetaInfo((short)data.remaining(), offset, queueInfo);
         this.data = data;
         this.dataPosition = data.position();
     }

@@ -52,6 +52,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int spaceLevelCount = (17 * 1024 + RAM_SPACE_LEVEL_GAP - 1) / RAM_SPACE_LEVEL_GAP;
     public static final int MAX_TRY_TIMES_WHILE_ALLOCATE_SPACE = 5;
     public static final long PMEM_CACHE_SIZE = 60 * GB;
+    public static final long MAX_MESSAGE_FILE_SIZE = 125 * GB;
 //     public static final long PMEM_HEAP_SIZE = 20 * MB;
 
 
@@ -98,13 +99,38 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 }
                 dataWriteChannels[i] = FileChannel.open(file.toPath(), StandardOpenOption.WRITE, StandardOpenOption.READ);
             }
+
+            // ssd预先填0
+            CountDownLatch allocateCountDownLatch = new CountDownLatch(groupCount - 1);
+            for (int i = 0; i < groupCount - 1; i++) {
+                final int groupId = i;
+                new Thread(() -> {
+                    try {
+                        int bufferSize = 6 * 1024 * 1024;
+                        ByteBuffer byteBuffer = ByteBuffer.allocateDirect(bufferSize);
+                        // MAX_MESSAGE_FILE_SIZE: 125G, groupCount: 5
+                        byteBuffer.position(bufferSize);
+                        for (long writeTime = 0; writeTime < MAX_MESSAGE_FILE_SIZE / ((groupCount - 1) * bufferSize) ; writeTime++) {
+                            byteBuffer.flip();
+                            dataWriteChannels[groupId].write(byteBuffer);
+                        }
+                        dataWriteChannels[groupId].force(true);
+                        dataWriteChannels[groupId].position(0);
+                        allocateCountDownLatch.countDown();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }).start();
+            }
+            allocateCountDownLatch.await();
+
             // 恢复阶段不实例化写
             if (getTotalFileSize() > 0){
                 return;
             }
             pmemDataWriter = new PmemDataWriter();
             ramDataWriter = new RamDataWriter();
-        }catch(IOException e){
+        }catch(Exception e){
             e.printStackTrace();
         }
     }
@@ -127,7 +153,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public DefaultMessageQueueImpl() {
         log.info("DefaultMessageQueueImpl 开始执行构造函数");
-        DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("h:/essd") : new File("/essd");
+        DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("d:/essd") : new File("/essd");
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
 
         init();
@@ -202,7 +228,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         QueueInfo queueInfo = topicInfo.computeIfAbsent((short) queueId, k -> new QueueInfo());
         int offset = queueInfo.size();
 
-        wrappedData.setWrapInfo(topicId, (short) queueId, data, offset, queueInfo);
+        wrappedData.setWrapInfo(data, offset, queueInfo);
         // 写缓存
         ramDataWriter.pushWrappedData(wrappedData);
 //        pmemDataWriter.pushWrappedData(wrappedData);
@@ -307,12 +333,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 
     // 本地调试
-    public static final int threadCount = 50;
+    public static final int threadCount = 42;
     public static final int topicCountPerThread = 2;  // threadCount * topicCountPerThread <= 100
     public static final int queueIdCountPerTopic = 5 * 5;
     public static final int writeTimesPerQueueId = 3 * 100;
     public static void main(String[] args) throws InterruptedException {
-        for (File file : new File("h:/essd").listFiles()) {
+        for (File file : new File("d:/essd").listFiles()) {
             if(file.isFile()){
                 file.delete();
             }else{
