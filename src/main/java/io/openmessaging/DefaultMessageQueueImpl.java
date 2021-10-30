@@ -64,8 +64,18 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static PmemDataWriter pmemDataWriter;
     public static RamDataWriter ramDataWriter;
 
+    public static AtomicInteger getRangeCount = new AtomicInteger();
+
+    static long allocateWriteTime = PreallocateSpeedTest.preAllocate();
+    static long noAllocateWriteTime = PreallocateSpeedTest.noAllocate();
+
 
     public static void init() {
+        Runtime.getRuntime().addShutdownHook(new Thread(()->{
+            log.info("getRangeCount:{}", getRangeCount);
+            log.info("{},{}", allocateWriteTime, noAllocateWriteTime);
+        }));
+
         try {
             for (int i = 0; i < groupCount; i++) {
                 ByteBuffer byteBuffer = ByteBuffer.allocateDirect(THREAD_COUNT_PER_GROUP * 18 * 1024);
@@ -140,6 +150,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //        if (getTotalFileSize() == 0){
 //            return;
 //        }
+        log.info("开始执行断电恢复函数，totalFileSize: {}", getTotalFileSize());
         // 分组文件以及私有文件
         for (int id = 0; id < dataWriteChannels.length; id++) {
             ByteBuffer readBuffer = ByteBuffer.allocateDirect(DATA_INFORMATION_LENGTH);
@@ -170,6 +181,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 System.out.println("ignore exception while rectory");
             }
         }
+        log.info("恢复完毕 metaInfo.size={}", metaInfo.size());
     }
 
     // 每个线程私有，barrier broken后用私有（不会和其他线程共同拥有）的channel单个落盘数据
@@ -299,9 +311,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     @Override
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
         GetRangeTaskData task = getTask(Thread.currentThread());
-
+        int a = 1 / 0;
         task.setGetRangeParameter(topic, queueId, offset, fetchNum);
         task.queryData();
+        getRangeCount.getAndIncrement();
         return task.getResult();
     }
 

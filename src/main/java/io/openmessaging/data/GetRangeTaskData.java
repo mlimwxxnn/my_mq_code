@@ -13,9 +13,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
+import static io.openmessaging.DefaultMessageQueueImpl.metaInfo;
 import static io.openmessaging.writer.PmemDataWriter.freePmemQueues;
 import static io.openmessaging.data.PmemSaveSpaceData.*;
 import static io.openmessaging.writer.RamDataWriter.*;
+import static io.openmessaging.DefaultMessageQueueImpl.log;
 
 // todo 这里把初始化改到MQ构造函数里会更快
 public class GetRangeTaskData {
@@ -55,7 +57,12 @@ public class GetRangeTaskData {
             if (topicId == null) {
                 return;
             }
-            QueueInfo queueInfo = DefaultMessageQueueImpl.metaInfo.get(topicId).get((short) queueId);
+            QueueInfo queueInfo = null;
+            try {
+                queueInfo = DefaultMessageQueueImpl.metaInfo.get(topicId).get((short) queueId);
+            }catch (Exception e){
+                log.info("metaInfo.get(): {}", metaInfo.get(topicId));
+            }
             if (queueInfo == null) {
                 return;
             }
