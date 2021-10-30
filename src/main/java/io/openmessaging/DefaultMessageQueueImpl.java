@@ -311,7 +311,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     @Override
     public Map<Integer, ByteBuffer> getRange(String topic, int queueId, long offset, int fetchNum) {
         GetRangeTaskData task = getTask(Thread.currentThread());
-        int a = 1 / 0;
         task.setGetRangeParameter(topic, queueId, offset, fetchNum);
         task.queryData();
         getRangeCount.getAndIncrement();
