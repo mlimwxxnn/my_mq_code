@@ -47,4 +47,24 @@ public class PmemSaveSpaceData {
         alreadyAllocateSize += size;
         return pmemInfo;
     }
+
+    public synchronized long allocateV2(int size){
+        if (size < RAM_SPACE_LEVEL_GAP){
+            size = RAM_SPACE_LEVEL_GAP;
+        }
+        // 保证回收后组后一个level的freeQueue有资源回收进去
+        if (size > 17 * 1024 - RAM_SPACE_LEVEL_GAP){
+            size += RAM_SPACE_LEVEL_GAP - 1;
+        }
+
+        int retrieveLevelIndex = RamInfo.getRetrieveLevelIndexByDataLen(size);
+        long pmemInfo = channelAlreadyAllocateSizes[retrieveLevelIndex] | ((long)(retrieveLevelIndex)<<40);
+        if (pmemInfo == 0){
+            pmemInfo += 1;
+            size += 1;
+        }
+        channelAlreadyAllocateSizes[retrieveLevelIndex] += size;
+        alreadyAllocateSize += size;
+        return pmemInfo;
+    }
 }
