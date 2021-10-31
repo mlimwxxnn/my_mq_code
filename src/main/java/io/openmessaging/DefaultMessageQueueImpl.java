@@ -13,6 +13,7 @@ import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -71,6 +72,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //    static long allocateWriteTime = PreallocateSpeedTest.preAllocate();
 //    static long noAllocateWriteTime = PreallocateSpeedTest.noAllocate();
 
+    static long writeSizeFor(long dataSize) {
+        return (dataSize & 0xfffff000) + pageSize;
+    }
 
     public static void init() {
         Runtime.getRuntime().addShutdownHook(new Thread(()->{
@@ -80,7 +84,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         try {
             for (int i = 0; i < groupCount; i++) {
-                ByteBuffer byteBuffer = ByteBuffer.allocateDirect(THREAD_COUNT_PER_GROUP * 18 * 1024);
+                ByteBuffer byteBuffer = ByteBuffer.allocateDirect(THREAD_COUNT_PER_GROUP * (17 * 1024 + DATA_INFORMATION_LENGTH) + 1 << 12);
                 final int groupId = i;
                 groupBuffers[groupId] = byteBuffer;
                 groupBufferWritePos[groupId] = new AtomicInteger();
@@ -88,12 +92,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 cyclicBarriers[groupId] = new CyclicBarrier(THREAD_COUNT_PER_GROUP, () -> {
                     try {
                         groupBuffers[groupId].position(0);
-                        groupBuffers[groupId].limit(groupBufferWritePos[groupId].get());
+                        groupBuffers[groupId].limit((int)writeSizeFor(groupBufferWritePos[groupId].get()));
                         dataWriteChannels[groupId].write(groupBuffers[groupId]);
                         dataWriteChannels[groupId].force(true);
                         groupBufferWritePos[groupId].set(0);
-                        long position = dataWriteChannels[groupId].position();
-                        dataWriteChannels[groupId].position((position & 0xfffffffffffff000L) + pageSize);
+//                        long position = dataWriteChannels[groupId].position();
+//                        dataWriteChannels[groupId].position((position & 0xfffffffffffff000L) + pageSize);
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -150,45 +154,45 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         log.info("DefaultMessageQueueImpl 构造函数执行完成");
     }
 
-//    public void powerFailureRecovery(ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo) {
-//        if (getTotalFileSize() == 0){
-//            // 预分配ssd空间
-//            PreallocateUtil.preAllocate(dataWriteChannels);
-//            return;
-//        }
-//        log.info("开始执行断电恢复函数，totalFileSize: {}", getTotalFileSize());
-//        // 分组文件以及私有文件
-//        for (int id = 0; id < dataWriteChannels.length; id++) {
-//            ByteBuffer readBuffer = ByteBuffer.allocate(DATA_INFORMATION_LENGTH);
-//            FileChannel channel = dataWriteChannels[id];
-//            byte topicId;
-//            short queueId;
-//            short dataLen = 0;
-//            int offset;
-//            try {
-//                ConcurrentHashMap<Short, QueueInfo> topicInfo;
-//                QueueInfo queueInfo;
-//                long dataFilesize = channel.size();
-//                while (channel.position() + dataLen < dataFilesize) {
-//                    channel.position(channel.position() + dataLen); // 跳过数据部分只读取数据头部的索引信息
-//                    readBuffer.clear();
-//                    channel.read(readBuffer);
-//                    readBuffer.flip();
-//                    topicId = readBuffer.get();
-//                    queueId = Short.reverseBytes(readBuffer.getShort());
-//                    dataLen = Short.reverseBytes(readBuffer.getShort());
-//                    offset = Integer.reverseBytes(readBuffer.getInt());
-//                    topicInfo = metaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
-////                    topicInfo = localMetaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
-//                    queueInfo = topicInfo.computeIfAbsent(queueId, k -> new QueueInfo());
-//                    long groupIdAndDataLength = (((long) id) << 32) | dataLen;
-//                    queueInfo.setDataPosInFile(offset, channel.position(), groupIdAndDataLength);
-//                }
-//            } catch (Exception e) {
-//                System.out.println("ignore exception while rectory");
-//            }
-//        }
-//    }
+    public void powerFailureRecovery(ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo) {
+        if (getTotalFileSize() == 0){
+            // 预分配ssd空间
+            PreallocateUtil.preAllocate(dataWriteChannels);
+            return;
+        }
+        log.info("开始执行断电恢复函数，totalFileSize: {}", getTotalFileSize());
+        // 分组文件以及私有文件
+        for (int id = 0; id < dataWriteChannels.length; id++) {
+            ByteBuffer readBuffer = ByteBuffer.allocate(DATA_INFORMATION_LENGTH);
+            FileChannel channel = dataWriteChannels[id];
+            byte topicId;
+            short queueId;
+            short dataLen = 0;
+            int offset;
+            try {
+                ConcurrentHashMap<Short, QueueInfo> topicInfo;
+                QueueInfo queueInfo;
+                long dataFilesize = channel.size();
+                while (channel.position() + dataLen < dataFilesize) {
+                    channel.position(channel.position() + dataLen); // 跳过数据部分只读取数据头部的索引信息
+                    readBuffer.clear();
+                    channel.read(readBuffer);
+                    readBuffer.flip();
+                    topicId = readBuffer.get();
+                    queueId = Short.reverseBytes(readBuffer.getShort());
+                    dataLen = Short.reverseBytes(readBuffer.getShort());
+                    offset = Integer.reverseBytes(readBuffer.getInt());
+                    topicInfo = metaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
+//                    topicInfo = localMetaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
+                    queueInfo = topicInfo.computeIfAbsent(queueId, k -> new QueueInfo());
+                    long groupIdAndDataLength = (((long) id) << 32) | dataLen;
+                    queueInfo.setDataPosInFile(offset, channel.position(), groupIdAndDataLength);
+                }
+            } catch (Exception e) {
+                System.out.println("ignore exception while rectory");
+            }
+        }
+    }
 
     public void powerFailureRecoveryV2(ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo) {
         if (getTotalFileSize() == 0){
@@ -230,7 +234,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         channel.position(channel.position() + dataLen); // 跳过数据部分只读取数据头部的索引信息
                     }
                     long position = dataWriteChannels[id].position();
-                    dataWriteChannels[id].position((position & 0xfffffffffffff000L) + pageSize);
+                    dataWriteChannels[id].position(writeSizeFor(position));
                 }
             } catch (Exception e) {
                 System.out.println("ignore exception while rectory");
