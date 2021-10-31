@@ -12,6 +12,7 @@ import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -150,12 +151,27 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
     public void powerFailureRecovery(ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo) {
-//        if (getTotalFileSize() == 0){
-//            return;
-//        }
+        if (getTotalFileSize() == 0){
+            return;
+        }
+        String[] topicNames = new String[100];
+        File topicIdFile = new File(DISC_ROOT, "topic");
+        try {
+            for (File topicFile : topicIdFile.listFiles()) {
+                String topicName = topicFile.getName();
+                FileInputStream fis = new FileInputStream(topicFile);
+                int topicId = (byte) fis.read();
+                topicNames[topicId] = topicName;
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+
         log.info("开始执行断电恢复函数，totalFileSize: {}", getTotalFileSize());
         // 分组文件以及私有文件
         for (int id = 0; id < dataWriteChannels.length; id++) {
+            ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> localMetaInfo = new ConcurrentHashMap<>(10);
+
             ByteBuffer readBuffer = ByteBuffer.allocate(DATA_INFORMATION_LENGTH);
             FileChannel channel = dataWriteChannels[id];
             byte topicId;
@@ -175,7 +191,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     queueId = Short.reverseBytes(readBuffer.getShort());
                     dataLen = Short.reverseBytes(readBuffer.getShort());
                     offset = Integer.reverseBytes(readBuffer.getInt());
-                    topicInfo = metaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
+//                    topicInfo = metaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
+                    topicInfo = localMetaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
                     queueInfo = topicInfo.computeIfAbsent(queueId, k -> new QueueInfo());
                     long groupIdAndDataLength = (((long) id) << 32) | dataLen;
                     queueInfo.setDataPosInFile(offset, channel.position(), groupIdAndDataLength);
@@ -183,8 +200,24 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             } catch (Exception e) {
                 System.out.println("ignore exception while rectory");
             }
+
+            metaInfo.putAll(localMetaInfo);
+
+            try {
+                log.info("channel: {}, channel.size(): {}, recoveryTopicCount: {}", id, channel.size(), localMetaInfo.size());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            for (Byte localTopicId : localMetaInfo.keySet()) {
+                ConcurrentHashMap<Short, QueueInfo> topicMap = localMetaInfo.get(localTopicId);
+                log.info("topic: {}, queueNums: {}", topicNames[localTopicId], topicMap.size());
+                for (Short localQueueId : topicMap.keySet()) {
+                    QueueInfo queueInfo = topicMap.get(localQueueId);
+                    System.out.printf("queueId: %d, \tqueueSize: %d\n", localQueueId, queueInfo.size());
+                }
+            }
+            System.out.println("************************************************************");
         }
-        log.info("恢复完毕 metaInfo.size={}", metaInfo.size());
     }
 
     // 每个线程私有，barrier broken后用私有（不会和其他线程共同拥有）的channel单个落盘数据
@@ -322,9 +355,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 
     // 本地调试
-    public static final int threadCount = 12;
-    public static final int topicCountPerThread = 1;  // threadCount * topicCountPerThread <= 100
-    public static final int queueIdCountPerTopic = 5000;
+    public static final int threadCount = 42;
+    public static final int topicCountPerThread = 2;  // threadCount * topicCountPerThread <= 100
+    public static final int queueIdCountPerTopic = 50;
     public static final int writeTimesPerQueueId = 10;
     public static void main(String[] args) throws InterruptedException {
         for (File file : new File("d:/essd").listFiles()) {
