@@ -63,7 +63,7 @@ public class PreallocateSpeedTest {
                 channel.position(((position + 4 * 1024 - 1) >> 12) << 12); // position对 4k 向上取整
                 buffer.flip();
                 channel.write(buffer);
-                channel.force(true);
+                channel.force(false);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -83,9 +83,9 @@ public class PreallocateSpeedTest {
                     for (long writeTime = 0; writeTime < (testTotalWriteFileSize << 1) / ((groupCount - 1) * preAllocateBufferSize) ; writeTime++) {
                         byteBuffer.flip();
                         dataWriteChannels[groupId].write(byteBuffer);
-                        dataWriteChannels[groupId].force(true);
+                        dataWriteChannels[groupId].force(false);
                     }
-                    dataWriteChannels[groupId].force(true);
+                    dataWriteChannels[groupId].force(false);
                     dataWriteChannels[groupId].position(0);
                     allocateCountDownLatch.countDown();
                 } catch (IOException e) {

@@ -15,7 +15,7 @@ public class PreallocateUtil {
 
     public static void preAllocate(FileChannel[] dataWriteChannels){
         CountDownLatch allocateCountDownLatch = new CountDownLatch(groupCount - 1);
-        for (int i = 0; i < groupCount; i++) {
+        for (int i = 0; i < groupCount - 1; i++) {
             final int groupId = i;
             new Thread(() -> {
                 try {
@@ -25,7 +25,7 @@ public class PreallocateUtil {
                         byteBuffer.flip();
                         dataWriteChannels[groupId].write(byteBuffer);
                     }
-                    dataWriteChannels[groupId].force(true);
+                    dataWriteChannels[groupId].force(false);
                     dataWriteChannels[groupId].position(0);
                     allocateCountDownLatch.countDown();
                 } catch (IOException e) {

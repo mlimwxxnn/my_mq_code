@@ -96,12 +96,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 cyclicBarriers[groupId] = new CyclicBarrier(THREAD_COUNT_PER_GROUP, () -> {
                     try {
                         groupBuffers[groupId].position(0);
+
                         groupBuffers[groupId].limit(writeSizeFor(groupBufferWritePos[groupId].get()));
+
                         dataWriteChannels[groupId].write(groupBuffers[groupId]);
-                        dataWriteChannels[groupId].force(true);
+                        dataWriteChannels[groupId].force(false);
+
                         groupBufferWritePos[groupId].set(0);
-//                        long position = dataWriteChannels[groupId].position();
-//                        dataWriteChannels[groupId].position((position & 0xfffffffffffff000L) + pageSize);
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -328,7 +329,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             buffer.position(0);
             buffer.limit(dataLen + 9);
             channel.write(buffer);
-            channel.force(true);
+            channel.force(false);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -356,7 +357,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
                     FileChannel channel = new RandomAccessFile(topicIdFile, "rw").getChannel();
                     channel.write(ByteBuffer.wrap(new byte[]{topicId}));
-                    channel.force(true);
+                    channel.force(false);
                     channel.close();
                 } else {
                     // 文件存在，topic不在内存，从文件恢复
