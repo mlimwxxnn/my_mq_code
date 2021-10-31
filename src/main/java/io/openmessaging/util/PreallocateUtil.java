@@ -1,4 +1,4 @@
-package io.openmessaging;
+package io.openmessaging.util;
 
 import java.io.File;
 import java.io.IOException;
@@ -7,11 +7,12 @@ import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
 import java.util.concurrent.CountDownLatch;
 
-public class PreallocateSpeedTest {
-    public static final int groupCount = 5;
+import static io.openmessaging.DefaultMessageQueueImpl.groupCount;
+
+public class PreallocateUtil {
     public static final int testWriteBufferSize = 8 * 10 * 1024 + 200;
     public static final int preAllocateBufferSize = 100 * 4 * 1024;
-    public static final long testTotalWriteFileSize = 1L * 1024 * 1024 * 1024;
+    public static final long testTotalWriteFileSize = System.getProperty("os.name").contains("Windows") ? 125 * 1024 * 1024 : 125L * 1024 * 1024 * 1024;
 
     public static FileChannel[] openFileChannel(boolean isPreAllocate){
         FileChannel[] dataWriteChannels = new FileChannel[groupCount];
@@ -70,6 +71,7 @@ public class PreallocateSpeedTest {
         }
     }
 
+    // todo 这里 groupCount - 1 可以试试改成 groupCount
     public static void preAllocate(FileChannel[] dataWriteChannels){
         CountDownLatch allocateCountDownLatch = new CountDownLatch(groupCount - 1);
         for (int i = 0; i < groupCount - 1; i++) {
@@ -77,12 +79,10 @@ public class PreallocateSpeedTest {
             new Thread(() -> {
                 try {
                     ByteBuffer byteBuffer = ByteBuffer.allocateDirect(preAllocateBufferSize);
-                    // MAX_MESSAGE_FILE_SIZE: 125G, groupCount: 5
                     byteBuffer.position(preAllocateBufferSize);
-                    for (long writeTime = 0; writeTime < (testTotalWriteFileSize << 1) / ((groupCount - 1) * preAllocateBufferSize) ; writeTime++) {
+                    for (long writeTime = 0; writeTime < testTotalWriteFileSize * 1.1 / ((groupCount - 1) * preAllocateBufferSize) ; writeTime++) {
                         byteBuffer.flip();
                         dataWriteChannels[groupId].write(byteBuffer);
-                        dataWriteChannels[groupId].force(true);
                     }
                     dataWriteChannels[groupId].force(true);
                     dataWriteChannels[groupId].position(0);
