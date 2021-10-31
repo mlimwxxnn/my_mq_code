@@ -11,7 +11,7 @@ public class PreallocateSpeedTest {
     public static final int groupCount = 5;
     public static final int testWriteBufferSize = 8 * 10 * 1024 + 200;
     public static final int preAllocateBufferSize = 100 * 4 * 1024;
-    public static final long testTotalWriteFileSize = 2L * 1024 * 1024 * 1024;
+    public static final long testTotalWriteFileSize = 1L * 1024 * 1024 * 1024;
 
     public static FileChannel[] openFileChannel(boolean isPreAllocate){
         FileChannel[] dataWriteChannels = new FileChannel[groupCount];

@@ -21,7 +21,6 @@ import static io.openmessaging.util.UnsafeUtil.unsafe;
 /**
  * 优化点：
  * 1. 内存占用优化（包括：查过的数据，内粗不再继续存储它的索引； hashmap -> arraylist）
- * 2. pmem使用到 62G
  * **/
 @SuppressWarnings("ResultOfMethodCallIgnored")
 public class DefaultMessageQueueImpl extends MessageQueue {
@@ -67,14 +66,14 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static AtomicInteger getRangeCount = new AtomicInteger();
 
-    static long allocateWriteTime = PreallocateSpeedTest.preAllocate();
-    static long noAllocateWriteTime = PreallocateSpeedTest.noAllocate();
+//    static long allocateWriteTime = PreallocateSpeedTest.preAllocate();
+//    static long noAllocateWriteTime = PreallocateSpeedTest.noAllocate();
 
 
     public static void init() {
         Runtime.getRuntime().addShutdownHook(new Thread(()->{
             log.info("getRangeCount:{}", getRangeCount);
-            log.info("{},{}", allocateWriteTime, noAllocateWriteTime);
+//            log.info("{},{}", allocateWriteTime, noAllocateWriteTime);
         }));
 
         try {
@@ -111,28 +110,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             }
 
             // ssd预先填0
-            CountDownLatch allocateCountDownLatch = new CountDownLatch(groupCount - 1);
-            for (int i = 0; i < groupCount - 1; i++) {
-                final int groupId = i;
-                new Thread(() -> {
-                    try {
-                        int bufferSize = 6 * 1024 * 1024;
-                        ByteBuffer byteBuffer = ByteBuffer.allocateDirect(bufferSize);
-                        // MAX_MESSAGE_FILE_SIZE: 125G, groupCount: 5
-                        byteBuffer.position(bufferSize);
-                        for (long writeTime = 0; writeTime < MAX_MESSAGE_FILE_SIZE / ((groupCount - 1) * bufferSize) ; writeTime++) {
-                            byteBuffer.flip();
-                            dataWriteChannels[groupId].write(byteBuffer);
-                        }
-                        dataWriteChannels[groupId].force(true);
-                        dataWriteChannels[groupId].position(0);
-                        allocateCountDownLatch.countDown();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }).start();
-            }
-            allocateCountDownLatch.await();
 
             // 恢复阶段不实例化写
             if (getTotalFileSize() > 0){
@@ -179,8 +156,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         log.info("开始执行断电恢复函数，totalFileSize: {}", getTotalFileSize());
         // 分组文件以及私有文件
         for (int id = 0; id < dataWriteChannels.length; id++) {
-            ByteBuffer readBuffer = ByteBuffer.allocateDirect(DATA_INFORMATION_LENGTH);
-            long baseAddress = ((DirectBuffer) readBuffer).address();
+            ByteBuffer readBuffer = ByteBuffer.allocate(DATA_INFORMATION_LENGTH);
             FileChannel channel = dataWriteChannels[id];
             byte topicId;
             short queueId;
@@ -194,10 +170,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     channel.position(channel.position() + dataLen); // 跳过数据部分只读取数据头部的索引信息
                     readBuffer.clear();
                     channel.read(readBuffer);
-                    topicId = unsafe.getByte(baseAddress);
-                    queueId = unsafe.getShort(baseAddress + 1);
-                    dataLen = unsafe.getShort(baseAddress + 3);
-                    offset = unsafe.getInt(baseAddress + 5);
+                    readBuffer.flip();
+                    topicId = readBuffer.get();
+                    queueId = Short.reverseBytes(readBuffer.getShort());
+                    dataLen = Short.reverseBytes(readBuffer.getShort());
+                    offset = Integer.reverseBytes(readBuffer.getInt());
                     topicInfo = metaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
                     queueInfo = topicInfo.computeIfAbsent(queueId, k -> new QueueInfo());
                     long groupIdAndDataLength = (((long) id) << 32) | dataLen;
@@ -268,7 +245,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             queueInfo.setDataPosInFile(offset, dataWriteChannels[groupId].position() + currentBufferPos + 9, (((long) groupId) << 32) | dataLen);
             cyclicBarriers[groupId].await(5, TimeUnit.SECONDS);
         } catch ( IOException | InterruptedException | BrokenBarrierException | TimeoutException e) {
-            log.info("cyclicBarrier timeout handle groupId: {}", groupId);
+//            log.info("cyclicBarrier timeout handle groupId: {}", groupId);
             // 超时等异常后把数据写入自己的channel
             groupBufferWritePos[groupId].set(0);
             appendSsdBySelf(getWorkContent(), topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
@@ -345,10 +322,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 
     // 本地调试
-    public static final int threadCount = 42;
-    public static final int topicCountPerThread = 2;  // threadCount * topicCountPerThread <= 100
-    public static final int queueIdCountPerTopic = 5 * 5;
-    public static final int writeTimesPerQueueId = 3 * 100;
+    public static final int threadCount = 12;
+    public static final int topicCountPerThread = 1;  // threadCount * topicCountPerThread <= 100
+    public static final int queueIdCountPerTopic = 5000;
+    public static final int writeTimesPerQueueId = 10;
     public static void main(String[] args) throws InterruptedException {
         for (File file : new File("d:/essd").listFiles()) {
             if(file.isFile()){
