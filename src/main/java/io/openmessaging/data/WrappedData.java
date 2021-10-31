@@ -11,6 +11,10 @@ public class WrappedData {
 
     private int dataPosition;
 
+    public byte state;
+
+    public Object posObj;
+
     public WrappedData() {
         this.meta = new MetaData();
     }
@@ -24,6 +28,8 @@ public class WrappedData {
     }
 
     public void setWrapInfo(ByteBuffer data, int offset, QueueInfo queueInfo){
+        this.posObj = null;
+        this.state = 0;
         this.meta.setMetaInfo((short)data.remaining(), offset, queueInfo);
         this.data = data;
         this.dataPosition = data.position();

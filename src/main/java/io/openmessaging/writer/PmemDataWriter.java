@@ -67,7 +67,6 @@ public class PmemDataWriter {
                 try {
                     WrappedData wrappedData;
                     ByteBuffer buf;
-                    QueueInfo queueInfo;
                     MetaData meta;
                     short dataLen;
                     long pmemInfo;
@@ -75,12 +74,12 @@ public class PmemDataWriter {
                         wrappedData = pmemWrappedDataQueue.take();
                         meta = wrappedData.getMeta();
 
-                        queueInfo = meta.getQueueInfo();
                         dataLen = meta.getDataLen();
                         if ((pmemInfo = getFreePmemInfo(dataLen)) > 0) {
                             buf = wrappedData.getData();
                             pmemChannels[(int)(pmemInfo >>> 40)].write(buf, pmemInfo & 0xffffffffffL);
-                            queueInfo.setDataPosInPmem(meta.getOffset(), pmemInfo);
+                            wrappedData.posObj = pmemInfo;
+                            wrappedData.state = 1;
                         }
                         meta.getCountDownLatch().countDown();
                     }

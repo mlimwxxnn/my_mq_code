@@ -1,7 +1,9 @@
 package io.openmessaging;
 
 import io.openmessaging.data.*;
+import io.openmessaging.info.DataPosInfo;
 import io.openmessaging.info.QueueInfo;
+import io.openmessaging.info.RamInfo;
 import io.openmessaging.writer.PmemDataWriter;
 import io.openmessaging.writer.RamDataWriter;
 import org.slf4j.Logger;
@@ -255,9 +257,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         // 写缓存
         ramDataWriter.pushWrappedData(wrappedData);
 //        pmemDataWriter.pushWrappedData(wrappedData);
-
+        if(wrappedData.state != 0) {
+            queueInfo.setDataPosition(new DataPosInfo(wrappedData.state, wrappedData.posObj));
+        }
         try {
-            appendSsdByGroup(groupId, topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
+            appendSsdByGroup(groupId, topicId, queueId, offset, queueInfo, data, dataLen, dataPosition, wrappedData.state);
             wrappedData.getMeta().getCountDownLatch().await();
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -266,7 +270,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     }
 
     // 聚合写入
-    public void appendSsdByGroup(int groupId, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data, short dataLen, int dataPosition) {
+    public void appendSsdByGroup(int groupId, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data, short dataLen, int dataPosition, byte state) {
         int currentBufferPos = groupBufferWritePos[groupId].getAndAdd( 9 + dataLen);
         long currentBufferAddress = groupBufferBasePos[groupId] + currentBufferPos;
         unsafe.putByte(currentBufferAddress, topicId);
@@ -276,18 +280,20 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         // 放入数据本体
         unsafe.copyMemory(data.array(), 16 + dataPosition, null, currentBufferAddress + 9, dataLen);
         try {
-            queueInfo.setDataPosInFile(offset, dataWriteChannels[groupId].position() + currentBufferPos + 9, (((long) groupId) << 32) | dataLen);
             cyclicBarriers[groupId].await(5, TimeUnit.SECONDS);
-        } catch ( IOException | InterruptedException | BrokenBarrierException | TimeoutException e) {
+            if(state == 0) {
+                queueInfo.setDataPosition(new DataPosInfo(0, new long[]{dataWriteChannels[groupId].position() + currentBufferPos + 9, (((long) groupId) << 32) | dataLen}));
+            }
+        } catch (InterruptedException | BrokenBarrierException | TimeoutException | IOException e) {
 //            log.info("cyclicBarrier timeout handle groupId: {}", groupId);
             // 超时等异常后把数据写入自己的channel
             groupBufferWritePos[groupId].set(0);
-            appendSsdBySelf(getWorkContent(), topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
+            appendSsdBySelf(getWorkContent(), topicId, queueId, offset, queueInfo, data, dataLen, dataPosition, state);
         }
     }
 
     // 单条写入
-    public void appendSsdBySelf(ThreadWorkContent workContent, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data, short dataLen, int dataPosition) {
+    public void appendSsdBySelf(ThreadWorkContent workContent, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data, short dataLen, int dataPosition, byte state) {
         FileChannel channel = workContent.channel;
         ByteBuffer buffer = workContent.buffer;
         long currentBufferAddress = ((DirectBuffer) buffer).address();
@@ -299,7 +305,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         // 放入数据本体
         unsafe.copyMemory(data.array(), 16 + dataPosition, null, currentBufferAddress + 9, dataLen);
         try {
-            queueInfo.setDataPosInFile(offset, channel.position() + 9, (workContent.fileId << 32) | dataLen);
+            if(state == 0) {
+                queueInfo.setDataPosition(new long[]{channel.position() + 9, (workContent.fileId << 32) | dataLen});
+            }
             buffer.position(0);
             buffer.limit(dataLen + 9);
             channel.write(buffer);

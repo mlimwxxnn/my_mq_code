@@ -77,11 +77,12 @@ public class RamDataWriter {
 
                         queueInfo = meta.getQueueInfo();
                         dataLen = meta.getDataLen();
-                        if (!queueInfo.ramIsFull() && (ramInfo = getFreeRamInfo(dataLen)) != null) {
+                        if ((ramInfo = getFreeRamInfo(dataLen)) != null) {
                             buf = wrappedData.getData();
                             data = buf.array();
                             unsafe.copyMemory(data, 16 + wrappedData.getDataPosition(), ramInfo.ramObj, ramInfo.offset, wrappedData.getMeta().getDataLen());//directByteBuffer
-                            queueInfo.setDataPosInRam(meta.getOffset(), ramInfo);
+                            wrappedData.posObj = ramInfo;
+                            wrappedData.state = 2;
                             meta.getCountDownLatch().countDown();
                         } else {
                             pmemDataWriter.pushWrappedData(wrappedData);
