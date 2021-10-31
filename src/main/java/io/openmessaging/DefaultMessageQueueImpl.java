@@ -143,7 +143,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public DefaultMessageQueueImpl() {
         log.info("DefaultMessageQueueImpl 开始执行构造函数");
-        DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("d:/essd") : new File("/essd");
+        DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("h:/essd") : new File("/essd");
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
 
         init();
@@ -180,7 +180,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             byte topicId;
             short queueId;
             short dataLen = 0;
-            int offset;
             try {
                 ConcurrentHashMap<Short, QueueInfo> topicInfo;
                 QueueInfo queueInfo;
@@ -193,12 +192,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     topicId = readBuffer.get();
                     queueId = Short.reverseBytes(readBuffer.getShort());
                     dataLen = Short.reverseBytes(readBuffer.getShort());
-                    offset = Integer.reverseBytes(readBuffer.getInt());
+//                    offset = Integer.reverseBytes(readBuffer.getInt());
 //                    topicInfo = metaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
                     topicInfo = localMetaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
                     queueInfo = topicInfo.computeIfAbsent(queueId, k -> new QueueInfo());
                     long groupIdAndDataLength = (((long) id) << 32) | dataLen;
-                    queueInfo.setDataPosInFile(offset, channel.position(), groupIdAndDataLength);
+                    queueInfo.setDataPosition(new DataPosInfo((byte) 0, new long[]{channel.position(), groupIdAndDataLength}));
                 }
             } catch (Exception e) {
                 System.out.println("ignore exception while rectory");
@@ -257,20 +256,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         // 写缓存
         ramDataWriter.pushWrappedData(wrappedData);
 //        pmemDataWriter.pushWrappedData(wrappedData);
-        if(wrappedData.state != 0) {
-            queueInfo.setDataPosition(new DataPosInfo(wrappedData.state, wrappedData.posObj));
-        }
-        try {
-            appendSsdByGroup(groupId, topicId, queueId, offset, queueInfo, data, dataLen, dataPosition, wrappedData.state);
-            wrappedData.getMeta().getCountDownLatch().await();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+        appendSsdByGroup(groupId, topicId, queueId, offset, queueInfo, data, dataLen, dataPosition, wrappedData);
         return offset;
     }
 
     // 聚合写入
-    public void appendSsdByGroup(int groupId, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data, short dataLen, int dataPosition, byte state) {
+    public void appendSsdByGroup(int groupId, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data, short dataLen, int dataPosition, WrappedData wrappedData) {
         int currentBufferPos = groupBufferWritePos[groupId].getAndAdd( 9 + dataLen);
         long currentBufferAddress = groupBufferBasePos[groupId] + currentBufferPos;
         unsafe.putByte(currentBufferAddress, topicId);
@@ -280,15 +271,18 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         // 放入数据本体
         unsafe.copyMemory(data.array(), 16 + dataPosition, null, currentBufferAddress + 9, dataLen);
         try {
-            cyclicBarriers[groupId].await(5, TimeUnit.SECONDS);
-            if(state == 0) {
-                queueInfo.setDataPosition(new DataPosInfo(0, new long[]{dataWriteChannels[groupId].position() + currentBufferPos + 9, (((long) groupId) << 32) | dataLen}));
+            cyclicBarriers[groupId].await(1, TimeUnit.SECONDS);
+            wrappedData.getMeta().getCountDownLatch().await();
+            if(wrappedData.state != 0) {
+                queueInfo.setDataPosition(new DataPosInfo(wrappedData.state, wrappedData.posObj));
+            }else {
+                queueInfo.setDataPosition(new DataPosInfo((byte)0, new long[]{dataWriteChannels[groupId].position() + currentBufferPos + 9, (((long) groupId) << 32) | dataLen}));
             }
         } catch (InterruptedException | BrokenBarrierException | TimeoutException | IOException e) {
 //            log.info("cyclicBarrier timeout handle groupId: {}", groupId);
             // 超时等异常后把数据写入自己的channel
             groupBufferWritePos[groupId].set(0);
-            appendSsdBySelf(getWorkContent(), topicId, queueId, offset, queueInfo, data, dataLen, dataPosition, state);
+            appendSsdBySelf(getWorkContent(), topicId, queueId, offset, queueInfo, data, dataLen, dataPosition, wrappedData.state);
         }
     }
 
@@ -306,7 +300,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         unsafe.copyMemory(data.array(), 16 + dataPosition, null, currentBufferAddress + 9, dataLen);
         try {
             if(state == 0) {
-                queueInfo.setDataPosition(new long[]{channel.position() + 9, (workContent.fileId << 32) | dataLen});
+                queueInfo.setDataPosition(new DataPosInfo((byte) 0, new long[]{channel.position() + 9, (workContent.fileId << 32) | dataLen}));
             }
             buffer.position(0);
             buffer.limit(dataLen + 9);
@@ -371,12 +365,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
 
     // 本地调试
-    public static final int threadCount = 42;
-    public static final int topicCountPerThread = 2;  // threadCount * topicCountPerThread <= 100
-    public static final int queueIdCountPerTopic = 50;
-    public static final int writeTimesPerQueueId = 10;
+    public static final int threadCount = 10;
+    public static final int topicCountPerThread = 1;  // threadCount * topicCountPerThread <= 100
+    public static final int queueIdCountPerTopic = 1;
+    public static final int writeTimesPerQueueId = 1;
     public static void main(String[] args) throws InterruptedException {
-        for (File file : new File("d:/essd").listFiles()) {
+        for (File file : new File("h:/essd").listFiles()) {
             if(file.isFile()){
                 file.delete();
             }else{

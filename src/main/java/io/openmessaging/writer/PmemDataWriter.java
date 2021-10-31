@@ -58,7 +58,7 @@ public class PmemDataWriter {
         while ((pmemInfo = freePmemQueues[levelIndex].poll()) == null && levelIndex < maxTryLevelIndex){
             levelIndex++;
         }
-        return pmemInfo == null ? 0 : pmemInfo;
+        return pmemInfo == null ? 0 : (pmemInfo | ((long)dataLen << 48));
     }
 
     private void writeDataToPmem(){

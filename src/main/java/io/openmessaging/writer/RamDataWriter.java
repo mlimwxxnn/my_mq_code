@@ -82,6 +82,7 @@ public class RamDataWriter {
                             data = buf.array();
                             unsafe.copyMemory(data, 16 + wrappedData.getDataPosition(), ramInfo.ramObj, ramInfo.offset, wrappedData.getMeta().getDataLen());//directByteBuffer
                             wrappedData.posObj = ramInfo;
+                            ramInfo.dataLen = dataLen;
                             wrappedData.state = 2;
                             meta.getCountDownLatch().countDown();
                         } else {

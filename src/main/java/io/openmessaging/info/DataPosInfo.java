@@ -12,10 +12,10 @@ public class DataPosInfo {
         return state;
     }
     // fileChannelOffset, fileIdAndLen
-    public long[][] getDataPosInFile(){
-        return (long[][]) dataPos;
+    public long[] getDataPosInFile(){
+        return (long[]) dataPos;
     }
-    public Long getDaPosInPmem(){
+    public Long getDataPosInPmem(){
         return (Long) dataPos;
     }
     public RamInfo getDataPosInRam(){
