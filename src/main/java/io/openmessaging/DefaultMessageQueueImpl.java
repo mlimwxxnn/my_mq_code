@@ -54,7 +54,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int spaceLevelCount = (17 * 1024 + RAM_SPACE_LEVEL_GAP - 1) / RAM_SPACE_LEVEL_GAP;
     public static final int MAX_TRY_TIMES_WHILE_ALLOCATE_SPACE = 5;
     public static final long PMEM_CACHE_SIZE = 60 * GB;
-    public static final long pageSize = 4 * KB;
+    public static final int pageSize = (int) (4 * KB);
 //     public static final long PMEM_HEAP_SIZE = 20 * MB;
 
 
@@ -72,8 +72,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //    static long allocateWriteTime = PreallocateSpeedTest.preAllocate();
 //    static long noAllocateWriteTime = PreallocateSpeedTest.noAllocate();
 
-    static long writeSizeFor(long dataSize) {
+    static int writeSizeFor(int dataSize) {
         return (dataSize & 0xfffff000) + pageSize;
+    }
+
+    static long writeSizeFor(long position) {
+        return (position & 0xfffffffffffff000L) + pageSize;
     }
 
     public static void init() {
@@ -84,7 +88,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         try {
             for (int i = 0; i < groupCount; i++) {
-                ByteBuffer byteBuffer = ByteBuffer.allocateDirect((int)writeSizeFor(THREAD_COUNT_PER_GROUP * (17 * 1024 + DATA_INFORMATION_LENGTH)));
+                ByteBuffer byteBuffer = ByteBuffer.allocateDirect(writeSizeFor(THREAD_COUNT_PER_GROUP * (17 * 1024 + DATA_INFORMATION_LENGTH)));
                 final int groupId = i;
                 groupBuffers[groupId] = byteBuffer;
                 groupBufferWritePos[groupId] = new AtomicInteger();
@@ -92,7 +96,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 cyclicBarriers[groupId] = new CyclicBarrier(THREAD_COUNT_PER_GROUP, () -> {
                     try {
                         groupBuffers[groupId].position(0);
-                        groupBuffers[groupId].limit((int)writeSizeFor(groupBufferWritePos[groupId].get()));
+                        groupBuffers[groupId].limit(writeSizeFor(groupBufferWritePos[groupId].get()));
                         dataWriteChannels[groupId].write(groupBuffers[groupId]);
                         dataWriteChannels[groupId].force(true);
                         groupBufferWritePos[groupId].set(0);
