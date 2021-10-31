@@ -84,7 +84,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
         try {
             for (int i = 0; i < groupCount; i++) {
-                ByteBuffer byteBuffer = ByteBuffer.allocateDirect(THREAD_COUNT_PER_GROUP * (17 * 1024 + DATA_INFORMATION_LENGTH) + 1 << 12);
+                ByteBuffer byteBuffer = ByteBuffer.allocateDirect((int)writeSizeFor(THREAD_COUNT_PER_GROUP * (17 * 1024 + DATA_INFORMATION_LENGTH)));
                 final int groupId = i;
                 groupBuffers[groupId] = byteBuffer;
                 groupBufferWritePos[groupId] = new AtomicInteger();
