@@ -96,8 +96,8 @@ public class PmemDataWriter {
                                 pmemChannels[(int) (pmemInfo >>> 40)].write(buf, pmemInfo & 0xffffffffffL);
                                 queueInfo.setDataPosInPmem(meta.getOffset(), pmemInfo);
                             }catch (Exception e){
+                                isAllocateSpaceWhileNeed = false;
                                 if ((pmemInfo = getFreePmemInfoV2(dataLen)) > 0) {
-                                    isAllocateSpaceWhileNeed = false;
                                     buf = wrappedData.getData();
                                     pmemChannels[(int) (pmemInfo >>> 40)].write(buf, pmemInfo & 0xffffffffffL);
                                     queueInfo.setDataPosInPmem(meta.getOffset(), pmemInfo);
