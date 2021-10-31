@@ -160,6 +160,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             for (File topicFile : topicIdFile.listFiles()) {
                 String topicName = topicFile.getName();
                 FileInputStream fis = new FileInputStream(topicFile);
+
                 int topicId = (byte) fis.read();
                 topicNames[topicId] = topicName;
             }
@@ -326,14 +327,21 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                     }
                     // 文件不存在，这是一个新的Topic，保存topic名称到topicId的映射，文件名为topic，内容为id
                     topicNameToTopicId.put(topic, topicId = (byte) topicCount.getAndIncrement());
-                    FileOutputStream fos = new FileOutputStream(topicIdFile);
-                    fos.write(topicId);
-                    fos.flush();
-                    fos.close();
+
+
+                    FileChannel channel = new RandomAccessFile(topicIdFile, "rw").getChannel();
+                    channel.write(ByteBuffer.wrap(new byte[]{topicId}));
+                    channel.force(true);
+                    channel.close();
                 } else {
                     // 文件存在，topic不在内存，从文件恢复
-                    FileInputStream fis = new FileInputStream(topicIdFile);
-                    topicId = (byte) fis.read();
+
+                    FileChannel channel = new RandomAccessFile(topicIdFile, "r").getChannel();
+                    ByteBuffer buffer = ByteBuffer.allocate(1);
+                    channel.read(buffer);
+                    channel.close();
+                    buffer.flip();
+                    topicId = buffer.get();
                 }
             } catch (Exception e) {
                 e.printStackTrace();
