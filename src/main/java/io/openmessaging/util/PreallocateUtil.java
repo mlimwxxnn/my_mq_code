@@ -20,7 +20,9 @@ public class PreallocateUtil {
             new Thread(() -> {
                 try {
                     ByteBuffer byteBuffer = ByteBuffer.allocateDirect(preAllocateBufferSize);
-                    byteBuffer.position(preAllocateBufferSize);
+                    for (int j = 0; j < preAllocateBufferSize; j++) {
+                        byteBuffer.put((byte) 0);
+                    }
                     for (long writeTime = 0; writeTime < testTotalWriteFileSize * 1.1 / ((groupCount - 1) * preAllocateBufferSize) ; writeTime++) {
                         byteBuffer.flip();
                         dataWriteChannels[groupId].write(byteBuffer);

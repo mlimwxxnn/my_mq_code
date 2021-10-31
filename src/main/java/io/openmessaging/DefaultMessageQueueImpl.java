@@ -96,12 +96,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                 cyclicBarriers[groupId] = new CyclicBarrier(THREAD_COUNT_PER_GROUP, () -> {
                     try {
                         groupBuffers[groupId].position(0);
-
                         groupBuffers[groupId].limit(writeSizeFor(groupBufferWritePos[groupId].get()));
-
                         dataWriteChannels[groupId].write(groupBuffers[groupId]);
                         dataWriteChannels[groupId].force(false);
-
                         groupBufferWritePos[groupId].set(0);
                     } catch (IOException e) {
                         e.printStackTrace();
