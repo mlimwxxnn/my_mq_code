@@ -11,9 +11,9 @@ public class QueueInfo {
     public static final byte IN_RAM = (byte) 2;
     public static final byte IN_PMEM = (byte) 1;
     public static final byte IN_FILE = (byte) 0;
-    private int queueLength;
-    private boolean haveQueried;
-    private final LinkedList<DataPosInfo> dataPos = new LinkedList<>();
+    private volatile int queueLength;
+    private volatile boolean haveQueried;
+    private volatile LinkedList<DataPosInfo> dataPos = new LinkedList<>();
 
     public DataPosInfo getDataPosition(){
         return dataPos.pollFirst();

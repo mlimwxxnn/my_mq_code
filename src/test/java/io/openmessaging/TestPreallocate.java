@@ -61,7 +61,7 @@ public class TestPreallocate {
 //                long position = channel.position();
 //                channel.position(((position + 4 * 1024 - 1) / (4 * 1024)) * 4 * 1024); // position对 4k 向上取整
                 channel.write(buffer);
-                channel.force(true);
+                channel.force(false);
                 buffer.flip();
             } catch (IOException e) {
                 e.printStackTrace();
@@ -82,9 +82,9 @@ public class TestPreallocate {
                     for (long writeTime = 0; writeTime < testTotalWriteFileSize / ((groupCount - 1) * preAllocateBufferSize) ; writeTime++) {
                         byteBuffer.flip();
                         dataWriteChannels[groupId].write(byteBuffer);
-                        dataWriteChannels[groupId].force(true);
+                        dataWriteChannels[groupId].force(false);
                     }
-                    dataWriteChannels[groupId].force(true);
+                    dataWriteChannels[groupId].force(false);
                     dataWriteChannels[groupId].position(0);
                     allocateCountDownLatch.countDown();
                 } catch (IOException e) {

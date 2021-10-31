@@ -94,7 +94,7 @@ public class GetRangeTaskData {
                         dataLen = (short)(pmemInfo >>> 48);
                         buf.limit(dataLen);
                         pmemChannels[pmemChannelIndex].read(buf, pmemInfo & 0xffffffffffL);
-                        freePmemQueues[pmemChannelIndex].offer(pmemInfo); // 回收
+                        freePmemQueues[pmemChannelIndex].offer(pmemInfo & 0x0000_ffff_ffff_ffffL); // 回收
                         buf.flip();
                         break;
                     default:

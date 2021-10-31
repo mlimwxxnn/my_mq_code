@@ -50,7 +50,7 @@ public class PmemDataWriter {
             if (pmemInfo == 0){
                 isAllocateSpaceWhileNeed = false;
             }else {
-                return pmemInfo;
+                return (pmemInfo | ((long)dataLen << 48));
             }
         }
         int levelIndex = RamInfo.getEnoughFreeSpaceLevelIndexByDataLen(dataLen);
@@ -77,7 +77,7 @@ public class PmemDataWriter {
                         dataLen = meta.getDataLen();
                         if ((pmemInfo = getFreePmemInfo(dataLen)) > 0) {
                             buf = wrappedData.getData();
-                            pmemChannels[(int)(pmemInfo >>> 40)].write(buf, pmemInfo & 0xffffffffffL);
+                            pmemChannels[(byte)(pmemInfo >>> 40)].write(buf, pmemInfo & 0xffffffffffL);
                             wrappedData.posObj = pmemInfo;
                             wrappedData.state = 1;
                         }
