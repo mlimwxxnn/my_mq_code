@@ -347,9 +347,9 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     // 本地调试
 
-    public static final int threadCount = 42;
+    public static final int threadCount = 1;
     public static final int topicCountPerThread = 2;  // threadCount * topicCountPerThread <= 100
-    public static final int queueIdCountPerTopic = 10;
+    public static final int queueIdCountPerTopic = 50;
     public static final int writeTimesPerQueueId = 100;
     public static void main(String[] args) throws InterruptedException {
         for (File file : new File("h:/essd").listFiles()) {

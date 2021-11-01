@@ -11,9 +11,9 @@ public class QueueInfo {
     public static final byte IN_RAM = (byte) 2;
     public static final byte IN_PMEM = (byte) 1;
     public static final byte IN_FILE = (byte) 0;
-    private volatile int queueLength;
-    private volatile boolean haveQueried;
-    private volatile LinkedList<DataPosInfo> dataPos = new LinkedList<>();
+    private int queueLength;
+    private boolean haveQueried;
+    private final LinkedList<DataPosInfo> dataPos = new LinkedList<>();
 
     public DataPosInfo getDataPosition(){
         return dataPos.pollFirst();
@@ -39,7 +39,7 @@ public class QueueInfo {
                     break;
                 case IN_PMEM:
                     pmemInfo = dataPosInfo.getDataPosInPmem();
-                    freePmemQueues[(int)(pmemInfo>>>40)].offer(pmemInfo); // 回收
+                    freePmemQueues[(byte)(pmemInfo>>>40)].offer(pmemInfo & & 0x0000_ffff_ffff_ffffL); // 回收
                     break;
                 default:
                     break;

@@ -39,7 +39,7 @@ public class PowerFailureTest {
                 for (int topicIndex = 0; topicIndex < topicCountPerThread; topicIndex++) {
                     String topic = threadIndex + "-" + topicIndex;
                     for (int queueIndex = 0; queueIndex < queueIdCountPerTopic; queueIndex++) {
-                        for (int t = 0; t < writeTimesPerQueueId; t++) {
+                        for (int t = 1; t < writeTimesPerQueueId; t++) {
                             Map<Integer, ByteBuffer> res = mq.getRange(topic, queueIndex, t, 1);
                             ByteBuffer byteBuffer = res.get(0);
                             if (byteBuffer.remaining() != 8){

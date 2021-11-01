@@ -66,7 +66,6 @@ public class RamDataWriter {
                 try {
                     WrappedData wrappedData;
                     ByteBuffer buf;
-                    QueueInfo queueInfo;
                     MetaData meta;
                     byte[] data;
                     short dataLen;
@@ -75,7 +74,6 @@ public class RamDataWriter {
                         wrappedData = ramWrappedDataQueue.take();
                         meta = wrappedData.getMeta();
 
-                        queueInfo = meta.getQueueInfo();
                         dataLen = meta.getDataLen();
                         if ((ramInfo = getFreeRamInfo(dataLen)) != null) {
                             buf = wrappedData.getData();
