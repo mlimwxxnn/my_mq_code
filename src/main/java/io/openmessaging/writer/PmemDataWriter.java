@@ -75,9 +75,9 @@ public class PmemDataWriter {
                         meta = wrappedData.getMeta();
 
                         dataLen = meta.getDataLen();
-                        if ((pmemInfo = getFreePmemInfo(dataLen)) > 0) {
+                        if ((pmemInfo = getFreePmemInfo(dataLen)) != 0) {
                             buf = wrappedData.getData();
-                            pmemChannels[(byte)(pmemInfo >>> 40)].write(buf, pmemInfo & 0xffffffffffL);
+                            pmemChannels[(byte)(pmemInfo >>> 40)].write(buf, pmemInfo & 0xff_ffff_ffffL);
                             wrappedData.posObj = pmemInfo;
                             wrappedData.state = 1;
                         }

@@ -76,11 +76,11 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //    static long noAllocateWriteTime = PreallocateSpeedTest.noAllocate();
 
     static int writeSizeFor(int dataSize) {
-        return (dataSize & 0xfffff000) + pageSize;
+        return (dataSize & 0xffff_f000) + pageSize;
     }
 
     static long writeSizeFor(long position) {
-        return (position & 0xfffffffffffff000L) + pageSize;
+        return (position & 0xffff_ffff_ffff_f000L) + pageSize;
     }
 
     public static void init() {
@@ -254,7 +254,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         unsafe.copyMemory(data.array(), 16 + dataPosition, null, currentBufferAddress + 9, dataLen);
         try {
             long position = dataWriteChannels[groupId].position();
-            cyclicBarriers[groupId].await(1, TimeUnit.SECONDS);
+            cyclicBarriers[groupId].await(5, TimeUnit.SECONDS);
             wrappedData.getMeta().getCountDownLatch().await();
             if(wrappedData.state != 0) {
                 queueInfo.setDataPosition(new DataPosInfo(wrappedData.state, wrappedData.posObj));
@@ -265,12 +265,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 //            log.info("cyclicBarrier timeout handle groupId: {}", groupId);
             // 超时等异常后把数据写入自己的channel
             groupBufferWritePos[groupId].set(0);
-            appendSsdBySelf(getWorkContent(), topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
+            appendSsdBySelf(getWorkContent(), topicId, queueId, offset, queueInfo, data, dataLen, dataPosition, wrappedData);
         }
     }
 
     // 单条写入
-    public void appendSsdBySelf(ThreadWorkContent workContent, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data, short dataLen, int dataPosition) {
+    public void appendSsdBySelf(ThreadWorkContent workContent, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data, short dataLen, int dataPosition, WrappedData wrappedData) {
         FileChannel channel = workContent.channel;
         ByteBuffer buffer = workContent.buffer;
         long currentBufferAddress = ((DirectBuffer) buffer).address();
@@ -288,7 +288,8 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             buffer.limit(dataLen + 9);
             channel.write(buffer);
             channel.force(false);
-        } catch (IOException e) {
+            wrappedData.getMeta().getCountDownLatch().await();
+        } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
     }
@@ -347,10 +348,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     // 本地调试
 
-    public static final int threadCount = 1;
+    public static final int threadCount = 40;
     public static final int topicCountPerThread = 2;  // threadCount * topicCountPerThread <= 100
     public static final int queueIdCountPerTopic = 50;
-    public static final int writeTimesPerQueueId = 100;
+    public static final int writeTimesPerQueueId = 10;
     public static void main(String[] args) throws InterruptedException {
         for (File file : new File("h:/essd").listFiles()) {
             if(file.isFile()){

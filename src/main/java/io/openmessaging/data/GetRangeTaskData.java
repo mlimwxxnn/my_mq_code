@@ -30,7 +30,6 @@ public class GetRangeTaskData {
     int queueId;
     long offset;
     int fetchNum;
-    private CountDownLatch countDownLatch;
     Unsafe unsafe = UnsafeUtil.unsafe;
 
     public GetRangeTaskData() {
@@ -45,7 +44,6 @@ public class GetRangeTaskData {
         this.queueId = queueId;
         this.offset = offset;
         this.fetchNum = fetchNum;
-        this.countDownLatch = new CountDownLatch(1);
     }
 
     public Map<Integer, ByteBuffer> getResult() {
@@ -93,8 +91,8 @@ public class GetRangeTaskData {
                         int pmemChannelIndex = (byte)(pmemInfo>>>40);
                         dataLen = (short)(pmemInfo >>> 48);
                         buf.limit(dataLen);
-                        pmemChannels[pmemChannelIndex].read(buf, pmemInfo & 0xffffffffffL);
-                        freePmemQueues[pmemChannelIndex].offer(pmemInfo & 0x0000_ffff_ffff_ffffL); // 回收
+                        pmemChannels[pmemChannelIndex].read(buf, pmemInfo & 0xff_ffff_ffffL);
+                        freePmemQueues[pmemChannelIndex].offer(pmemInfo & 0xffff_ffff_ffffL); // 回收
                         buf.flip();
                         break;
                     default:
@@ -103,6 +101,7 @@ public class GetRangeTaskData {
                         buf.limit((int)(p[1]));
                         DefaultMessageQueueImpl.dataWriteChannels[id].read(buf, p[0]);
                         buf.flip();
+                        break;
                 }
                 result.put(i, buf);
             }
@@ -112,8 +111,5 @@ public class GetRangeTaskData {
         }
     }
 
-    public CountDownLatch getCountDownLatch() {
-        return countDownLatch;
-    }
 }
 
