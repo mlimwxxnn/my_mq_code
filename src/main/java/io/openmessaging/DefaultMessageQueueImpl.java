@@ -1,11 +1,10 @@
 package io.openmessaging;
 
-import io.openmessaging.data.*;
+import io.openmessaging.data.GetRangeTaskData;
+import io.openmessaging.data.ThreadWorkContent;
+import io.openmessaging.data.WrappedData;
 import io.openmessaging.info.DataPosInfo;
 import io.openmessaging.info.QueueInfo;
-
-import io.openmessaging.info.RamInfo;
-
 import io.openmessaging.util.PreallocateUtil;
 import io.openmessaging.writer.PmemDataWriter;
 import io.openmessaging.writer.RamDataWriter;
@@ -13,11 +12,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sun.nio.ch.DirectBuffer;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -343,10 +343,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     // 本地调试
 
-    public static final int threadCount = 40;
-    public static final int topicCountPerThread = 2;  // threadCount * topicCountPerThread <= 100
-    public static final int queueIdCountPerTopic = 2000;
-    public static final int writeTimesPerQueueId = 10;
+    public static final int threadCount = 10;
+    public static final int topicCountPerThread = 1;  // threadCount * topicCountPerThread <= 100
+    public static final int queueIdCountPerTopic = 20;
+    public static final int writeTimesPerQueueId = 100;
     public static void main(String[] args) throws InterruptedException {
         for (File file : new File("h:/essd").listFiles()) {
             if(file.isFile()){

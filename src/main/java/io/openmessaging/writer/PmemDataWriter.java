@@ -59,19 +59,19 @@ public class PmemDataWriter {
         return pmemInfo == null ? 0 : (pmemInfo | ((long)dataLen << 48));
     }
 
-    private long getFreePmemInfoV2(short dataLen){
-        Long pmemInfo;
-        if (isAllocateSpaceWhileNeed){
-            pmemInfo = pmemSaveSpaceData.allocateV2(dataLen);
-            return pmemInfo;
-        }
-        int levelIndex = RamInfo.getEnoughFreeSpaceLevelIndexByDataLen(dataLen);
-        int maxTryLevelIndex = Math.min(spaceLevelCount - 1, levelIndex + MAX_TRY_TIMES_WHILE_ALLOCATE_SPACE);
-        while ((pmemInfo = freePmemQueues[levelIndex].poll()) == null && levelIndex < maxTryLevelIndex){
-            levelIndex++;
-        }
-        return pmemInfo == null ? 0 : pmemInfo;
-    }
+//    private long getFreePmemInfoV2(short dataLen){
+//        Long pmemInfo;
+//        if (isAllocateSpaceWhileNeed){
+//            pmemInfo = pmemSaveSpaceData.allocateV2(dataLen);
+//            return pmemInfo;
+//        }
+//        int levelIndex = RamInfo.getEnoughFreeSpaceLevelIndexByDataLen(dataLen);
+//        int maxTryLevelIndex = Math.min(spaceLevelCount - 1, levelIndex + MAX_TRY_TIMES_WHILE_ALLOCATE_SPACE);
+//        while ((pmemInfo = freePmemQueues[levelIndex].poll()) == null && levelIndex < maxTryLevelIndex){
+//            levelIndex++;
+//        }
+//        return pmemInfo == null ? 0 : pmemInfo;
+//    }
     private void writeDataToPmem(){
         for(int t = 0; t < PMEM_WRITE_THREAD_COUNT; t++) {
             new Thread(() -> {
@@ -86,7 +86,7 @@ public class PmemDataWriter {
                         meta = wrappedData.getMeta();
 
                         dataLen = meta.getDataLen();
-                        if ((pmemInfo = getFreePmemInfoV2(dataLen)) > 0) {
+                        if ((pmemInfo = getFreePmemInfo(dataLen)) > 0) {
                             try {
                                 buf = wrappedData.getData();
                                 pmemChannels[(byte)(pmemInfo >>> 40)].write(buf, pmemInfo & 0xff_ffff_ffffL);
@@ -94,7 +94,7 @@ public class PmemDataWriter {
                                 wrappedData.state = 1;
                             }catch (Exception e){
                                 isAllocateSpaceWhileNeed = false;
-                                if ((pmemInfo = getFreePmemInfoV2(dataLen)) > 0) {
+                                if ((pmemInfo = getFreePmemInfo(dataLen)) > 0) {
                                     buf = wrappedData.getData();
                                     pmemChannels[(byte)(pmemInfo >>> 40)].write(buf, pmemInfo & 0xff_ffff_ffffL);
                                     wrappedData.posObj = pmemInfo;
