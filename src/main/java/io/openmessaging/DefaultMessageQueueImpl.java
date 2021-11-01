@@ -282,7 +282,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         // 放入数据本体
         unsafe.copyMemory(data.array(), 16 + dataPosition, null, currentBufferAddress + 9, dataLen);
         try {
-
             queueInfo.setDataPosition(new DataPosInfo((byte) 0, new long[]{channel.position() + 9, (workContent.fileId << 32) | dataLen}));
             buffer.position(0);
             buffer.limit(dataLen + 9);
@@ -350,7 +349,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static final int threadCount = 40;
     public static final int topicCountPerThread = 2;  // threadCount * topicCountPerThread <= 100
-    public static final int queueIdCountPerTopic = 50;
+    public static final int queueIdCountPerTopic = 2000;
     public static final int writeTimesPerQueueId = 10;
     public static void main(String[] args) throws InterruptedException {
         for (File file : new File("h:/essd").listFiles()) {

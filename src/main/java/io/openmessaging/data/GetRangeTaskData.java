@@ -1,7 +1,6 @@
 package io.openmessaging.data;
 
 import io.openmessaging.DefaultMessageQueueImpl;
-//import io.openmessaging.info.PmemInfo;
 import io.openmessaging.info.DataPosInfo;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.info.RamInfo;
@@ -12,15 +11,15 @@ import sun.nio.ch.DirectBuffer;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
 
+import static io.openmessaging.DefaultMessageQueueImpl.log;
 import static io.openmessaging.DefaultMessageQueueImpl.metaInfo;
+import static io.openmessaging.data.PmemSaveSpaceData.pmemChannels;
 import static io.openmessaging.info.QueueInfo.IN_PMEM;
 import static io.openmessaging.info.QueueInfo.IN_RAM;
 import static io.openmessaging.writer.PmemDataWriter.freePmemQueues;
-import static io.openmessaging.data.PmemSaveSpaceData.*;
-import static io.openmessaging.writer.RamDataWriter.*;
-import static io.openmessaging.DefaultMessageQueueImpl.log;
+import static io.openmessaging.writer.RamDataWriter.freeRamQueues;
+
 
 // todo 这里把初始化改到MQ构造函数里会更快
 public class GetRangeTaskData {
@@ -79,29 +78,31 @@ public class GetRangeTaskData {
                 ByteBuffer buf = buffers[i];
                 buf.clear();
                 DataPosInfo dataPosition = queueInfo.getDataPosition();
-                switch (dataPosition.getState()){ // 判断数据位置再读取
-                    case IN_RAM:
+                // 判断数据位置再读取
+                switch (dataPosition.getState()) {
+                    case IN_RAM -> {
                         RamInfo ramInfo = dataPosition.getDataPosInRam();
                         buf.limit(ramInfo.dataLen);
-                        unsafe.copyMemory(ramInfo.ramObj, ramInfo.offset, null, ((DirectBuffer) buf).address(), ramInfo.dataLen);
+                        unsafe.copyMemory(ramInfo.ramObj, ramInfo.offset, null, ((DirectBuffer) buf).address(),
+                                ramInfo.dataLen);
                         freeRamQueues[ramInfo.levelIndex].offer(ramInfo); // 回收
-                        break;
-                    case IN_PMEM:
+                    }
+                    case IN_PMEM -> {
                         long pmemInfo = dataPosition.getDataPosInPmem();
-                        int pmemChannelIndex = (byte)(pmemInfo>>>40);
-                        dataLen = (short)(pmemInfo >>> 48);
+                        int pmemChannelIndex = (byte) (pmemInfo >>> 40);
+                        dataLen = (short) (pmemInfo >>> 48);
                         buf.limit(dataLen);
                         pmemChannels[pmemChannelIndex].read(buf, pmemInfo & 0xff_ffff_ffffL);
                         freePmemQueues[pmemChannelIndex].offer(pmemInfo & 0xffff_ffff_ffffL); // 回收
                         buf.flip();
-                        break;
-                    default:
+                    }
+                    default -> {
                         long[] p = dataPosition.getDataPosInFile();
                         int id = (int) (p[1] >> 32);
-                        buf.limit((int)(p[1]));
+                        buf.limit((int) (p[1]));
                         DefaultMessageQueueImpl.dataWriteChannels[id].read(buf, p[0]);
                         buf.flip();
-                        break;
+                    }
                 }
                 result.put(i, buf);
             }
