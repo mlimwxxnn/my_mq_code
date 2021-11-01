@@ -1,7 +1,11 @@
 package io.openmessaging;
 
 import io.openmessaging.data.*;
+import io.openmessaging.info.DataPosInfo;
 import io.openmessaging.info.QueueInfo;
+
+import io.openmessaging.info.RamInfo;
+
 import io.openmessaging.util.PreallocateUtil;
 import io.openmessaging.writer.PmemDataWriter;
 import io.openmessaging.writer.RamDataWriter;
@@ -48,8 +52,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static final int DATA_INFORMATION_LENGTH = 9;
     public static final int PMEM_WRITE_THREAD_COUNT = 8;
     public static final int RAM_WRITE_THREAD_COUNT = 8;
+
     public static final long DIRECT_CACHE_SIZE = 1970 * MB;
-    public static final long HEAP_CACHE_SIZE = 2400 * MB;
+    public static final long HEAP_CACHE_SIZE = 2600 * MB;
+
     public static final int RAM_SPACE_LEVEL_GAP = 200; // B
     public static final int spaceLevelCount = (17 * 1024 + RAM_SPACE_LEVEL_GAP - 1) / RAM_SPACE_LEVEL_GAP;
     public static final int MAX_TRY_TIMES_WHILE_ALLOCATE_SPACE = 5;
@@ -67,24 +73,16 @@ public class DefaultMessageQueueImpl extends MessageQueue {
     public static PmemDataWriter pmemDataWriter;
     public static RamDataWriter ramDataWriter;
 
-    public static AtomicInteger getRangeCount = new AtomicInteger();
-
-//    static long allocateWriteTime = PreallocateSpeedTest.preAllocate();
-//    static long noAllocateWriteTime = PreallocateSpeedTest.noAllocate();
 
     static int writeSizeFor(int dataSize) {
-        return (dataSize & 0xfffff000) + pageSize;
+        return (dataSize & 0xffff_f000) + pageSize;
     }
 
     static long writeSizeFor(long position) {
-        return (position & 0xfffffffffffff000L) + pageSize;
+        return (position & 0xffff_ffff_ffff_f000L) + pageSize;
     }
 
     public static void init() {
-        Runtime.getRuntime().addShutdownHook(new Thread(()->{
-            log.info("getRangeCount:{}", getRangeCount);
-//            log.info("{},{}", allocateWriteTime, noAllocateWriteTime);
-        }));
 
         try {
             for (int i = 0; i < groupCount; i++) {
@@ -147,53 +145,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public DefaultMessageQueueImpl() {
         log.info("DefaultMessageQueueImpl 开始执行构造函数");
-        DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("d:/essd") : new File("/essd");
+        DISC_ROOT = System.getProperty("os.name").contains("Windows") ? new File("h:/essd") : new File("/essd");
         PMEM_ROOT = System.getProperty("os.name").contains("Windows") ? new File("./pmem") : new File("/pmem");
 
         init();
         // 断电后数据恢复
         powerFailureRecoveryV2(metaInfo);
         log.info("DefaultMessageQueueImpl 构造函数执行完成");
-    }
-
-    public void powerFailureRecovery(ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo) {
-        if (getTotalFileSize() == 0){
-            // 预分配ssd空间
-            PreallocateUtil.preAllocate(dataWriteChannels);
-            return;
-        }
-        log.info("开始执行断电恢复函数，totalFileSize: {}", getTotalFileSize());
-        // 分组文件以及私有文件
-        for (int id = 0; id < dataWriteChannels.length; id++) {
-            ByteBuffer readBuffer = ByteBuffer.allocate(DATA_INFORMATION_LENGTH);
-            FileChannel channel = dataWriteChannels[id];
-            byte topicId;
-            short queueId;
-            short dataLen = 0;
-            int offset;
-            try {
-                ConcurrentHashMap<Short, QueueInfo> topicInfo;
-                QueueInfo queueInfo;
-                long dataFilesize = channel.size();
-                while (channel.position() + dataLen < dataFilesize) {
-                    channel.position(channel.position() + dataLen); // 跳过数据部分只读取数据头部的索引信息
-                    readBuffer.clear();
-                    channel.read(readBuffer);
-                    readBuffer.flip();
-                    topicId = readBuffer.get();
-                    queueId = Short.reverseBytes(readBuffer.getShort());
-                    dataLen = Short.reverseBytes(readBuffer.getShort());
-                    offset = Integer.reverseBytes(readBuffer.getInt());
-                    topicInfo = metaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
-//                    topicInfo = localMetaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
-                    queueInfo = topicInfo.computeIfAbsent(queueId, k -> new QueueInfo());
-                    long groupIdAndDataLength = (((long) id) << 32) | dataLen;
-                    queueInfo.setDataPosInFile(offset, channel.position(), groupIdAndDataLength);
-                }
-            } catch (Exception e) {
-                System.out.println("ignore exception while rectory");
-            }
-        }
     }
 
     public void powerFailureRecoveryV2(ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo) {
@@ -210,7 +168,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             byte topicId;
             short queueId;
             short dataLen = 0;
-            int offset;
             try {
                 ConcurrentHashMap<Short, QueueInfo> topicInfo;
                 QueueInfo queueInfo;
@@ -228,11 +185,10 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                         if (dataLen == 0){
                             break channelLoop;
                         }
-                        offset = Integer.reverseBytes(readBuffer.getInt());
                         topicInfo = metaInfo.computeIfAbsent(topicId, k -> new ConcurrentHashMap<>(2000));
                         queueInfo = topicInfo.computeIfAbsent(queueId, k -> new QueueInfo());
                         long groupIdAndDataLength = (((long) id) << 32) | dataLen;
-                        queueInfo.setDataPosInFile(offset, channel.position(), groupIdAndDataLength);
+                        queueInfo.setDataPosition(new DataPosInfo((byte) 0, new long[]{channel.position(), groupIdAndDataLength}));
                         channel.position(channel.position() + dataLen); // 跳过数据部分只读取数据头部的索引信息
                     }
                     long position = dataWriteChannels[id].position();
@@ -278,18 +234,12 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         // 写缓存
         ramDataWriter.pushWrappedData(wrappedData);
 //        pmemDataWriter.pushWrappedData(wrappedData);
-
-        try {
-            appendSsdByGroup(groupId, topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
-            wrappedData.getMeta().getCountDownLatch().await();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+        appendSsdByGroup(groupId, topicId, queueId, offset, queueInfo, data, dataLen, dataPosition, wrappedData);
         return offset;
     }
 
     // 聚合写入
-    public void appendSsdByGroup(int groupId, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data, short dataLen, int dataPosition) {
+    public void appendSsdByGroup(int groupId, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data, short dataLen, int dataPosition, WrappedData wrappedData) {
         int currentBufferPos = groupBufferWritePos[groupId].getAndAdd( 9 + dataLen);
         long currentBufferAddress = groupBufferBasePos[groupId] + currentBufferPos;
         unsafe.putByte(currentBufferAddress, topicId);
@@ -299,18 +249,24 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         // 放入数据本体
         unsafe.copyMemory(data.array(), 16 + dataPosition, null, currentBufferAddress + 9, dataLen);
         try {
-            queueInfo.setDataPosInFile(offset, dataWriteChannels[groupId].position() + currentBufferPos + 9, (((long) groupId) << 32) | dataLen);
+            long position = dataWriteChannels[groupId].position();
             cyclicBarriers[groupId].await(5, TimeUnit.SECONDS);
-        } catch ( IOException | InterruptedException | BrokenBarrierException | TimeoutException e) {
+            wrappedData.getMeta().getCountDownLatch().await();
+            if(wrappedData.state != 0) {
+                queueInfo.setDataPosition(new DataPosInfo(wrappedData.state, wrappedData.posObj));
+            }else {
+                queueInfo.setDataPosition(new DataPosInfo((byte)0, new long[]{position + currentBufferPos + 9, (((long) groupId) << 32) | dataLen}));
+            }
+        } catch (InterruptedException | BrokenBarrierException | TimeoutException | IOException e) {
 //            log.info("cyclicBarrier timeout handle groupId: {}", groupId);
             // 超时等异常后把数据写入自己的channel
             groupBufferWritePos[groupId].set(0);
-            appendSsdBySelf(getWorkContent(), topicId, queueId, offset, queueInfo, data, dataLen, dataPosition);
+            appendSsdBySelf(getWorkContent(), topicId, queueId, offset, queueInfo, data, dataLen, dataPosition, wrappedData);
         }
     }
 
     // 单条写入
-    public void appendSsdBySelf(ThreadWorkContent workContent, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data, short dataLen, int dataPosition) {
+    public void appendSsdBySelf(ThreadWorkContent workContent, byte topicId, int queueId, int offset, QueueInfo queueInfo, ByteBuffer data, short dataLen, int dataPosition, WrappedData wrappedData) {
         FileChannel channel = workContent.channel;
         ByteBuffer buffer = workContent.buffer;
         long currentBufferAddress = ((DirectBuffer) buffer).address();
@@ -322,12 +278,13 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         // 放入数据本体
         unsafe.copyMemory(data.array(), 16 + dataPosition, null, currentBufferAddress + 9, dataLen);
         try {
-            queueInfo.setDataPosInFile(offset, channel.position() + 9, (workContent.fileId << 32) | dataLen);
+            queueInfo.setDataPosition(new DataPosInfo((byte) 0, new long[]{channel.position() + 9, (workContent.fileId << 32) | dataLen}));
             buffer.position(0);
             buffer.limit(dataLen + 9);
             channel.write(buffer);
             channel.force(false);
-        } catch (IOException e) {
+            wrappedData.getMeta().getCountDownLatch().await();
+        } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
     }
@@ -380,18 +337,18 @@ public class DefaultMessageQueueImpl extends MessageQueue {
         GetRangeTaskData task = getTask(Thread.currentThread());
         task.setGetRangeParameter(topic, queueId, offset, fetchNum);
         task.queryData();
-        getRangeCount.getAndIncrement();
         return task.getResult();
     }
 
 
     // 本地调试
-    public static final int threadCount = 42;
-    public static final int topicCountPerThread = 1;  // threadCount * topicCountPerThread <= 100
-    public static final int queueIdCountPerTopic = 1;
+
+    public static final int threadCount = 40;
+    public static final int topicCountPerThread = 2;  // threadCount * topicCountPerThread <= 100
+    public static final int queueIdCountPerTopic = 2000;
     public static final int writeTimesPerQueueId = 10;
     public static void main(String[] args) throws InterruptedException {
-        for (File file : new File("d:/essd").listFiles()) {
+        for (File file : new File("h:/essd").listFiles()) {
             if(file.isFile()){
                 file.delete();
             }else{
@@ -461,7 +418,6 @@ public class DefaultMessageQueueImpl extends MessageQueue {
                             }
                             if (byteBuffer.getInt(0) != t || byteBuffer.getInt(4) != queueIndex){
                                 System.out.println(String.format("data error: %d: %d: %d topic: %s, data: {%d, %d}", topicIndex, queueIndex, t, topic, byteBuffer.getInt(), byteBuffer.getInt()));
-//                                System.exit(-1);
                             }
                         }
                     }
@@ -473,22 +429,5 @@ public class DefaultMessageQueueImpl extends MessageQueue {
             threads1[i].join();
         }
         System.out.println("query done.");
-
-
-//        mq.append("big_data", 1, ByteBuffer.allocate(17*1024));
-//        ConcurrentHashMap<Byte, ConcurrentHashMap<Short, QueueInfo>> metaInfo = mq.metaInfo;
-//        for (Byte topicId : metaInfo.keySet()) {
-//            ConcurrentHashMap<Short, QueueInfo> topicInfo = metaInfo.get(topicId);
-//            for (Short queueId : topicInfo.keySet()) {
-//                QueueInfo queueInfo = topicInfo.get(queueId);
-//                for (int offset = 0; offset < queueInfo.size(); offset++) {
-//                    long[] p = queueInfo.getDataPosInFile(offset);
-//                    short dataLen = (short) p[1];
-//                    if (dataLen != 8){
-//                        int a = 1;
-//                    }
-//                }
-//            }
-//        }
     }
 }

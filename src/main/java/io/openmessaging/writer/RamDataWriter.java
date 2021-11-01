@@ -3,7 +3,6 @@ package io.openmessaging.writer;
 import io.openmessaging.data.MetaData;
 import io.openmessaging.data.RamSaveSpaceData;
 import io.openmessaging.data.WrappedData;
-import io.openmessaging.info.QueueInfo;
 import io.openmessaging.info.RamInfo;
 import io.openmessaging.util.UnsafeUtil;
 import sun.misc.Unsafe;
@@ -66,7 +65,6 @@ public class RamDataWriter {
                 try {
                     WrappedData wrappedData;
                     ByteBuffer buf;
-                    QueueInfo queueInfo;
                     MetaData meta;
                     byte[] data;
                     short dataLen;
@@ -75,13 +73,14 @@ public class RamDataWriter {
                         wrappedData = ramWrappedDataQueue.take();
                         meta = wrappedData.getMeta();
 
-                        queueInfo = meta.getQueueInfo();
                         dataLen = meta.getDataLen();
-                        if (!queueInfo.ramIsFull() && (ramInfo = getFreeRamInfo(dataLen)) != null) {
+                        if ((ramInfo = getFreeRamInfo(dataLen)) != null) {
                             buf = wrappedData.getData();
                             data = buf.array();
                             unsafe.copyMemory(data, 16 + wrappedData.getDataPosition(), ramInfo.ramObj, ramInfo.offset, wrappedData.getMeta().getDataLen());//directByteBuffer
-                            queueInfo.setDataPosInRam(meta.getOffset(), ramInfo);
+                            wrappedData.posObj = ramInfo;
+                            ramInfo.dataLen = dataLen;
+                            wrappedData.state = 2;
                             meta.getCountDownLatch().countDown();
                         } else {
                             pmemDataWriter.pushWrappedData(wrappedData);

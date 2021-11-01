@@ -1,7 +1,7 @@
 package io.openmessaging.data;
 
 import io.openmessaging.DefaultMessageQueueImpl;
-//import io.openmessaging.info.PmemInfo;
+import io.openmessaging.info.DataPosInfo;
 import io.openmessaging.info.QueueInfo;
 import io.openmessaging.info.RamInfo;
 import io.openmessaging.util.UnsafeUtil;
@@ -11,13 +11,15 @@ import sun.nio.ch.DirectBuffer;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
 
-import static io.openmessaging.DefaultMessageQueueImpl.metaInfo;
-import static io.openmessaging.writer.PmemDataWriter.freePmemQueues;
-import static io.openmessaging.data.PmemSaveSpaceData.*;
-import static io.openmessaging.writer.RamDataWriter.*;
 import static io.openmessaging.DefaultMessageQueueImpl.log;
+import static io.openmessaging.DefaultMessageQueueImpl.metaInfo;
+import static io.openmessaging.data.PmemSaveSpaceData.pmemChannels;
+import static io.openmessaging.info.QueueInfo.IN_PMEM;
+import static io.openmessaging.info.QueueInfo.IN_RAM;
+import static io.openmessaging.writer.PmemDataWriter.freePmemQueues;
+import static io.openmessaging.writer.RamDataWriter.freeRamQueues;
+
 
 // todo 这里把初始化改到MQ构造函数里会更快
 public class GetRangeTaskData {
@@ -27,14 +29,12 @@ public class GetRangeTaskData {
     int queueId;
     long offset;
     int fetchNum;
-    private CountDownLatch countDownLatch;
     Unsafe unsafe = UnsafeUtil.unsafe;
 
     public GetRangeTaskData() {
         for (int i = 0; i < buffers.length; i++) {
             buffers[i] = ByteBuffer.allocateDirect(17 * 1024);
         }
-
     }
 
     public void setGetRangeParameter(String topic, int queueId, long offset, int fetchNum) {
@@ -42,7 +42,6 @@ public class GetRangeTaskData {
         this.queueId = queueId;
         this.offset = offset;
         this.fetchNum = fetchNum;
-        this.countDownLatch = new CountDownLatch(1);
     }
 
     public Map<Integer, ByteBuffer> getResult() {
@@ -68,43 +67,41 @@ public class GetRangeTaskData {
             }
 
             if (!queueInfo.haveQueried()) {
-                long[] allPmemInfos = queueInfo.getAllPmemPageInfos();
-                for (int j = 0; j < offset; j++) {
-                    long pmemInfo = allPmemInfos[j];
-                    if (pmemInfo >0) {
-                        freePmemQueues[(int)(pmemInfo>>>40)].offer(pmemInfo);
-                    }
-                    if(queueInfo.isInRam(j)){
-                        RamInfo ramInfo = queueInfo.getDataPosInRam();
-                        freeRamQueues[ramInfo.levelIndex].offer(ramInfo);
-                    }
-                }
+                queueInfo.deleteBefore((int)offset);
             }
 
             int n = Math.min(fetchNum, queueInfo.size() - (int) offset);
 
             short dataLen;
             for (int i = 0; i < n; i++) {
-                int currentOffset = i + (int) offset;
-                long[] p = queueInfo.getDataPosInFile(currentOffset);
-                dataLen = (short) p[1];
                 ByteBuffer buf = buffers[i];
                 buf.clear();
-                buf.limit(dataLen);
-                if(queueInfo.isInRam(currentOffset)){
-                    RamInfo ramInfo = queueInfo.getDataPosInRam();
-                    unsafe.copyMemory(ramInfo.ramObj, ramInfo.offset, null, ((DirectBuffer) buf).address(), dataLen); //direct
-                    freeRamQueues[ramInfo.levelIndex].offer(ramInfo);
-                }else if (queueInfo.isInPmem(currentOffset)) {
-                    long pmemInfo = queueInfo.getDataPosInPmem(currentOffset);
-                    int pmemChannelIndex = (int)(pmemInfo>>>40);
-                    pmemChannels[pmemChannelIndex].read(buf, pmemInfo & 0xffffffffffL);
-                    freePmemQueues[pmemChannelIndex].offer(pmemInfo); // 回收
-                    buf.flip();
-                } else {
-                    int id = (int) (p[1] >> 32);
-                    DefaultMessageQueueImpl.dataWriteChannels[id].read(buf, p[0]);
-                    buf.flip();
+                DataPosInfo dataPosition = queueInfo.getDataPosition();
+                // 判断数据位置再读取
+                switch (dataPosition.getState()) {
+                    case IN_RAM:
+                        RamInfo ramInfo = dataPosition.getDataPosInRam();
+                        buf.limit(ramInfo.dataLen);
+                        unsafe.copyMemory(ramInfo.ramObj, ramInfo.offset, null, ((DirectBuffer) buf).address(),
+                                ramInfo.dataLen);
+                        freeRamQueues[ramInfo.levelIndex].offer(ramInfo); // 回收
+                        break;
+                    case IN_PMEM:
+                        long pmemInfo = dataPosition.getDataPosInPmem();
+                        int pmemChannelIndex = (byte) (pmemInfo >>> 40);
+                        dataLen = (short) (pmemInfo >>> 48);
+                        buf.limit(dataLen);
+                        pmemChannels[pmemChannelIndex].read(buf, pmemInfo & 0xff_ffff_ffffL);
+                        freePmemQueues[pmemChannelIndex].offer(pmemInfo & 0xffff_ffff_ffffL); // 回收
+                        buf.flip();
+                        break;
+                    default:
+                        long[] p = dataPosition.getDataPosInFile();
+                        int id = (int) (p[1] >> 32);
+                        buf.limit((int) (p[1]));
+                        DefaultMessageQueueImpl.dataWriteChannels[id].read(buf, p[0]);
+                        buf.flip();
+                        break;
                 }
                 result.put(i, buf);
             }
@@ -114,8 +111,4 @@ public class GetRangeTaskData {
         }
     }
 
-    public CountDownLatch getCountDownLatch() {
-        return countDownLatch;
-    }
 }
-

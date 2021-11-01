@@ -3,8 +3,6 @@ package io.openmessaging.writer;
 import io.openmessaging.data.MetaData;
 import io.openmessaging.data.PmemSaveSpaceData;
 import io.openmessaging.data.WrappedData;
-//import io.openmessaging.info.PmemInfo;
-import io.openmessaging.info.QueueInfo;
 import io.openmessaging.info.RamInfo;
 import io.openmessaging.util.UnsafeUtil;
 import sun.misc.Unsafe;
@@ -50,7 +48,7 @@ public class PmemDataWriter {
             if (pmemInfo == 0){
                 isAllocateSpaceWhileNeed = false;
             }else {
-                return pmemInfo;
+                return (pmemInfo | ((long)dataLen << 48));
             }
         }
         int levelIndex = RamInfo.getEnoughFreeSpaceLevelIndexByDataLen(dataLen);
@@ -58,7 +56,7 @@ public class PmemDataWriter {
         while ((pmemInfo = freePmemQueues[levelIndex].poll()) == null && levelIndex < maxTryLevelIndex){
             levelIndex++;
         }
-        return pmemInfo == null ? 0 : pmemInfo;
+        return pmemInfo == null ? 0 : (pmemInfo | ((long)dataLen << 48));
     }
 
     private long getFreePmemInfoV2(short dataLen){
@@ -80,7 +78,6 @@ public class PmemDataWriter {
                 try {
                     WrappedData wrappedData;
                     ByteBuffer buf;
-                    QueueInfo queueInfo;
                     MetaData meta;
                     short dataLen;
                     long pmemInfo;
@@ -88,21 +85,23 @@ public class PmemDataWriter {
                         wrappedData = pmemWrappedDataQueue.take();
                         meta = wrappedData.getMeta();
 
-                        queueInfo = meta.getQueueInfo();
                         dataLen = meta.getDataLen();
                         if ((pmemInfo = getFreePmemInfoV2(dataLen)) > 0) {
                             try {
                                 buf = wrappedData.getData();
-                                pmemChannels[(int) (pmemInfo >>> 40)].write(buf, pmemInfo & 0xffffffffffL);
-                                queueInfo.setDataPosInPmem(meta.getOffset(), pmemInfo);
+                                pmemChannels[(byte)(pmemInfo >>> 40)].write(buf, pmemInfo & 0xff_ffff_ffffL);
+                                wrappedData.posObj = pmemInfo;
+                                wrappedData.state = 1;
                             }catch (Exception e){
                                 isAllocateSpaceWhileNeed = false;
                                 if ((pmemInfo = getFreePmemInfoV2(dataLen)) > 0) {
                                     buf = wrappedData.getData();
-                                    pmemChannels[(int) (pmemInfo >>> 40)].write(buf, pmemInfo & 0xffffffffffL);
-                                    queueInfo.setDataPosInPmem(meta.getOffset(), pmemInfo);
+                                    pmemChannels[(byte)(pmemInfo >>> 40)].write(buf, pmemInfo & 0xff_ffff_ffffL);
+                                    wrappedData.posObj = pmemInfo;
+                                    wrappedData.state = 1;
                                 }
                             }
+
                         }
                         meta.getCountDownLatch().countDown();
                     }
