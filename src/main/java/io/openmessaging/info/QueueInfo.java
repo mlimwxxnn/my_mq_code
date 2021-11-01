@@ -39,7 +39,7 @@ public class QueueInfo {
                     break;
                 case IN_PMEM:
                     pmemInfo = dataPosInfo.getDataPosInPmem();
-                    freePmemQueues[(byte)(pmemInfo>>>40)].offer(pmemInfo & & 0x0000_ffff_ffff_ffffL); // 回收
+                    freePmemQueues[(byte)(pmemInfo>>>40)].offer(pmemInfo & 0x0000_ffff_ffff_ffffL); // 回收
                     break;
                 default:
                     break;
