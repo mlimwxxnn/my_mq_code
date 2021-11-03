@@ -24,10 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.openmessaging.util.UnsafeUtil.unsafe;
 
-/**
- * 优化点：
- * 1. 内存占用优化（包括：查过的数据，内粗不再继续存储它的索引； hashmap -> arraylist）
- * **/
+
 @SuppressWarnings("ResultOfMethodCallIgnored")
 public class DefaultMessageQueueImpl extends MessageQueue {
 
@@ -58,7 +55,7 @@ public class DefaultMessageQueueImpl extends MessageQueue {
 
     public static final int RAM_SPACE_LEVEL_GAP = 200; // B
     public static final int spaceLevelCount = (17 * 1024 + RAM_SPACE_LEVEL_GAP - 1) / RAM_SPACE_LEVEL_GAP;
-    public static final int MAX_TRY_TIMES_WHILE_ALLOCATE_SPACE = 7;
+    public static final int MAX_TRY_TIMES_WHILE_ALLOCATE_SPACE = 5;
     public static final long PMEM_CACHE_SIZE = 60 * GB;
     public static final int pageSize = (int) (4 * KB);
 //     public static final long PMEM_HEAP_SIZE = 20 * MB;
